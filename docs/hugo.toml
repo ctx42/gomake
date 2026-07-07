@@ -2,9 +2,11 @@ baseURL = "https://ctx42.github.io/gomake/"
 title = "GoMake"
 locale = "en-us"
 summaryLength = 10
-paginate = 10
 enableRobotsTXT = true
 cleanDestinationDir = true
+
+[pagination]
+  pageSize = 10
 
 [params]
   description = "Go-native build automation — write targets as functions, not shell scripts."
