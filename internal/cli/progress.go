@@ -9,7 +9,10 @@ import (
 	"time"
 )
 
-const progressThreshold = 500 * time.Millisecond
+// progressThreshold is how long an action may run before withProgress emits
+// its message. It is a var, not a const, so tests can disable timing-based
+// progress output and stay deterministic regardless of compilation speed.
+var progressThreshold = 500 * time.Millisecond
 
 // withProgress runs fn and prints msg to w if fn takes longer than
 // progressThreshold (500ms).

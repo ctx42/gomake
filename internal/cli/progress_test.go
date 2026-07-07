@@ -25,6 +25,12 @@ func (w *gateWriter) Write(p []byte) (int, error) {
 
 func Test_withProgress(t *testing.T) {
 	// --- Given ---
+	// TestMain disables progress package-wide; re-enable a short threshold so
+	// the progress goroutine fires within this test.
+	prev := progressThreshold
+	progressThreshold = 10 * time.Millisecond
+	t.Cleanup(func() { progressThreshold = prev })
+
 	w := &gateWriter{
 		entered: make(chan struct{}),
 		release: make(chan struct{}),
