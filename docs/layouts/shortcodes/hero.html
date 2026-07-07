@@ -1,0 +1,26 @@
+<section class="mx-auto max-w-5xl px-6 pb-20 pt-24 text-center">
+  {{ with .Get "badge" }}
+  <div class="mb-6 inline-block rounded-full border border-[#00d4aa]/30 bg-[#00d4aa]/10 px-4 py-1 text-xs font-bold uppercase tracking-widest text-[#00d4aa]">
+    {{ . }}
+  </div>
+  {{ end }}
+
+  <h1 class="mb-5 bg-gradient-to-br from-[#e2e4f0] to-[#8b8fa8] bg-clip-text text-5xl font-extrabold leading-tight tracking-tight text-transparent sm:text-6xl">
+    {{ .Get "title" | markdownify }}
+  </h1>
+
+  <p class="mx-auto mb-10 max-w-xl text-lg text-[#8b8fa8]">
+    {{ .Get "tagline" }}
+  </p>
+
+  <div class="flex flex-wrap justify-center gap-4">
+    <a href="{{ .Get "cta1_url" | strings.TrimPrefix "/" | relURL }}"
+       class="inline-flex items-center gap-2 rounded-lg bg-[#00d4aa] px-7 py-3 text-sm font-semibold text-[#0f1117] no-underline transition hover:-translate-y-px hover:bg-[#00a882]">
+      {{ .Get "cta1_text" }}
+    </a>
+    <a href="{{ .Get "cta2_url" | strings.TrimPrefix "/" | relURL }}"
+       class="inline-flex items-center gap-2 rounded-lg border border-[#2a2d3e] px-7 py-3 text-sm font-semibold text-[#e2e4f0] no-underline transition hover:-translate-y-px hover:border-[#8b8fa8] hover:bg-[#1a1d27]">
+      {{ .Get "cta2_text" }}
+    </a>
+  </div>
+</section>

@@ -1,0 +1,7 @@
+<div class="group rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-7 transition hover:-translate-y-1 hover:border-[#00d4aa]">
+  <div class="mb-3 text-2xl">{{ .Get "icon" }}</div>
+  <h3 class="mb-2 text-sm font-semibold">{{ .Get "title" }}</h3>
+  <div class="text-sm text-[#8b8fa8] leading-relaxed [&_p]:m-0 [&_code]:text-[#00d4aa] [&_code]:text-xs">
+    {{ .Inner | markdownify }}
+  </div>
+</div>

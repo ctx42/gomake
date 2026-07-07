@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or discussion
+    url: https://github.com/ctx42/gomake/discussions
+    about: Ask questions and discuss usage in GitHub Discussions.
+  - name: Documentation
+    url: https://ctx42.github.io/gomake/
+    about: Read the GoMake documentation before opening an issue.

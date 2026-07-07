@@ -1,0 +1,26 @@
+---
+targets := make([]*Target, 0, 1)
+var tgt *Target
+
+var _vmainNS0 NS0
+tgt = &Target{
+	ImpSpec:     "github.com/ctx42/gomake/testdata/projects/showcase_targets/project",
+	ImpPath:     "{{ .prj_root }}/testdata/projects/showcase_targets/project",
+	PkgName:     "main",
+	PkgNS:       "",
+	Breadcrumbs: []string{"__root__", "NS0"},
+	Receiver:    "NS0",
+	FuncName:    "Hello",
+	Name:        "ns0:hello",
+	VarName:     "_vmainNS0",
+	CodeRef:     "_vmainNS0.Hello",
+	DefRef:      "NS0.Hello",
+	Default:     false,
+	Synopsis:    "",
+	Doc:         "",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return _vmainNS0.Hello(ctx, rng)
+	},
+}
+targets = append(targets, tgt)

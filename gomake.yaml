@@ -1,0 +1,67 @@
+# gomake.yaml — GoMake configuration
+#
+# GoMake reads an optional YAML file named "gomake.yaml" that holds two kinds
+# of configuration:
+#
+#   - settings: configures GoMake itself (execution timeout, temp dir).
+#   - targets:  per-target configuration a target reads at run time.
+#
+# There are two levels, both using this same file name:
+#
+#   User    $XDG_CONFIG_HOME/gomake/gomake.yaml   (or $HOME/.config/gomake/…)
+#   Project <source-scan-dir>/gomake.yaml         (committed with the repo)
+#
+# The source-scan directory is where GoMake looks for makefile*.go files: the
+# current directory by default, or whatever "--src" selects.
+#
+# Both files are optional. When more than one source sets the same value, the
+# highest-priority source wins:
+#
+#   command-line option  >  environment variable  >  project file  >  user file
+#
+# A target's config block is replaced whole by the project file, not merged.
+# Inside a module, a user-level entry for one of that module's own targets is
+# ignored — configure local targets in the project file.
+#
+# This file (only "version" active) is a copy-paste template; uncomment the
+# sections you need. Note: "gomake.yaml" is unrelated to "targets.yaml", which
+# declares install-time target imports.
+
+# Schema version. Required, integer. GoMake aborts on a version newer than the
+# running binary understands. Current binaries support version 1.
+version: 1
+
+# settings — configuration for GoMake itself. Omit a key to leave it unset.
+#
+# settings:
+#   # Default per-target execution timeout, as a Go duration string
+#   # (e.g. "500ms", "30s", "5m"). Overridden by the --timeout option.
+#   timeout: 30s
+#
+#   # Default temporary directory. Must be an absolute path. Overridden by the
+#   # environment; falls back to <os-temp-dir>/gomake when unset.
+#   tmp: /abs/path/to/tmp
+
+# targets — per-target configuration. Each block is keyed by the target's
+# canonical origin:
+#
+#   <import-path>#<name>
+#
+# <name> is the Go identifier in the target's own package: a plain function
+# contributes its function name (Deploy); a namespaced method contributes
+# <Receiver>.<Method> (Project.Setup). The key follows the target's home
+# package, so renaming an import with //gomake:import does not change it.
+#
+# Run "gomake --check-config" to print the exact key for every discovered
+# target. A block's contents are opaque to GoMake and never validated — the
+# target decodes its own block with gomake.TargetConfig.
+#
+# targets:
+#   # A plain function target.
+#   github.com/acme/tasks#Deploy:
+#     region: eu
+#     hosts: [web-1, web-2]
+#
+#   # A namespaced method target.
+#   example.com/proj#Project.Setup:
+#     dirs: [cmd, internal]

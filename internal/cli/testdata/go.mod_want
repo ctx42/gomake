@@ -1,0 +1,12 @@
+module makefile
+
+go 1.20
+
+require (
+	example.com/user/repo v0.0.0
+	github.com/ctx42/dotenv v0.2.0
+	github.com/ctx42/testing v0.49.0
+	github.com/ctx42/xflag v0.10.0
+)
+
+replace example.com/user/repo v0.0.0 => /module/path

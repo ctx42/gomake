@@ -1,0 +1,14 @@
+<section class="px-6 py-20">
+  <div class="mx-auto max-w-5xl">
+    {{ with .Get "label" }}
+    <p class="mb-3 text-xs font-bold uppercase tracking-widest text-[#00d4aa]">{{ . }}</p>
+    {{ end }}
+    <h2 class="mb-4 text-3xl font-bold tracking-tight">{{ .Get "title" }}</h2>
+    {{ with .Get "sub" }}
+    <p class="mb-14 max-w-xl text-[#8b8fa8]">{{ . }}</p>
+    {{ end }}
+    <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {{ .Inner }}
+    </div>
+  </div>
+</section>

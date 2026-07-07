@@ -1,0 +1,354 @@
+// SPDX-FileCopyrightText: (c) 2026 Rafal Zajac
+// SPDX-License-Identifier: MIT
+
+package parser
+
+import (
+	"bytes"
+	"fmt"
+	"go/doc"
+	"sort"
+	"strings"
+
+	"github.com/ctx42/ring/pkg/ring"
+
+	"github.com/ctx42/gomake/internal/mkf"
+)
+
+// TgsMapCB is callback signature for [Targets.Map] method.
+type TgsMapCB func(*Targets, *mkf.Target)
+
+// Targets represent a collection of unique gomake targets.
+type Targets struct {
+	unique map[string]struct{} // Map of target names (for uniqueness).
+	list   []*mkf.Target       // List of unique targets (sorted).
+	sorted bool                // True when list is sorted.
+}
+
+// NewTargets returns new instance of Targets.
+func NewTargets() *Targets {
+	return &Targets{
+		unique: make(map[string]struct{}, 10),
+		list:   make([]*mkf.Target, 0, 10),
+	}
+}
+
+// TargetsFromList uses [NewTargets] to create a new instance and adds the
+// targets to it. If there are duplicates, it returns an [ErrDupTarget] error.
+func TargetsFromList(ts ...*mkf.Target) (*Targets, error) {
+	tgs := NewTargets()
+	if err := tgs.Add(ts...); err != nil {
+		return nil, err
+	}
+	return tgs, nil
+}
+
+// TargetsFromSpecs returns a list of targets in given import specs.
+// For targets from each spec it applies provided call back function(s) and
+// then merges them into one list of targets.
+func TargetsFromSpecs(
+	rng *ring.Ring,
+	specs []string,
+	fns ...TgsMapCB,
+) (*Targets, error) {
+
+	all := NewTargets()
+	for _, spec := range specs {
+		pkg, err := NewPackage(rng, spec, withPkgSpec)
+		if err != nil {
+			return nil, err
+		}
+		pmf, err := MakefileFromPackage(rng, pkg)
+		if err != nil {
+			return nil, err
+		}
+		pmf.Targets.Map(fns...)
+		if err = all.Add(pmf.Targets.List()...); err != nil {
+			return nil, err
+		}
+	}
+	return all, nil
+}
+
+// Len returns number of targets in the collection.
+func (tgs *Targets) Len() int {
+	return len(tgs.list)
+}
+
+// Add adds new target(s) to the collection. Returns [ErrDupTarget] when target
+// is already in the collection.
+func (tgs *Targets) Add(ts ...*mkf.Target) error {
+	for _, tgt := range ts {
+		if got := tgs.Get(tgt.Name); got != nil {
+			format := "%w: %s, %s"
+			return fmt.Errorf(format, ErrDupTarget, got.DefRef, tgt.DefRef)
+		}
+		tgs.unique[tgt.Name] = struct{}{}
+		tgs.list = append(tgs.list, tgt)
+		tgs.sorted = false
+	}
+	return nil
+}
+
+// Has returns true if target name exists in the collection.
+func (tgs *Targets) Has(name string) bool {
+	_, ok := tgs.unique[name]
+	return ok
+}
+
+// addFunc adds function(s) (targets) belonging to given package to the
+// collection. If a function doesn't have compatible signature it will be
+// skipped without error. Method returns [ErrDupTarget] when duplicate target
+// is detected. Targets are considered a duplicate if their Name fields are
+// the same.
+func (tgs *Targets) addFunc(pkg *Package, fns ...*doc.Func) error {
+	for _, fn := range fns {
+		if tgt, err := newTarget(pkg, fn); err == nil {
+			if err = tgs.Add(tgt); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// addType adds targets (methods) from the given type (namespace) in given
+// package. If the type is not namespace it's skipped, the same applies to
+// the methods of the type. Method returns [ErrDupTarget] when duplicate target
+// is detected. Targets are considered a duplicate if their Name fields are
+// the same.
+func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
+	// Map of incomplete namespace paths (types) where keys are missing
+	// receiver names (types). Incomplete type is a type which namespace path
+	// does not go all the way from rootNS to the type (namespace) itself.
+	inc := make(map[string][]*doc.Type)
+	// Matching namespace paths for above types.
+	pth := make(map[string][][]string)
+
+	for _, typ := range tps {
+		nsp := breadcrumbs(typ)
+		if len(nsp) == 0 {
+			continue
+		}
+		if nsp[0] == partCrumb {
+			rel := nsp[1] // The namespace name this namespace extends.
+			inc[rel] = append(inc[rel], typ)
+			pth[rel] = append(pth[rel], nsp[2:])
+			continue
+		}
+		if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
+			return err
+		}
+	}
+
+	prev := len(inc) // Number of incomplete types.
+	for len(inc) > 0 {
+		for rcv, tps := range inc {
+			tgt := tgs.withReceiver(rcv)
+			if tgt == nil {
+				continue
+			}
+			for i, typ := range tps {
+				nsp := append([]string{}, tgt.Breadcrumbs...)
+				nsp = append(nsp, pth[rcv][i]...)
+				if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
+					return err
+				}
+			}
+			delete(inc, rcv)
+		}
+		cur := len(inc)
+		if prev == cur {
+			break // If we did not resolve any types exit.
+		}
+		prev = cur
+	}
+	return nil
+}
+
+// addMethods adds methods (targets) with given namespace path. Returns
+// [ErrDupTarget] when there are duplicated targets on the list.
+func (tgs *Targets) addMethods(
+	pkg *Package,
+	fns []*doc.Func,
+	nsp ...string,
+) error {
+
+	for _, met := range fns {
+		if tgt, err := newTarget(pkg, met, nsp...); err == nil {
+			if err = tgs.Add(tgt); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// withReceiver returns the first target information instance with given
+// [mkf.Target.Receiver].
+func (tgs *Targets) withReceiver(name string) *mkf.Target {
+	if name == "" {
+		return nil
+	}
+	for _, tgt := range tgs.list {
+		if name == tgt.Receiver {
+			return tgt
+		}
+	}
+	return nil
+}
+
+// Sort sorts the internal list of targets.
+func (tgs *Targets) Sort() {
+	list := tgs.list
+	sort.Slice(list, func(i, j int) bool {
+		return list[i].Name < list[j].Name
+	})
+	tgs.sorted = true
+}
+
+// Get returns target by its name or nil if it's not in the collection.
+func (tgs *Targets) Get(tgtName string) *mkf.Target {
+	if _, ok := tgs.unique[tgtName]; ok {
+		for _, tgt := range tgs.list {
+			if tgt.Name == tgtName {
+				return tgt
+			}
+		}
+	}
+	return nil
+}
+
+// List returns alphabetically sorted list of targets by their names.
+func (tgs *Targets) List() []*mkf.Target {
+	if !tgs.sorted {
+		tgs.Sort()
+	}
+	list := make([]*mkf.Target, len(tgs.list))
+	copy(list, tgs.list)
+	return list
+}
+
+// Names returns the list of target names in the collection.
+func (tgs *Targets) Names() []string {
+	list := tgs.List()
+	names := make([]string, len(list))
+	for i, tgt := range list {
+		names[i] = tgt.Name
+	}
+	return names
+}
+
+// MarkDefault marks target as default based on target's default code reference
+// (DefRef) and returns the target's name. Returns empty string if DefRef does
+// not match any target in the collection.
+//
+// The defaultness of targets currently marked as default will be cleared.
+func (tgs *Targets) MarkDefault(defRef string) string {
+	def := ""
+	for _, tgt := range tgs.list {
+		tgt.Default = false
+		if tgt.DefRef == defRef {
+			def = tgt.Name
+			tgt.Default = true
+		}
+	}
+	return def
+}
+
+// BuiltInCB is callback function for [Targets.Map] method which marks given
+// target as built-in.
+func BuiltInCB(tgs *Targets, tgt *mkf.Target) {
+	delete(tgs.unique, tgt.Name)
+	tgt.Name = ":" + tgt.Name
+	tgs.unique[tgt.Name] = struct{}{}
+}
+
+// Map runs function(s) on all the targets.
+func (tgs *Targets) Map(fns ...TgsMapCB) {
+	for _, fn := range fns {
+		for _, tgt := range tgs.list {
+			fn(tgs, tgt)
+		}
+	}
+}
+
+// GoImports returns unique imports tagged with a `gomake:import` comment.
+func (tgs *Targets) GoImports() string {
+	var lines []string
+	used := make(map[string]struct{}, 10)
+	for _, tgt := range tgs.List() {
+		// There is no way to import main package so we skip it.
+		if tgt.PkgName == MainName {
+			continue
+		}
+		if _, ok := used[tgt.ImpSpec]; ok {
+			continue
+		}
+		if len(lines) == 0 {
+			lines = append(lines, "")
+		}
+		code := fmt.Sprintf("%q", tgt.ImpSpec)
+		lines = append(lines, code)
+		used[tgt.ImpSpec] = struct{}{}
+	}
+
+	if len(lines) > 0 {
+		sort.Strings(lines)
+		return strings.Join(lines, "\n") + "\n"
+	}
+	return ""
+}
+
+// GoCode returns Go source code defining the targets. If the qt is true the
+// package qualifier is added to the Target references ("mkf.Target" vs
+// "Target").
+func (tgs *Targets) GoCode(qt bool) string {
+	corePkg := ""
+	if qt {
+		corePkg = "mkf."
+	}
+	buf := &bytes.Buffer{}
+	var code string
+	if n := len(tgs.list); n > 0 {
+		code = fmt.Sprintf("targets := make([]*%sTarget, 0, %d)", corePkg, n)
+	} else {
+		code = fmt.Sprintf("targets := make([]*%sTarget, 0)", corePkg)
+	}
+	buf.WriteString(code)
+
+	vars := make(map[string]struct{}, 10)
+	for i, tgt := range tgs.List() {
+		if i == 0 {
+			buf.WriteString("\n")
+			buf.WriteString("var tgt *")
+			buf.WriteString(corePkg)
+			buf.WriteString("Target\n")
+			buf.WriteString("\n")
+		}
+		if tgt.VarName != "" {
+			// Define variable if it's not defined.
+			if _, ok := vars[tgt.VarName]; !ok {
+				var pkg string
+				// When target comes from imported package we
+				// need to add the package name qualifier.
+				if tgt.PkgName != MainName {
+					pkg = tgt.PkgName + "."
+				}
+				format := "var %s %s%s\n"
+				code = fmt.Sprintf(format, tgt.VarName, pkg, tgt.Receiver)
+				buf.WriteString(code)
+				vars[tgt.VarName] = struct{}{}
+			}
+		}
+		code = fmt.Sprintf("tgt = &%s\n", tgt.GoCode(qt))
+		code += "targets = append(targets, tgt)\n\n"
+		buf.WriteString(code)
+	}
+
+	ret := buf.String()
+	if len(tgs.list) > 0 {
+		ret = ret[:len(ret)-1]
+	}
+	return ret
+}

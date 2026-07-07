@@ -1,0 +1,25 @@
+---
+targets := make([]*Target, 0, 1)
+var tgt *Target
+
+tgt = &Target{
+	ImpSpec:     "github.com/ctx42/gomake/testdata/imports/pkg1",
+	ImpPath:     "{{ .prj_root }}/testdata/imports/pkg1",
+	PkgName:     "pkg1",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "Pkg1",
+	Name:        "pkg1",
+	VarName:     "",
+	CodeRef:     "pkg1.Pkg1",
+	DefRef:      "pkg1.Pkg1",
+	Default:     false,
+	Synopsis:    "",
+	Doc:         "",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return pkg1.Pkg1(ctx, rng)
+	},
+}
+targets = append(targets, tgt)

@@ -1,0 +1,16 @@
+{
+  "colors": {
+    "default": {
+      "theme_color": "#00d4aa",
+      "primary_bg": "#0f1117",
+      "secondary_bg": "#1a1d27",
+      "body": "#e2e4f0",
+      "border": "#2a2d3e",
+      "placeholder": "#8b8fa8"
+    }
+  },
+  "fonts": {
+    "font_family": "Inter:wght@400;500;600;700;800",
+    "font_mono": "JetBrains+Mono:wght@400;600"
+  }
+}

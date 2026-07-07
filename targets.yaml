@@ -1,0 +1,45 @@
+# targets.yaml — GoMake built-in target imports
+#
+# This file compiles external Go packages permanently into the gomake binary
+# at install time. They become built-in targets — available in every project
+# that uses this binary, with no makefile.go required.
+#
+# Location: gomake repo root (committed to version control).
+# Format:   YAML, parsed by github.com/goccy/go-yaml.
+#
+# After editing this file, re-run the install to rebuild the binary:
+#
+#   go run ./cmd/install
+#
+# To regenerate built-in target code without a full install:
+#
+#   go generate ./internal/builtin/
+
+imports:
+  # Minimal import — targets registered in the root namespace.
+  # Exposes: gomake docker:build, gomake docker:push, …
+  #
+  # - import: example.com/myorg/targets/docker
+
+  # Import with a namespace — all targets are prefixed with "release:".
+  # Exposes: gomake release:tag, gomake release:publish, …
+  #
+  # - import: example.com/myorg/targets/release
+  #   namespace: release
+
+  # Import with config — the config map is injected into ring.Ring metadata
+  # at runtime under the key "db" (the namespace). Targets read it with:
+  #
+  #   raw := rng.MetaGet("db")
+  #
+  # - import: example.com/myorg/targets/db
+  #   namespace: db
+  #   config:
+  #     host: db.internal
+  #     port: 5432
+  #     tls:  true
+
+  # Version-pinned import — go get fetches exactly this version at install.
+  #
+  # - import: example.com/myorg/targets/infra@v1.3.0
+  #   namespace: infra

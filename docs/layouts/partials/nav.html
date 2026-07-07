@@ -1,0 +1,18 @@
+<nav class="sticky top-0 z-50 border-b border-[var(--color-border)] bg-[#0f1117]/90 backdrop-blur-md">
+  <div class="mx-auto flex h-[60px] max-w-5xl items-center gap-8 px-6">
+    <a href="{{ .Site.Home.RelPermalink }}"
+       class="font-mono text-[1.1rem] font-bold text-[var(--color-accent)] no-underline tracking-tight">
+      <span class="text-[var(--color-muted)]">$</span> gomake
+    </a>
+    <ul class="ml-auto flex list-none gap-6 m-0 p-0">
+      {{ range .Site.Menus.main }}
+      <li class="m-0">
+        <a href="{{ .URL }}"
+           class="text-sm font-medium text-[var(--color-muted)] no-underline transition-colors hover:text-[var(--color-text)]">
+          {{ .Name }}
+        </a>
+      </li>
+      {{ end }}
+    </ul>
+  </div>
+</nav>

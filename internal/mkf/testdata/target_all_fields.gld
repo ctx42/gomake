@@ -1,0 +1,22 @@
+Target with all the fields set.
+---
+Target{
+	ImpSpec:     "ImpSpec",
+	ImpPath:     "ImpPath",
+	PkgName:     "PkgName",
+	PkgNS:       "Namespace",
+	Breadcrumbs: []string{"a", "b", "c"},
+	Receiver:    "Receiver",
+	FuncName:    "FuncName",
+	Name:        "Name",
+	VarName:     "VarName",
+	CodeRef:     "CodeRef",
+	DefRef:      "DefRef",
+	Default:     true,
+	Synopsis:    "Synopsis",
+	Doc:         "Doc",
+	Hidden:      true,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return CodeRef(ctx, rng)
+	},
+}

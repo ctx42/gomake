@@ -1,0 +1,48 @@
+---
+targets := make([]*Target, 0, 2)
+var tgt *Target
+
+var _vpkg4NS pkg4.NS
+tgt = &Target{
+	ImpSpec:     "github.com/ctx42/gomake/testdata/imports/pkg4",
+	ImpPath:     "{{ .prj_root }}/testdata/imports/pkg4",
+	PkgName:     "pkg4",
+	PkgNS:       "",
+	Breadcrumbs: []string{"__root__", "NS"},
+	Receiver:    "NS",
+	FuncName:    "M0",
+	Name:        "ns:m0",
+	VarName:     "_vpkg4NS",
+	CodeRef:     "_vpkg4NS.M0",
+	DefRef:      "pkg4.NS.M0",
+	Default:     false,
+	Synopsis:    "is a method in namespace NS",
+	Doc:         "is a method in namespace NS. The rest of the doc string.",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return _vpkg4NS.M0(ctx, rng)
+	},
+}
+targets = append(targets, tgt)
+
+tgt = &Target{
+	ImpSpec:     "github.com/ctx42/gomake/testdata/imports/pkg4",
+	ImpPath:     "{{ .prj_root }}/testdata/imports/pkg4",
+	PkgName:     "pkg4",
+	PkgNS:       "",
+	Breadcrumbs: []string{"__root__", "NS"},
+	Receiver:    "NS",
+	FuncName:    "M1",
+	Name:        "ns:m1",
+	VarName:     "_vpkg4NS",
+	CodeRef:     "_vpkg4NS.M1",
+	DefRef:      "pkg4.NS.M1",
+	Default:     false,
+	Synopsis:    "is a method in namespace NS",
+	Doc:         "is a method in namespace NS. The rest of the doc string.",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return _vpkg4NS.M1(ctx, rng)
+	},
+}
+targets = append(targets, tgt)

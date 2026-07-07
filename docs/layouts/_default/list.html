@@ -1,0 +1,21 @@
+{{ define "main" }}
+<div class="mx-auto max-w-3xl px-6 py-16">
+  <h1 class="mb-8 text-3xl font-bold tracking-tight">{{ .Title }}</h1>
+  <article class="prose prose-invert max-w-none">
+    {{ .Content }}
+  </article>
+  <ul class="mt-8 list-none space-y-3 p-0">
+    {{ range .Pages.ByWeight }}
+    <li class="m-0">
+      <a href="{{ .Permalink }}"
+         class="font-semibold text-[var(--color-link)] no-underline hover:underline">
+        {{ .Title }}
+      </a>
+      {{ with .Description }}
+        <span class="text-[var(--color-muted)]"> — {{ . }}</span>
+      {{ end }}
+    </li>
+    {{ end }}
+  </ul>
+</div>
+{{ end }}

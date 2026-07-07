@@ -1,0 +1,8 @@
+<div{{ if eq (.Get "span") "2" }} class="lg:col-span-2"{{ end }}>
+  {{ with .Get "title" }}
+  <p class="mb-3 text-xs font-semibold uppercase tracking-widest text-[#8b8fa8]">{{ . }}</p>
+  {{ end }}
+  <div class="overflow-hidden rounded-xl border border-[#2a2d3e] bg-[#12141e] [&_pre]:m-0 [&_pre]:rounded-none [&_pre]:border-0 [&_pre]:bg-transparent [&_.chroma]:bg-transparent">
+    {{ .Inner | markdownify }}
+  </div>
+</div>

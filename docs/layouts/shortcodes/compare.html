@@ -1,0 +1,22 @@
+<section class="px-6 py-20">
+  <div class="mx-auto max-w-5xl">
+    {{ with .Get "label" }}
+    <p class="mb-3 text-xs font-bold uppercase tracking-widest text-[#00d4aa]">{{ . }}</p>
+    {{ end }}
+    <h2 class="mb-4 text-3xl font-bold tracking-tight">{{ .Get "title" }}</h2>
+    {{ with .Get "sub" }}
+    <p class="mb-10 max-w-xl text-[#8b8fa8]">{{ . }}</p>
+    {{ end }}
+    <div class="overflow-x-auto rounded-xl border border-[#2a2d3e]
+                [&_table]:w-full [&_table]:text-sm [&_table]:border-collapse
+                [&_thead_tr]:border-b [&_thead_tr]:border-[#2a2d3e] [&_thead_tr]:bg-[#1a1d27]
+                [&_th]:px-5 [&_th]:py-3 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-wider [&_th]:text-[#8b8fa8]
+                [&_th:nth-child(2)]:text-[#00d4aa]
+                [&_td]:px-5 [&_td]:py-3 [&_td]:border-b [&_td]:border-[#2a2d3e] [&_td]:text-[#8b8fa8]
+                [&_td:nth-child(2)]:font-medium [&_td:nth-child(2)]:text-[#00d4aa]
+                [&_td_code]:text-xs [&_th_code]:text-xs
+                [&_tr:hover_td]:bg-[#1a1d27]">
+      {{ .Inner | markdownify }}
+    </div>
+  </div>
+</section>

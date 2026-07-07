@@ -1,0 +1,20 @@
+---
+gomake [options] [target] [args]
+
+The makefile is a make-like target runner.
+
+options:
+      --bin             path to put the compiled makefile in
+      --check-config    validate gomake.yaml and list target config keys
+      --complete        install shell completion
+  -h, --help            show this help or description of the target
+      --list            show available targets
+      --src             path where to look for targets
+      --timeout         target execution timeout (default: 0)
+      --tmp             absolute path temporary directory
+      --version         print version
+      --wd              working directory for compiled makefile
+
+targets:
+  :panic-string
+  :print           is a test target with help message

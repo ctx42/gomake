@@ -1,0 +1,11 @@
+{{ define "main" }}
+<div class="mx-auto max-w-3xl px-6 py-16">
+  <h1 class="mb-2 text-3xl font-bold tracking-tight">{{ .Title }}</h1>
+  {{ with .Description }}
+  <p class="mb-10 text-lg text-[var(--color-muted)]">{{ . }}</p>
+  {{ end }}
+  <article class="prose prose-invert max-w-none">
+    {{ .Content }}
+  </article>
+</div>
+{{ end }}

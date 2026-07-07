@@ -1,0 +1,7 @@
+node_modules/
+public/
+resources/
+.hugo_build.lock
+
+# The root .gitignore excludes *.html globally; un-exclude layout templates.
+!layouts/**/*.html

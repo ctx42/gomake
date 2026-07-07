@@ -1,0 +1,22 @@
+Target with quotation characters in the document strings.
+---
+Target{
+	ImpSpec:     "",
+	ImpPath:     "",
+	PkgName:     "",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "",
+	Name:        "Name",
+	VarName:     "",
+	CodeRef:     "CodeRef",
+	DefRef:      "",
+	Default:     false,
+	Synopsis:    "Synopsis for \"a.go\"",
+	Doc:         "Doc for \"a.go\"",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return CodeRef(ctx, rng)
+	},
+}

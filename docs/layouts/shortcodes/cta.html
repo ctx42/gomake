@@ -1,0 +1,16 @@
+<section class="px-6 pb-32 pt-10 text-center">
+  <div class="mx-auto max-w-xl">
+    <h2 class="mb-4 text-3xl font-bold tracking-tight">{{ .Get "title" }}</h2>
+    <p class="mb-10 text-[#8b8fa8]">{{ .Get "sub" }}</p>
+    <div class="flex flex-wrap justify-center gap-4">
+      <a href="{{ .Get "btn1_url" | strings.TrimPrefix "/" | relURL }}"
+         class="inline-flex items-center gap-2 rounded-lg bg-[#00d4aa] px-7 py-3 text-sm font-semibold text-[#0f1117] no-underline transition hover:-translate-y-px hover:bg-[#00a882]">
+        {{ .Get "btn1_text" }}
+      </a>
+      <a href="{{ .Get "btn2_url" | strings.TrimPrefix "/" | relURL }}"
+         class="inline-flex items-center gap-2 rounded-lg border border-[#2a2d3e] px-7 py-3 text-sm font-semibold text-[#e2e4f0] no-underline transition hover:-translate-y-px hover:border-[#8b8fa8] hover:bg-[#1a1d27]">
+        {{ .Get "btn2_text" }}
+      </a>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,8 @@
+module github.com/ctx42/gomake
+
+go 1.20
+
+require (
+	github.com/ctx42/dotenv v0.2.0
+	github.com/ctx42/testing v0.49.0
+)

@@ -1,0 +1,14 @@
+---
+makefile [options] [target] [args]
+
+The makefile is a make-like target runner.
+
+options:
+  -h, --help       show this help or target documentation
+      --list       show available targets
+      --timeout    target execution timeout (default: 0)
+      --version    print version
+      --wd         working directory for a target
+
+targets:
+  no targets

@@ -1,0 +1,38 @@
+baseURL = "https://ctx42.github.io/gomake/"
+title = "GoMake"
+locale = "en-us"
+summaryLength = 10
+paginate = 10
+enableRobotsTXT = true
+cleanDestinationDir = true
+
+[params]
+  description = "Go-native build automation — write targets as functions, not shell scripts."
+  author = "Rafal Zajac"
+  repoURL = "https://github.com/ctx42/gomake"
+  tagline = "Build automation in Go, for Go."
+  logo = "GoMake"
+  logo_mono = "$ gomake"
+
+[markup.highlight]
+  style = "dracula"
+  lineNos = false
+  codeFences = true
+
+[markup.goldmark.renderer]
+  unsafe = true
+
+[[menus.main]]
+  name = "Docs"
+  url = "/docs/"
+  weight = 10
+
+[[menus.main]]
+  name = "Changelog"
+  url = "/changelog/"
+  weight = 20
+
+[[menus.main]]
+  name = "Source"
+  url = "https://github.com/ctx42/gomake"
+  weight = 30

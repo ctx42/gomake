@@ -1,0 +1,47 @@
+---
+targets := make([]*Target, 0, 2)
+var tgt *Target
+
+tgt = &Target{
+	ImpSpec:     "git.com/prj/pkg1",
+	ImpPath:     "",
+	PkgName:     "pkg1",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "",
+	Name:        "a",
+	VarName:     "",
+	CodeRef:     "pkg1.Target",
+	DefRef:      "",
+	Default:     false,
+	Synopsis:    "",
+	Doc:         "",
+	Hidden:      true,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return pkg1.Target(ctx, rng)
+	},
+}
+targets = append(targets, tgt)
+
+tgt = &Target{
+	ImpSpec:     "git.com/prj/pkg2",
+	ImpPath:     "",
+	PkgName:     "pkg2",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "",
+	Name:        "b",
+	VarName:     "",
+	CodeRef:     "pkg2.Target",
+	DefRef:      "",
+	Default:     false,
+	Synopsis:    "",
+	Doc:         "",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return pkg2.Target(ctx, rng)
+	},
+}
+targets = append(targets, tgt)

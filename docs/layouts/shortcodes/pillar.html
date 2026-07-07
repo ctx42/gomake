@@ -1,0 +1,15 @@
+<div class="flex flex-col rounded-xl border border-[#2a2d3e] bg-[#1a1d27] p-7 transition hover:-translate-y-1 hover:border-[#00d4aa]">
+  <div class="mb-4 flex h-9 w-9 items-center justify-center rounded-lg bg-[#00d4aa]/10 text-sm font-bold text-[#00d4aa]">
+    {{ .Get "num" }}
+  </div>
+  <h3 class="mb-2 text-base font-semibold">{{ .Get "title" }}</h3>
+  <div class="text-sm text-[#8b8fa8] leading-relaxed [&_p]:m-0 [&_code]:text-[#00d4aa] [&_code]:text-xs">
+    {{ .Inner | markdownify }}
+  </div>
+  {{ with .Get "link_url" }}
+  <a href="{{ . | strings.TrimPrefix "/" | relURL }}"
+     class="mt-4 inline-block text-sm font-semibold text-[#00d4aa] no-underline hover:underline">
+    {{ $.Get "link_text" }} →
+  </a>
+  {{ end }}
+</div>

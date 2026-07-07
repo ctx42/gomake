@@ -1,0 +1,21 @@
+---
+:panic-string
+:print                     is a test target with help message
+
+basic                      prints its name to stdout
+basic-args
+basic-env
+kebab-case:hello-world
+long
+ns-def
+ns-def:hello
+ns-def:world
+ns0:hello
+ns0:ns1:hello
+ns0:ns1:ns2:hello-hello
+ns0:ns1:ns2:say-my-name
+ns0:ns3:hello
+ns0:ns3:ns4:hello
+panic-string
+print-args
+say-hello

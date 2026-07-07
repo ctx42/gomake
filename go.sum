@@ -1,0 +1,12 @@
+github.com/ctx42/ring v0.7.1 h1:qN6SR9OrXq0Yj8Sf1ilEY/m6kHFbyRJb6VmlO0bQe9E=
+github.com/ctx42/ring v0.7.1/go.mod h1:ko72cbRboriU8jTgDUEZHacrfwPKPjy8edtJ2doccHQ=
+github.com/ctx42/testing v0.55.0 h1:xzYg+zW6xx2BDemveLhIztU6BdY9O6KCCR1FeYEt+mk=
+github.com/ctx42/testing v0.55.0/go.mod h1:wRBqNRtlxDZnXIjgCX3zr05Acl6JC1D6cSBN2IpaMIs=
+github.com/ctx42/testkit v0.7.0 h1:vdoedBK7j1FDezYOxNw0j0z0Lm/I9bGocMWGXZqQHpk=
+github.com/ctx42/testkit v0.7.0/go.mod h1:TuyXl4VM5PLj9VKMFQxVFyJH84fotgVMuxdwXDSEo7M=
+github.com/ctx42/xdef v0.1.0 h1:NILTQhyp7G/ALyH3qHvK0MLCQOaM0FWrUe08oHGsDcU=
+github.com/ctx42/xdef v0.1.0/go.mod h1:KY52keTViC/5i/nI25eRNBtYifhRqqyLs7gvIVbbaZ8=
+github.com/ctx42/xflag v0.10.0 h1:QaaOz0JRkJQtumPWnbMQ04dYDURgWKgsIco53Dder5M=
+github.com/ctx42/xflag v0.10.0/go.mod h1:8VeKeOfwpoA2uPLPnbYPxOatFpBvfmuHz7O7Wii2nGc=
+github.com/goccy/go-yaml v1.19.2 h1:PmFC1S6h8ljIz6gMRBopkjP1TVT7xuwrButHID66PoM=
+github.com/goccy/go-yaml v1.19.2/go.mod h1:XBurs7gK8ATbW4ZPGKgcbrY1Br56PdM69F7LkFRi1kA=

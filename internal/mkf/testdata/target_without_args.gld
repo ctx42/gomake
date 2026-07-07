@@ -1,0 +1,22 @@
+Target without arguments.
+---
+Target{
+	ImpSpec:     "",
+	ImpPath:     "",
+	PkgName:     "",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "",
+	Name:        "Name",
+	VarName:     "",
+	CodeRef:     "CodeRef",
+	DefRef:      "",
+	Default:     false,
+	Synopsis:    "",
+	Doc:         "",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return CodeRef(ctx, rng)
+	},
+}

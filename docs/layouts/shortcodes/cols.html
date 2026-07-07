@@ -1,0 +1,22 @@
+<section class="border-y border-[#2a2d3e] bg-[#1a1d27] px-6 py-20">
+  <div class="mx-auto max-w-5xl">
+    {{ with .Get "label" }}
+    <p class="mb-3 text-xs font-bold uppercase tracking-widest text-[#00d4aa]">{{ . }}</p>
+    {{ end }}
+    <h2 class="mb-4 text-3xl font-bold tracking-tight">{{ .Get "title" }}</h2>
+    {{ with .Get "sub" }}
+    <p class="mb-14 text-[#8b8fa8]">{{ . | markdownify }}</p>
+    {{ end }}
+    <div class="grid grid-cols-1 gap-8 lg:grid-cols-2">
+      {{ .Inner }}
+    </div>
+    {{ with .Get "link_url" }}
+    <div class="mt-8 text-center">
+      <a href="{{ . | strings.TrimPrefix "/" | relURL }}"
+         class="inline-flex items-center gap-2 rounded-lg border border-[#2a2d3e] px-6 py-3 text-sm font-semibold text-[#e2e4f0] no-underline transition hover:border-[#8b8fa8] hover:bg-[#0f1117]">
+        {{ $.Get "link_text" }}
+      </a>
+    </div>
+    {{ end }}
+  </div>
+</section>

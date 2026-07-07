@@ -1,0 +1,25 @@
+---
+targets := make([]*mkf.Target, 0, 1)
+var tgt *mkf.Target
+
+tgt = &mkf.Target{
+	ImpSpec:     "github.com/ctx42/gomake/testdata/projects/showcase_targets/project",
+	ImpPath:     "{{ .prj_root }}/testdata/projects/showcase_targets/project",
+	PkgName:     "main",
+	PkgNS:       "",
+	Breadcrumbs: nil,
+	Receiver:    "",
+	FuncName:    "Basic",
+	Name:        "basic",
+	VarName:     "",
+	CodeRef:     "Basic",
+	DefRef:      "Basic",
+	Default:     false,
+	Synopsis:    "prints its name to stdout",
+	Doc:         "prints its name to stdout. Some more detailed documentation here. Even more detailed documentation.",
+	Hidden:      false,
+	Run: func(ctx context.Context, rng *ring.Ring) error {
+		return Basic(ctx, rng)
+	},
+}
+targets = append(targets, tgt)

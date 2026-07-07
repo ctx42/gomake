@@ -1,0 +1,1 @@
+Directory (package) without source files.

@@ -1,0 +1,55 @@
+{{ define "main" }}
+<div class="mx-auto flex max-w-5xl gap-12 px-6 py-16">
+
+  <!-- Sidebar (same as single.html) -->
+  <aside class="hidden w-52 shrink-0 lg:block">
+    <nav class="sticky top-[76px] space-y-6 text-sm">
+      <div>
+        <p class="mb-2 text-xs font-bold uppercase tracking-widest text-[#8b8fa8]">Get started</p>
+        <ul class="list-none space-y-1 p-0">
+          <li><a href="{{ "docs/getting-started/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Installation</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="mb-2 text-xs font-bold uppercase tracking-widest text-[#8b8fa8]">Guides</p>
+        <ul class="list-none space-y-1 p-0">
+          <li><a href="{{ "docs/writing-targets/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Writing Targets</a></li>
+          <li><a href="{{ "docs/namespaces/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Namespaces</a></li>
+          <li><a href="{{ "docs/imports/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Importing Targets</a></li>
+          <li><a href="{{ "docs/builtin-targets/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Builtin Targets</a></li>
+          <li><a href="{{ "docs/testing/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Testing Targets</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="mb-2 text-xs font-bold uppercase tracking-widest text-[#8b8fa8]">Configuration</p>
+        <ul class="list-none space-y-1 p-0">
+          <li><a href="{{ "docs/configuration/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Configuring Targets</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <p class="mb-2 text-xs font-bold uppercase tracking-widest text-[#8b8fa8]">Reference</p>
+        <ul class="list-none space-y-1 p-0">
+          <li><a href="{{ "docs/cli-reference/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">CLI Reference</a></li>
+          <li><a href="{{ "docs/library/" | relURL }}" class="block rounded px-2 py-1 text-[#8b8fa8] no-underline transition hover:bg-[#1a1d27] hover:text-[#e2e4f0]">Library Usage</a></li>
+        </ul>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- Content -->
+  <article class="min-w-0 flex-1">
+    <h1 class="mb-8 text-3xl font-bold tracking-tight">{{ .Title }}</h1>
+    <div class="prose prose-invert max-w-none">{{ .Content }}</div>
+    <ul class="mt-8 list-none space-y-3 p-0">
+      {{ range .Pages.ByWeight }}
+      <li class="m-0">
+        <a href="{{ .Permalink }}" class="font-semibold text-[#6eb5ff] no-underline hover:underline">{{ .Title }}</a>
+        {{ with .Description }}<span class="text-[#8b8fa8]"> — {{ . }}</span>{{ end }}
+      </li>
+      {{ end }}
+    </ul>
+  </article>
+
+</div>
+{{ end }}
