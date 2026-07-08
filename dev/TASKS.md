@@ -6,9 +6,10 @@ source-code locations, and the background known when it was found.
 
 ---
 
-T1: Check where things are printed to a terminal (stdout, stderr) places like
-`install.Main`, `cli.Main`, and top level function running tasks are places we
-know are there any others?
+T1: List where things are being printed to a terminal (stdout, stderr) places
+like`install.Main`, `cli.Main`, and top level function running tasks are places
+we know (list them too) are there any others? List only functions not each
+instance of printing to a terminal.
 
 ---
 
