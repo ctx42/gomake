@@ -1,4 +1,4 @@
-baseURL = "https://ctx42.github.io/gomake/"
+baseURL = "https://gomake.ctx42.com/"
 title = "GoMake"
 locale = "en-us"
 summaryLength = 10
