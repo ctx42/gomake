@@ -52,7 +52,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodePickTarget, code)
-		assert.Equal(t, mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
+		assert.Equal(t, "gomake: "+mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -76,7 +76,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodePickTarget, code)
-		assert.Equal(t, mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
+		assert.Equal(t, "gomake: "+mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -107,7 +107,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeUnkTarget, code)
-		assert.Equal(t, mkf.ErrUnkTarget.Error()+"\n", tst.Stderr())
+		assert.Equal(t, "gomake: "+mkf.ErrUnkTarget.Error()+"\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -200,7 +200,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeUnkTarget, code)
-		assert.Equal(t, "unknown target\n", tst.Stderr())
+		assert.Equal(t, "gomake: unknown target\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -419,7 +419,7 @@ func mainMakefileWithNoTargets(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeErr, code)
-		assert.Equal(t, "no makefile found\n", tst.Stderr())
+		assert.Equal(t, "gomake: no makefile found\n", tst.Stderr())
 		assert.NoFileExist(t, bin)
 	})
 
@@ -834,7 +834,8 @@ func Test_main(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		assert.Equal(t, "target panicked with: panic string\n", tst.Stderr())
+		want := "gomake: target panicked with: panic string\n"
+		assert.Equal(t, want, tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -864,7 +865,8 @@ func Test_main(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		assert.Equal(t, "duplicated target: PKG1, pkg1.Pkg1\n", tst.Stderr())
+		want := "gomake: duplicated target: PKG1, pkg1.Pkg1\n"
+		assert.Equal(t, want, tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -1258,7 +1260,9 @@ func Test_RunWithoutCompile(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, rc)
-		want := "parsing flags: flag provided but not defined: -unknown\n"
+		want := "" +
+			"gomake: parsing flags: flag provided but " +
+			"not defined: -unknown\n"
 		assert.Equal(t, want, tst.Stderr())
 	})
 
@@ -1276,7 +1280,8 @@ func Test_RunWithoutCompile(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, rc)
-		assert.Equal(t, "target panicked with: panic string\n", tst.Stderr())
+		want := "gomake: target panicked with: panic string\n"
+		assert.Equal(t, want, tst.Stderr())
 	})
 }
 
@@ -1474,7 +1479,7 @@ func mainPreRun(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		assert.Equal(t, "test error: a\n", tst.Stderr())
+		assert.Equal(t, "gomake: test error: a\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 }
@@ -1541,7 +1546,7 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		want := "-h, --help cannot be used with --bin\n"
+		want := "gomake: -h, --help cannot be used with --bin\n"
 		assert.Equal(t, want, tst.Stderr())
 	})
 
@@ -1631,7 +1636,7 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodePickTarget, code)
-		assert.Equal(t, mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
+		assert.Equal(t, "gomake: "+mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
 	})
 
 	t.Run("--help AllTargets error", func(t *testing.T) {

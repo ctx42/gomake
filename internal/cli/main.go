@@ -49,14 +49,14 @@ func Main(
 	defer func() {
 		if v := recover(); v != nil {
 			err := mkf.RecoverError(v)
-			_, _ = fmt.Fprintf(rng.Stderr(), "panicked with: %s\n", err)
+			fail(rng, fmt.Errorf("panicked with: %w", err))
 			code = 1
 		}
 	}()
 
 	cfg, err := newConfig(ver, rng)
 	if err != nil {
-		_, _ = fmt.Fprintln(rng.Stderr(), err)
+		fail(rng, err)
 		return 1
 	}
 
@@ -75,7 +75,7 @@ func Main(
 			_, _ = fmt.Fprint(rng.Stderr(), msg)
 		}
 		if err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+			fail(rng, err)
 		}
 		return mkf.ExitCode(err)
 	}
@@ -103,14 +103,13 @@ func Main(
 			return mkf.ExitCode(err)
 		}
 	} else if !fi.IsDir() {
-		_, _ = fmt.Fprintf(rng.Stderr(), "%s must be a directory", cfg.tmp)
+		fail(rng, fmt.Errorf("%s must be a directory", cfg.tmp))
 		return 1
 	}
 
 	if cfg.showCheckConfig {
 		if err = runCheckConfig(rng, cfg, tgs); err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 		return 0
 	}
@@ -118,8 +117,7 @@ func Main(
 	if cfg.showList {
 		all, err := allTargets(rng, cfg, tgs)
 		if err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 		_, _ = fmt.Fprint(rng.Stderr(), mkf.HelpTargets(all, 0))
 		return 0
@@ -128,8 +126,7 @@ func Main(
 	if cfg.showHelp {
 		all, err := allTargets(rng, cfg, tgs)
 		if err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 		out, err := mkf.HelpUsage(
 			binName,
@@ -138,7 +135,7 @@ func Main(
 			all,
 		)
 		if err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+			fail(rng, err)
 			return 1
 		}
 		_, _ = fmt.Fprint(rng.Stderr(), out)
@@ -153,7 +150,7 @@ func Main(
 		if tgt, _ := mkf.FindTarget(cfg.target, tgs); tgt != nil {
 			applyExternalTargetMeta(rng, cfg.src)
 			if err = deliverTargetConfig(rng, cfg, tgt); err != nil {
-				_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+				fail(rng, err)
 				return 1
 			}
 			return runWithoutCompile(ctx, rng, ver, tgs)
@@ -169,20 +166,18 @@ func Main(
 	switch {
 	case errors.Is(err, errNoMakefile) || errors.Is(err, gomake.ErrNoGoMod):
 		if cfg.target != "" {
-			_, _ = fmt.Fprintln(rng.Stderr(), mkf.ErrUnkTarget.Error())
+			fail(rng, mkf.ErrUnkTarget)
 			return mkf.ExitCodeUnkTarget
 		}
 
 		if cfg.bin != "" {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 
 		return runWithoutCompile(ctx, rng, ver, tgs)
 
 	case err != nil:
-		_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-		return mkf.ExitCode(err)
+		return failCode(rng, err)
 	}
 
 	buildDir := gmk.cu.BuildDir
@@ -196,8 +191,7 @@ func Main(
 		// If there are no custom targets, there is no point compiling custom
 		// binary which would have "the same content" as gomake binary.
 		if gmk.targets.Len() == 0 {
-			_, _ = fmt.Fprintln(rng.Stderr(), errNoMakefile.Error())
-			return mkf.ExitCode(errNoMakefile)
+			return failCode(rng, errNoMakefile)
 		}
 
 		compileAct := func() error {
@@ -206,8 +200,7 @@ func Main(
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 		return 0
 	}
@@ -215,7 +208,7 @@ func Main(
 	// Run all the pre-runs.
 	for _, fn := range bip.PreRuns() {
 		if ctx, rng, err = fn(ctx, rng); err != nil {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+			fail(rng, err)
 			return 1
 		}
 	}
@@ -223,19 +216,19 @@ func Main(
 	applyExternalTargetMeta(rng, cfg.src)
 	tgt := invokedTarget(cfg, gmk.targets)
 	if err = deliverTargetConfig(rng, cfg, tgt); err != nil {
-		_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+		fail(rng, err)
 		return 1
 	}
 	if err = gmk.Execute(ctx, rng); err != nil {
 		if _, ok := errors.AsType[*errCompile](err); ok {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+			fail(rng, err)
 			return mkf.ExitCodeCompile
 		}
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
 		}
 		if !gomake.HasRun(err) {
-			_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+			fail(rng, err)
 		}
 		return gomake.ExitStatus(err)
 	}
@@ -274,12 +267,11 @@ func runWithoutCompile(
 	rngOF := mkf.WithMakefileRing(rng)
 	cmf, err := mkf.NewMakefile(tgs, rngOF, verOF)
 	if err != nil {
-		_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
+		fail(rng, err)
 		return mkf.ExitCodeErr
 	}
 	if err = cmf.Execute(ctx); err != nil {
-		_, _ = fmt.Fprintln(rng.Stderr(), err.Error())
-		return mkf.ExitCode(err)
+		return failCode(rng, err)
 	}
 	return 0
 }
