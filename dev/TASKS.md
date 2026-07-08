@@ -6,11 +6,13 @@ source-code locations, and the background known when it was found.
 
 ---
 
-- errors should have gomake prefix, but they should be added on the top of the call chain.
+T1: Check where things are printed to a terminal (stdout, stderr) places like
+`install.Main`, `cli.Main`, and top level function running tasks are places we
+know are there any others?
 
 ---
 
-- Enable GitHub private vulnerability reporting after making the repo public.
+T2: Enable GitHub private vulnerability reporting after making the repo public.
 
   The repo is currently private, so the "Private vulnerability reporting"
   toggle does not exist on Settings -> Advanced Security. Both SECURITY.md and
