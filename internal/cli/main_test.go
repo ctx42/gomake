@@ -1552,7 +1552,7 @@ func Test_main_error(t *testing.T) {
 
 	t.Run("tmp path stat fails", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t).WetStderr()
 		dir := t.TempDir()
 		assert.NoError(t, os.Chmod(dir, 0))
 		t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
@@ -1571,11 +1571,14 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
+		have := tst.Stderr()
+		assert.Contain(t, "gomake: ", have)
+		assert.Contain(t, tmp, have)
 	})
 
 	t.Run("tmp mkdir fails", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t).WetStderr()
 		base := t.TempDir()
 		parent := filepath.Join(base, "file")
 		oskit.Write(t, "x", parent)
@@ -1594,6 +1597,9 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
+		have := tst.Stderr()
+		assert.Contain(t, "gomake: ", have)
+		assert.Contain(t, tmpPath, have)
 	})
 
 	t.Run("tmp path is a file", func(t *testing.T) {

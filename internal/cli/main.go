@@ -97,10 +97,10 @@ func Main(
 	fi, err := os.Stat(cfg.tmp)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 		if err = os.Mkdir(cfg.tmp, 0755); err != nil {
-			return mkf.ExitCode(err)
+			return failCode(rng, err)
 		}
 	} else if !fi.IsDir() {
 		fail(rng, fmt.Errorf("%s must be a directory", cfg.tmp))
