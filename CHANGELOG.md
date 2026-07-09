@@ -1,3 +1,6 @@
+## v0.18.0 (Thu, 09 Jul 2026 20:51:42 UTC)
+- feat(config)!: nest gomake.yaml targets by import path and name.
+
 ## v0.17.0 (Thu, 09 Jul 2026 15:06:45 UTC)
 - fix(cli): print error when tmp dir cannot be prepared.
 - refactor(version): source placeholders and var names from xdef.
