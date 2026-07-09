@@ -41,69 +41,89 @@ wins:
 command-line option  >  environment variable  >  project file  >  user file
 ```
 
-For a target's configuration block, the project file replaces the user file's
-block for that target as a whole; the two are not deep-merged. When GoMake runs
-inside a module, a user-level entry for one of that module's own targets is
-ignored — configure local targets in the project file.
+For a target's configuration, GoMake resolves a single block per invocation. It
+looks in the project file first and falls back to the user file only when the
+project file carries nothing for that target; the two are never deep-merged.
+When GoMake runs inside a module, the user-file fallback is skipped for that
+module's own targets — configure local targets in the project file.
 
 ## Schema
 
+The `targets` section is a nested tree keyed first by import path and then by
+the target's invocation-path names — the same lower-case, kebab-cased
+identifiers `gomake --list` prints, split on `:`. A namespace becomes a nesting
+level; a target's own settings live under its name.
+
 ```yaml
-version: 1                       # required, integer schema version
-settings:                        # configuration for GoMake itself
-  timeout: 30s                   # default target execution timeout
-  tmp: /abs/path/to/tmp          # default temporary directory (absolute)
-targets:                         # per-target configuration
-  github.com/acme/tasks#Deploy:  # <import-path>#<name>
-    region: eu
-    hosts: [web-1, web-2]
-  example.com/proj#Project.Setup:
-    dirs: [cmd, internal]
+version: 1                          # required, integer schema version
+settings:                           # configuration for GoMake itself
+  timeout: 30s                      # default target execution timeout
+  tmp: /abs/path/to/tmp             # default temporary directory (absolute)
+targets:                            # per-target configuration
+  github.com/acme/tasks:            # import path
+    deploy:                         # target :deploy
+      region: eu
+      hosts: [web-1, web-2]
+    go:                             # namespace :go:*
+      timeout: 5m                   # shared by every :go target
+      lint:                         # sub-namespace :go:lint:*
+        version: v2.13.0            # shared by :go:lint and its children
+        file: .golangci.yml
 ```
 
 The `version` field is required and must be an integer. GoMake aborts when a
 file declares a version newer than the running binary supports. Unknown keys
-under `version`, `settings`, or `targets` are rejected; the contents of a
-single target block are opaque to GoMake and never validated.
+under `version` or `settings` are rejected; the target tree is opaque to GoMake
+and its contents are never validated (see [Validation](#validation)).
 
 ## Target keys
 
-Each target block is keyed by the target's canonical origin:
+A target's configuration lives at the node reached by walking from its import
+path down through its namespace names to the target's own name — exactly the
+pieces that make up the name `gomake --list` shows:
 
 ```
-<import-path>#<name>
+targets:
+  <import-path>:
+    <namespace>:      # zero or more namespace levels
+      <target-name>:  # the kebab function name, e.g. install or test-v
+        <settings>
 ```
 
-`<name>` is the Go identifier as declared in the target's own package: a plain
-function contributes its function name (`Deploy`), and a namespaced method
-contributes `<Receiver>.<Method>` (`Project.Setup`). The key follows the
-target's home package, so renaming an import with `//gomake:import` does not
-change it.
+The key follows the target's home package, so renaming an import with
+`//gomake:import` does not change it.
 
-Run `gomake --check-config` to print the exact key for every discovered target,
-so there is no need to guess:
+GoMake delivers the **nearest-level** block: it walks from the target's own node
+up toward the import-path root and uses the first node that carries settings, so
+namespace-level keys are shared by every target beneath them while a target's
+own block shadows them. A block never includes a nested target's keys.
+
+Run `gomake --check-config` to print every discovered target grouped by import
+path, so there is no need to guess the nesting:
 
 ```shell
 gomake --check-config
 ```
 
-The same command reports project-level keys that match no target and any
-`settings.tmp` value that is not absolute.
+The same command reports project-level import keys that match no discovered
+target, an import config that is not a mapping, and any `settings.tmp` value
+that is not absolute.
 
 ## How configuration reaches a target
 
 Only the *invoked* target receives configuration, and it receives only its own
-block. The value travels from the YAML file to your function through a fixed
-pipeline:
+nearest-level block. The value travels from the YAML file to your function
+through a fixed pipeline:
 
 ```text
 gomake.yaml  (user file + project file)
-    │   1. load, validate, merge   (project block wins, whole-block replace)
+    │   1. load + validate; keep each file's target tree
     ▼
-merged targets map                 keyed by <import-path>#<name>
-    │   2. select the invoked target's block; drop settings + other targets
+per-file target trees              keyed by <import-path>, then by names
+    │   2. resolve the invoked target's nearest-level block
+    │      (project tree first, user tree as a fallback)
     ▼
-opaque YAML block
+opaque YAML block                  child-node keys stripped
     │   3. json.Marshal            (YAML → JSON string)
     ▼
 JSON string
@@ -118,16 +138,17 @@ subprocess ring meta store  ────►  6. target decodes with gomake.Targe
 
 Step by step:
 
-1. **Load and merge.** GoMake reads the user-level and project-level files,
-   validates the `version` and `settings` keys, and keeps every target block as
-   an opaque value. The two files are merged so that, for any given target, the
-   project-level block replaces the user-level block as a whole (see
-   [Precedence](#precedence)).
+1. **Load.** GoMake reads the user-level and project-level files, validates the
+   `version` and `settings` keys, and keeps each file's `targets` tree as an
+   opaque nested value. Only the `settings` sections are merged (see
+   [Precedence](#precedence)); the target trees stay separate.
 
-2. **Select one block.** When you run a target, GoMake computes that target's
-   canonical `<import-path>#<name>` key and looks it up in the merged `targets`
-   map. At most one block is selected — the invoked target's. The `settings`
-   section and every other target's block are left behind.
+2. **Resolve one block.** When you run a target, GoMake walks the tree for that
+   target's import path down its namespace and target names, then back up to the
+   nearest node carrying settings, stripping any nested target's keys. It tries
+   the project tree first and the user tree as a fallback. At most one block is
+   selected — the invoked target's. The `settings` section and every other
+   target's block are left behind.
 
 3. **Convert YAML to JSON.** The selected block is re-encoded from YAML into a
    JSON string with `encoding/json`. A target therefore decodes JSON, not YAML,
@@ -166,11 +187,12 @@ Given this project-level block:
 ```yaml
 version: 1
 targets:
-  github.com/acme/tasks#Deploy:
-    region: eu
-    hosts: [web-1, web-2]
-    replicas: 3
-    dry_run: false
+  github.com/acme/tasks:
+    deploy:
+      region: eu
+      hosts: [web-1, web-2]
+      replicas: 3
+      dry_run: false
 ```
 
 GoMake delivers it to the target as the JSON string:
@@ -221,6 +243,25 @@ A target never sees the `settings` section or another target's block. When one
 target calls another as a plain Go function, GoMake applies no configuration to
 the callee — only the top-level invoked target's block is delivered, so pass
 whatever the callee needs as function arguments.
+
+## Validation
+
+GoMake navigates the target tree structurally but never judges a block's
+contents. It tells a child-node key (a known namespace or target name) from a
+setting key (anything else), strips the child nodes, and delivers the rest. A
+mistyped key it cannot recognise as a child is simply carried into the delivered
+block.
+
+Validation is therefore the target's job. Decode the block into a type that
+rejects unknown fields and a typo becomes a hard error the target raises; leave
+the decoder lenient and the typo silently leaves its field at the zero value. A
+key the target knows but does not use is harmless — targets that share a
+namespace node share its settings and each ignores the keys outside its own
+schema.
+
+`--check-config` checks only structure: it flags a top-level key matching no
+discovered import path and an import config that is not a mapping. It never
+judges setting keys, which are opaque to GoMake.
 
 ## Relationship to targets.yaml
 

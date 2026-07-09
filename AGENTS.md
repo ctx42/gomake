@@ -155,11 +155,14 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
 - **internal/cli**: High-level `goMake`, `newGoMake`/`Compile`/`Execute`,
   config parsing, `prepare` (the big one that copies sources + edits
   go.mod/go.work + generates), `Main` entry. Runtime `gomake.yaml` handling
-  lives in `config_file.go`: schema + strict load, two-level merge + settings
-  precedence (`applyFileConfig`), the canonical `<import>#<name>` key
-  (`localImportPath` fills the empty `ImpSpec` of main-package targets),
-  delivery of the invoked target's block into `ring.Meta` only
-  (`deliverTargetConfig`), and `--check-config` (`runCheckConfig`). Delivery: a
+  lives in `config_file.go`: schema + strict load, settings-only merge +
+  precedence (`applyFileConfig`), a nested `targets:` tree keyed by import path
+  then kebab invocation-path names (`localImportPath` fills the empty `ImpSpec`
+  of main-package targets), per-invocation nearest-level resolution with
+  project-first / user-fallback / in-module skip (`resolveDelivered`,
+  `resolveTargetBlock`), delivery of the invoked target's block into `ring.Meta`
+  only (`deliverTargetConfig`), and `--check-config` (`runCheckConfig`).
+  Delivery: a
   target's config originates solely from
   `ring.Meta`, never the environment. In-process built-in/external targets read
   it directly. For a local target compiled to a subprocess, `Execute` ferries

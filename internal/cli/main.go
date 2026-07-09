@@ -149,7 +149,7 @@ func Main(
 		// away.
 		if tgt, _ := mkf.FindTarget(cfg.target, tgs); tgt != nil {
 			applyExternalTargetMeta(rng, cfg.src)
-			if err = deliverTargetConfig(rng, cfg, tgt); err != nil {
+			if err = deliverTargetConfig(rng, cfg, tgt, tgs); err != nil {
 				fail(rng, err)
 				return 1
 			}
@@ -215,7 +215,8 @@ func Main(
 
 	applyExternalTargetMeta(rng, cfg.src)
 	tgt := invokedTarget(cfg, gmk.targets)
-	if err = deliverTargetConfig(rng, cfg, tgt); err != nil {
+	err = deliverTargetConfig(rng, cfg, tgt, gmk.targets.List())
+	if err != nil {
 		fail(rng, err)
 		return 1
 	}

@@ -157,23 +157,23 @@ func Test_parseConfigFile(t *testing.T) {
 		assert.Equal(t, 1, *cfg.Version)
 	})
 
-	t.Run("target blocks are kept opaque", func(t *testing.T) {
+	t.Run("target tree is kept opaque", func(t *testing.T) {
 		// --- Given ---
-		data := []byte(
+		data := []byte("" +
 			"version: 1\n" +
-				"targets:\n" +
-				"  github.com/acme/tasks#Deploy:\n" +
-				"    region: eu\n" +
-				"    nested:\n" +
-				"      count: 3\n",
-		)
+			"targets:\n" +
+			"  github.com/acme/tasks:\n" +
+			"    deploy:\n" +
+			"      region: eu\n" +
+			"      nested:\n" +
+			"        count: 3\n")
 
 		// --- When ---
 		cfg, err := parseConfigFile(data)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		_, ok := cfg.Targets["github.com/acme/tasks#Deploy"]
+		_, ok := cfg.Targets["github.com/acme/tasks"].(map[string]any)
 		assert.True(t, ok)
 	})
 }
@@ -215,7 +215,7 @@ func Test_parseConfigFile_error_tabular(t *testing.T) {
 	}
 }
 
-func Test_canonicalKey_tabular(t *testing.T) {
+func Test_targetImp_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
@@ -224,39 +224,50 @@ func Test_canonicalKey_tabular(t *testing.T) {
 		want     string
 	}{
 		{
-			"imported plain function",
-			&mkf.Target{ImpSpec: "github.com/me/proj", FuncName: "Build"},
+			"import spec wins",
+			&mkf.Target{ImpSpec: "github.com/me/proj"},
 			"local.com/mod",
-			"github.com/me/proj#Build",
+			"github.com/me/proj",
 		},
 		{
-			"namespaced method uses receiver",
-			&mkf.Target{
-				ImpSpec:  "github.com/me/proj",
-				Receiver: "Project",
-				FuncName: "Setup",
-			},
+			"empty import spec uses localImp",
+			&mkf.Target{},
 			"local.com/mod",
-			"github.com/me/proj#Project.Setup",
-		},
-		{
-			"external target",
-			&mkf.Target{ImpSpec: "github.com/acme/tasks", FuncName: "Deploy"},
 			"local.com/mod",
-			"github.com/acme/tasks#Deploy",
-		},
-		{
-			"local target with empty ImpSpec uses localImp",
-			&mkf.Target{FuncName: "Build"},
-			"local.com/mod",
-			"local.com/mod#Build",
 		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have := canonicalKey(tc.tgt, tc.localImp)
+			have := targetImp(tc.tgt, tc.localImp)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_namePath_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		name string
+		want []string
+	}{
+		{"bare target", "build", []string{"build"}},
+		{"namespaced", "go:test", []string{"go", "test"}},
+		{"nested namespace", "go:lint:install",
+			[]string{"go", "lint", "install"}},
+		{"leading colon dropped", ":print", []string{"print"}},
+		{"kebab preserved", "go:test-v", []string{"go", "test-v"}},
+		{"empty name", "", []string{}},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := namePath(tc.name)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
@@ -341,59 +352,6 @@ func Test_moduleImportPath(t *testing.T) {
 }
 
 func Test_mergeConfigs(t *testing.T) {
-	t.Run("project block replaces user block as a whole", func(t *testing.T) {
-		// --- Given ---
-		user := &fileConfig{Targets: map[string]any{
-			"ext.com/a#Run": map[string]any{"x": 1, "y": 2},
-		}}
-		project := &fileConfig{Targets: map[string]any{
-			"ext.com/a#Run": map[string]any{"x": 9},
-		}}
-
-		// --- When ---
-		have := mergeConfigs(user, project, "")
-
-		// --- Then ---
-		want := map[string]any{"x": 9}
-		assert.Equal(t, want, have.targets["ext.com/a#Run"])
-	})
-
-	t.Run("user-only external key is kept", func(t *testing.T) {
-		// --- Given ---
-		user := &fileConfig{Targets: map[string]any{
-			"ext.com/a#Run": map[string]any{"x": 1},
-		}}
-		project := &fileConfig{}
-
-		// --- When ---
-		have := mergeConfigs(user, project, "me.com/mod")
-
-		// --- Then ---
-		_, ok := have.targets["ext.com/a#Run"]
-		assert.True(t, ok)
-	})
-
-	t.Run("user key inside the module is discarded", func(t *testing.T) {
-		// --- Given ---
-		user := &fileConfig{Targets: map[string]any{
-			"me.com/mod#Build":     map[string]any{"x": 1},
-			"me.com/mod/sub#Build": map[string]any{"x": 2},
-			"ext.com/a#Run":        map[string]any{"x": 3},
-		}}
-		project := &fileConfig{}
-
-		// --- When ---
-		have := mergeConfigs(user, project, "me.com/mod")
-
-		// --- Then ---
-		_, hasRoot := have.targets["me.com/mod#Build"]
-		_, hasSub := have.targets["me.com/mod/sub#Build"]
-		_, hasExt := have.targets["ext.com/a#Run"]
-		assert.False(t, hasRoot)
-		assert.False(t, hasSub)
-		assert.True(t, hasExt)
-	})
-
 	t.Run("project settings win, user settings fill gaps", func(t *testing.T) {
 		// --- Given ---
 		user := &fileConfig{Settings: &fileSettings{
@@ -403,38 +361,281 @@ func Test_mergeConfigs(t *testing.T) {
 		project := &fileConfig{Settings: &fileSettings{Timeout: new("30s")}}
 
 		// --- When ---
-		have := mergeConfigs(user, project, "")
+		have := mergeConfigs(user, project)
 
 		// --- Then ---
 		assert.Equal(t, "30s", *have.timeout)
 		assert.Equal(t, "/u/tmp", *have.tmp)
 	})
+
+	t.Run("target trees are not merged into settings", func(t *testing.T) {
+		// --- Given ---
+		user := &fileConfig{Targets: map[string]any{"ext.com/a": nil}}
+		project := &fileConfig{Targets: map[string]any{"ext.com/b": nil}}
+
+		// --- When ---
+		have := mergeConfigs(user, project)
+
+		// --- Then ---
+		assert.Nil(t, have.timeout)
+		assert.Nil(t, have.tmp)
+	})
 }
 
-func Test_keyInModule_tabular(t *testing.T) {
+func Test_impInModule_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
-		key     string
+		imp     string
 		modPath string
 		want    bool
 	}{
-		{"module root package", "me.com/mod#Build", "me.com/mod", true},
-		{"sub package", "me.com/mod/sub#Build", "me.com/mod", true},
-		{"external package", "ext.com/a#Run", "me.com/mod", false},
-		{"prefix but not sub", "me.com/mod2#Run", "me.com/mod", false},
-		{"no hash still compares", "me.com/mod", "me.com/mod", true},
+		{"module root package", "me.com/mod", "me.com/mod", true},
+		{"sub package", "me.com/mod/sub", "me.com/mod", true},
+		{"external package", "ext.com/a", "me.com/mod", false},
+		{"prefix but not sub", "me.com/mod2", "me.com/mod", false},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have := keyInModule(tc.key, tc.modPath)
+			have := impInModule(tc.imp, tc.modPath)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
 		})
 	}
+}
+
+func Test_knownNodes(t *testing.T) {
+	t.Run("prefixes of same-import targets", func(t *testing.T) {
+		// --- Given ---
+		tgts := []*mkf.Target{
+			{ImpSpec: "ext.com/a", Name: "go:test"},
+			{ImpSpec: "ext.com/a", Name: "go:lint:install"},
+			{ImpSpec: "ext.com/b", Name: "deploy"},
+		}
+
+		// --- When ---
+		have := knownNodes(tgts, "me.com/mod", "ext.com/a")
+
+		// --- Then ---
+		want := map[string]bool{
+			"go":              true,
+			"go:test":         true,
+			"go:lint":         true,
+			"go:lint:install": true,
+		}
+		assert.Equal(t, want, have)
+	})
+
+	t.Run("local target matched via empty import spec", func(t *testing.T) {
+		// --- Given ---
+		tgts := []*mkf.Target{
+			{Name: "build"},
+			{ImpSpec: "ext.com/a", Name: "go:test"},
+		}
+
+		// --- When ---
+		have := knownNodes(tgts, "me.com/mod", "me.com/mod")
+
+		// --- Then ---
+		assert.Equal(t, map[string]bool{"build": true}, have)
+	})
+}
+
+func Test_settingKeys(t *testing.T) {
+	t.Run("strips known child keys", func(t *testing.T) {
+		// --- Given ---
+		known := map[string]bool{"go:lint": true, "go:build": true}
+		node := map[string]any{
+			"timeout": "5m",
+			"lint":    map[string]any{"version": "v1"},
+			"build":   map[string]any{"modules": nil},
+		}
+
+		// --- When ---
+		have := settingKeys([]string{"go"}, node, known)
+
+		// --- Then ---
+		assert.Equal(t, map[string]any{"timeout": "5m"}, have)
+	})
+
+	t.Run("root prefix keeps unknown keys", func(t *testing.T) {
+		// --- Given ---
+		known := map[string]bool{"go": true}
+		node := map[string]any{"go": map[string]any{}, "foo": "bar"}
+
+		// --- When ---
+		have := settingKeys(nil, node, known)
+
+		// --- Then ---
+		assert.Equal(t, map[string]any{"foo": "bar"}, have)
+	})
+}
+
+func Test_resolveTargetBlock_tabular(t *testing.T) {
+	// Tree mirrors the plan's gmgo example: a "go" ns_root carrying a shared
+	// timeout, a "lint" sub-namespace, and a "build" target with its own block.
+	root := map[string]any{
+		"go": map[string]any{
+			"timeout": "5m",
+			"lint": map[string]any{
+				"version": "v2.13.0",
+				"file":    ".golangci.yml",
+			},
+			"build": map[string]any{
+				"modules": map[string]any{"github.com/acme/app": "x"},
+			},
+		},
+	}
+	known := map[string]bool{
+		"go":              true,
+		"go:test":         true,
+		"go:test-v":       true,
+		"go:check":        true,
+		"go:vet":          true,
+		"go:doc":          true,
+		"go:lint":         true,
+		"go:lint:install": true,
+		"go:lint:config":  true,
+		"go:build":        true,
+	}
+
+	lint := map[string]any{"version": "v2.13.0", "file": ".golangci.yml"}
+	timeout := map[string]any{"timeout": "5m"}
+	build := map[string]any{
+		"modules": map[string]any{"github.com/acme/app": "x"},
+	}
+
+	tt := []struct {
+		testN string
+
+		path   []string
+		want   map[string]any
+		wantOK bool
+	}{
+		{"lint install", []string{"go", "lint", "install"}, lint, true},
+		{"lint config", []string{"go", "lint", "config"}, lint, true},
+		{"lint itself", []string{"go", "lint"}, lint, true},
+		{"test up to go", []string{"go", "test"}, timeout, true},
+		{"test-v up to go", []string{"go", "test-v"}, timeout, true},
+		{"check up to go", []string{"go", "check"}, timeout, true},
+		{"vet up to go", []string{"go", "vet"}, timeout, true},
+		{"doc up to go", []string{"go", "doc"}, timeout, true},
+		{"build own block", []string{"go", "build"}, build, true},
+		{"unknown target no block", []string{"missing"}, nil, false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have, ok := resolveTargetBlock(root, tc.path, known)
+
+			// --- Then ---
+			assert.Equal(t, tc.wantOK, ok)
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_resolveTargetBlock(t *testing.T) {
+	t.Run("scalar where a descent was expected yields no block",
+		func(t *testing.T) {
+			// --- Given ---
+			root := map[string]any{"go": map[string]any{"lint": "oops"}}
+			known := map[string]bool{
+				"go":              true,
+				"go:lint":         true,
+				"go:lint:install": true,
+			}
+			path := []string{"go", "lint", "install"}
+
+			// --- When ---
+			have, ok := resolveTargetBlock(root, path, known)
+
+			// --- Then ---
+			assert.False(t, ok)
+			assert.Nil(t, have)
+		})
+}
+
+func Test_resolveDelivered(t *testing.T) {
+	extTgts := []*mkf.Target{
+		{ImpSpec: "ext.com/a", Name: "go:test"},
+		{ImpSpec: "ext.com/a", Name: "go:lint"},
+	}
+
+	t.Run("project block wins over user block", func(t *testing.T) {
+		// --- Given ---
+		project := map[string]any{"ext.com/a": map[string]any{
+			"go": map[string]any{"timeout": "5m"},
+		}}
+		user := map[string]any{"ext.com/a": map[string]any{
+			"go": map[string]any{"timeout": "9m"},
+		}}
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "go:test"}
+
+		// --- When ---
+		have, ok := resolveDelivered(
+			tgt, "me.com/mod", "me.com/mod", user, project, extTgts,
+		)
+
+		// --- Then ---
+		assert.True(t, ok)
+		assert.Equal(t, map[string]any{"timeout": "5m"}, have)
+	})
+
+	t.Run("user fallback for an external import", func(t *testing.T) {
+		// --- Given ---
+		project := map[string]any{}
+		user := map[string]any{"ext.com/a": map[string]any{
+			"go": map[string]any{"timeout": "9m"},
+		}}
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "go:test"}
+
+		// --- When ---
+		have, ok := resolveDelivered(
+			tgt, "me.com/mod", "me.com/mod", user, project, extTgts,
+		)
+
+		// --- Then ---
+		assert.True(t, ok)
+		assert.Equal(t, map[string]any{"timeout": "9m"}, have)
+	})
+
+	t.Run("in-module target skips the user fallback", func(t *testing.T) {
+		// --- Given ---
+		localTgts := []*mkf.Target{{Name: "build"}}
+		project := map[string]any{}
+		user := map[string]any{"me.com/mod": map[string]any{
+			"build": map[string]any{"key": "val"},
+		}}
+		tgt := &mkf.Target{Name: "build"}
+
+		// --- When ---
+		have, ok := resolveDelivered(
+			tgt, "me.com/mod", "me.com/mod", user, project, localTgts,
+		)
+
+		// --- Then ---
+		assert.False(t, ok)
+		assert.Nil(t, have)
+	})
+
+	t.Run("no block anywhere", func(t *testing.T) {
+		// --- Given ---
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "go:test"}
+
+		// --- When ---
+		have, ok := resolveDelivered(
+			tgt, "me.com/mod", "me.com/mod", nil, nil, extTgts,
+		)
+
+		// --- Then ---
+		assert.False(t, ok)
+		assert.Nil(t, have)
+	})
 }
 
 func Test_pickSetting_tabular(t *testing.T) {
@@ -512,7 +713,7 @@ func Test_fileConfig_tmp(t *testing.T) {
 }
 
 func Test_config_applyFileConfig(t *testing.T) {
-	t.Run("applies settings and target blocks", func(t *testing.T) {
+	t.Run("applies settings and the project target tree", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		content := "version: 1\n" +
@@ -520,8 +721,9 @@ func Test_config_applyFileConfig(t *testing.T) {
 			"  timeout: 45s\n" +
 			"  tmp: /abs/from/settings\n" +
 			"targets:\n" +
-			"  ext.com/a#Run:\n" +
-			"    key: val\n"
+			"  ext.com/a:\n" +
+			"    run:\n" +
+			"      key: val\n"
 		oskit.Write(t, content, dir, configFileName)
 		cfg := &config{
 			src: dir,
@@ -535,7 +737,7 @@ func Test_config_applyFileConfig(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 45*time.Second, cfg.timeout)
 		assert.Equal(t, "/abs/from/settings", cfg.tmp)
-		_, ok := cfg.targetCfg["ext.com/a#Run"]
+		_, ok := cfg.projectTargets["ext.com/a"].(map[string]any)
 		assert.True(t, ok)
 	})
 
@@ -595,16 +797,18 @@ func Test_config_applyFileConfig(t *testing.T) {
 }
 
 func Test_deliverTargetConfig(t *testing.T) {
-	t.Run("delivers block to meta store", func(t *testing.T) {
+	t.Run("delivers nearest-level block to meta store", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-		cfg := &config{targetCfg: map[string]any{
-			"ext.com/a#Run": map[string]any{"region": "eu"},
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "run"}
+		cfg := &config{projectTargets: map[string]any{
+			"ext.com/a": map[string]any{
+				"run": map[string]any{"region": "eu"},
+			},
 		}}
-		tgt := &mkf.Target{ImpSpec: "ext.com/a", FuncName: "Run"}
 
 		// --- When ---
-		err := deliverTargetConfig(rng, cfg, tgt)
+		err := deliverTargetConfig(rng, cfg, tgt, []*mkf.Target{tgt})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -619,10 +823,10 @@ func Test_deliverTargetConfig(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		cfg := &config{}
-		tgt := &mkf.Target{ImpSpec: "ext.com/a", FuncName: "Run"}
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "run"}
 
 		// --- When ---
-		err := deliverTargetConfig(rng, cfg, tgt)
+		err := deliverTargetConfig(rng, cfg, tgt, []*mkf.Target{tgt})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -633,13 +837,15 @@ func Test_deliverTargetConfig(t *testing.T) {
 	t.Run("target without a config entry is a no-op", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-		cfg := &config{targetCfg: map[string]any{
-			"ext.com/b#Other": map[string]any{"x": 1},
+		tgt := &mkf.Target{ImpSpec: "ext.com/a", Name: "run"}
+		cfg := &config{projectTargets: map[string]any{
+			"ext.com/b": map[string]any{
+				"other": map[string]any{"x": 1},
+			},
 		}}
-		tgt := &mkf.Target{ImpSpec: "ext.com/a", FuncName: "Run"}
 
 		// --- When ---
-		err := deliverTargetConfig(rng, cfg, tgt)
+		err := deliverTargetConfig(rng, cfg, tgt, []*mkf.Target{tgt})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -650,12 +856,14 @@ func Test_deliverTargetConfig(t *testing.T) {
 	t.Run("nil target is a no-op", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-		cfg := &config{targetCfg: map[string]any{
-			"ext.com/a#Run": map[string]any{"region": "eu"},
+		cfg := &config{projectTargets: map[string]any{
+			"ext.com/a": map[string]any{
+				"run": map[string]any{"region": "eu"},
+			},
 		}}
 
 		// --- When ---
-		err := deliverTargetConfig(rng, cfg, nil)
+		err := deliverTargetConfig(rng, cfg, nil, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -718,10 +926,12 @@ func Test_runCheckConfig(t *testing.T) {
 
 	yaml := "version: 1\n" +
 		"targets:\n" +
-		"  " + prjkit.GoModName + "#Show:\n" +
-		"    message: hi\n" +
-		"  bogus.com/x#Gone:\n" +
-		"    k: v\n"
+		"  " + prjkit.GoModName + ":\n" +
+		"    show:\n" +
+		"      message: hi\n" +
+		"  bogus.com/x:\n" +
+		"    gone:\n" +
+		"      k: v\n"
 	oskit.Write(t, yaml, prj.Root(), configFileName)
 
 	rng := tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir())
@@ -734,17 +944,17 @@ func Test_runCheckConfig(t *testing.T) {
 	// --- Then ---
 	assert.NoError(t, err)
 	out := tst.Stderr()
-	assert.Contain(t, prjkit.GoModName+"#Show", out)
-	assert.Contain(t, "bogus.com/x#Gone", out)
-	assert.Contain(t, "problems found", out)
+	assert.Contain(t, prjkit.GoModName+":", out)
+	assert.Contain(t, "show", out)
+	assert.Contain(t, "project import path has no target: bogus.com/x", out)
 }
 
 func Test_checkConfigReport(t *testing.T) {
-	t.Run("no problems lists keys sorted", func(t *testing.T) {
+	t.Run("no problems lists targets grouped by import", func(t *testing.T) {
 		// --- Given ---
 		tgts := []*mkf.Target{
-			{ImpSpec: "ext.com/z", FuncName: "Run"},
-			{ImpSpec: "ext.com/a", FuncName: "Build"},
+			{ImpSpec: "ext.com/z", Name: "run"},
+			{ImpSpec: "ext.com/a", Name: "go:build"},
 		}
 		user := &fileConfig{}
 		project := &fileConfig{}
@@ -754,35 +964,39 @@ func Test_checkConfigReport(t *testing.T) {
 
 		// --- Then ---
 		assert.Contain(t, "no problems found", have)
-		aIdx := strings.Index(have, "ext.com/a#Build")
-		zIdx := strings.Index(have, "ext.com/z#Run")
+		aIdx := strings.Index(have, "ext.com/a:")
+		zIdx := strings.Index(have, "ext.com/z:")
 		assert.True(t, aIdx > 0 && zIdx > aIdx)
+		assert.Contain(t, "    go:build", have)
 	})
 
-	t.Run("reports problems then lists keys", func(t *testing.T) {
+	t.Run("reports problems then lists targets", func(t *testing.T) {
 		// --- Given ---
-		tgts := []*mkf.Target{{ImpSpec: "ext.com/a", FuncName: "Build"}}
+		tgts := []*mkf.Target{{ImpSpec: "ext.com/a", Name: "build"}}
 		user := &fileConfig{}
 		project := &fileConfig{Targets: map[string]any{
-			"ext.com/gone#X": map[string]any{"k": "v"},
+			"ext.com/gone": map[string]any{"x": map[string]any{"k": "v"}},
 		}}
 
 		// --- When ---
 		have := checkConfigReport(tgts, "local.com/m", user, project)
 
 		// --- Then ---
+		want := "project import path has no target: ext.com/gone"
 		assert.Contain(t, "problems found", have)
-		assert.Contain(t, "ext.com/gone#X", have)
-		assert.Contain(t, "ext.com/a#Build", have)
+		assert.Contain(t, want, have)
+		assert.Contain(t, "ext.com/a:", have)
 	})
 }
 
 func Test_checkConfigProblems(t *testing.T) {
 	t.Run("no problems", func(t *testing.T) {
 		// --- Given ---
-		valid := map[string]bool{"a#B": true}
+		valid := map[string]map[string]bool{"ext.com/a": {"build": true}}
 		user := &fileConfig{Settings: &fileSettings{Tmp: new("/abs")}}
-		project := &fileConfig{Targets: map[string]any{"a#B": nil}}
+		project := &fileConfig{Targets: map[string]any{
+			"ext.com/a": map[string]any{"build": nil},
+		}}
 
 		// --- When ---
 		have := checkConfigProblems(valid, user, project)
@@ -793,7 +1007,7 @@ func Test_checkConfigProblems(t *testing.T) {
 
 	t.Run("non-absolute tmp in both files", func(t *testing.T) {
 		// --- Given ---
-		valid := map[string]bool{}
+		valid := map[string]map[string]bool{}
 		user := &fileConfig{Settings: &fileSettings{Tmp: new("rel/u")}}
 		project := &fileConfig{Settings: &fileSettings{Tmp: new("rel/p")}}
 
@@ -806,13 +1020,13 @@ func Test_checkConfigProblems(t *testing.T) {
 		assert.Contain(t, "project", have[1])
 	})
 
-	t.Run("unmatched project target key", func(t *testing.T) {
+	t.Run("unmatched project import path", func(t *testing.T) {
 		// --- Given ---
-		valid := map[string]bool{"a#B": true}
+		valid := map[string]map[string]bool{"ext.com/a": {"build": true}}
 		user := &fileConfig{}
 		project := &fileConfig{Targets: map[string]any{
-			"a#B":   nil,
-			"c#Old": nil,
+			"ext.com/a":   map[string]any{"build": nil},
+			"ext.com/old": map[string]any{"gone": nil},
 		}}
 
 		// --- When ---
@@ -820,6 +1034,22 @@ func Test_checkConfigProblems(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, len(have))
-		assert.Contain(t, "c#Old", have[0])
+		assert.Contain(t, "ext.com/old", have[0])
+	})
+
+	t.Run("project import config is not a mapping", func(t *testing.T) {
+		// --- Given ---
+		valid := map[string]map[string]bool{}
+		user := &fileConfig{}
+		project := &fileConfig{Targets: map[string]any{
+			"ext.com/a": "oops",
+		}}
+
+		// --- When ---
+		have := checkConfigProblems(valid, user, project)
+
+		// --- Then ---
+		assert.Equal(t, 1, len(have))
+		assert.Contain(t, "project config is not a mapping: ext.com/a", have[0])
 	})
 }

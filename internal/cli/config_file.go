@@ -10,7 +10,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"maps"
 	"os"
 	"path/filepath"
 	"sort"
@@ -26,10 +25,12 @@ import (
 )
 
 // This file implements gomake's two-level YAML configuration. A user-level and
-// a project-level gomake.yaml are loaded, merged (project wins), and split into
-// gomake's own settings and per-target configuration blocks. The invoked
-// target's block is delivered to it through the ring meta store;
-// "--check-config" lints the files and lists every target's canonical key.
+// a project-level gomake.yaml are loaded; the settings section is merged
+// (project wins) while target configuration is kept as a nested tree keyed by
+// import path and then by the target's kebab invocation-path names. The invoked
+// target's nearest-level block is resolved (project first, user as a fallback)
+// and delivered to it through the ring meta store; "--check-config" lists the
+// discovered targets grouped by import path and flags soft structural problems.
 
 // configFileName is the name of gomake's YAML configuration file. Both the
 // user-level and the project-level configurations use this same name.
@@ -84,8 +85,9 @@ type fileSettings struct {
 }
 
 // fileConfig is the parsed content of a single gomake.yaml file. The
-// gomake-owned surface (version and settings) is parsed strictly; each target
-// block is kept as an opaque value that gomake does not validate.
+// gomake-owned surface (version and settings) is parsed strictly; the target
+// configuration is kept as an opaque nested tree that gomake navigates but does
+// not validate.
 type fileConfig struct {
 	// Version is the configuration schema version.
 	Version *int `yaml:"version"`
@@ -93,21 +95,20 @@ type fileConfig struct {
 	// Settings is gomake's own configuration.
 	Settings *fileSettings `yaml:"settings"`
 
-	// Targets maps a canonical target key to its opaque configuration block.
+	// Targets maps an import path to a nested tree of namespace and target
+	// nodes; each node's non-child keys are that node's opaque setting block.
 	Targets map[string]any `yaml:"targets"`
 }
 
-// mergedConfig is the effective gomake.yaml configuration after merging the
-// user-level and project-level files.
+// mergedConfig is the effective gomake.yaml settings after merging the
+// user-level and project-level files. Target configuration is not merged; it is
+// resolved per invocation by [resolveDelivered].
 type mergedConfig struct {
 	// timeout is the effective settings.timeout, or nil when unset.
 	timeout *string
 
 	// tmp is the effective settings.tmp, or nil when unset.
 	tmp *string
-
-	// targets maps a canonical target key to its opaque configuration block.
-	targets map[string]any
 }
 
 // userConfigPath returns the path to the user-level gomake.yaml. It honors
@@ -169,26 +170,29 @@ func parseConfigFile(data []byte) (*fileConfig, error) {
 	return &cfg, nil
 }
 
-// canonicalKey returns the canonical configuration key for tgt, of the form
-// "<import-path>#<name>". The name is the target's Go identifier as declared in
-// its defining package: a plain function contributes its function name, and a
-// method contributes "<Receiver>.<FuncName>". The key is derived from the
-// target's origin and is independent of any local import alias or namespace
-// rename applied where the target is used.
-//
-// A target defined in the project's own makefile package carries an empty
-// [mkf.Target.ImpSpec]; localImp supplies that package's import path for such
-// targets.
-func canonicalKey(tgt *mkf.Target, localImp string) string {
-	imp := tgt.ImpSpec
-	if imp == "" {
-		imp = localImp
+// targetImp returns tgt's import path. A target defined in the project's own
+// makefile package carries an empty [mkf.Target.ImpSpec]; localImp supplies
+// that package's import path for such targets.
+func targetImp(tgt *mkf.Target, localImp string) string {
+	if tgt.ImpSpec != "" {
+		return tgt.ImpSpec
 	}
-	name := tgt.FuncName
-	if tgt.Receiver != "" {
-		name = tgt.Receiver + "." + tgt.FuncName
+	return localImp
+}
+
+// namePath splits a target's CLI name into its node-path components, dropping
+// empty segments. It mirrors the pieces the parser joins to build the name, so
+// "go:lint:install" becomes {"go", "lint", "install"} and a bare "build"
+// becomes {"build"}.
+func namePath(name string) []string {
+	raw := strings.Split(name, ":")
+	path := make([]string, 0, len(raw))
+	for _, seg := range raw {
+		if seg != "" {
+			path = append(path, seg)
+		}
 	}
-	return imp + "#" + name
+	return path
 }
 
 // localImportPath returns the import path of the makefile package in the
@@ -241,35 +245,138 @@ func moduleImportPath(dir string) string {
 	return ""
 }
 
-// mergeConfigs merges the user-level and project-level configurations. For both
-// settings and target blocks the project-level file wins; a target block is
-// replaced as a whole rather than deep-merged. When modPath is non-empty
-// (gomake runs inside a module), user-level target entries whose key resolves
-// to a target within that module are discarded.
-func mergeConfigs(user, project *fileConfig, modPath string) *mergedConfig {
-	m := &mergedConfig{targets: make(map[string]any)}
-
-	for key, blk := range user.Targets {
-		if modPath != "" && keyInModule(key, modPath) {
-			continue
-		}
-		m.targets[key] = blk
+// mergeConfigs merges the settings sections of the user-level and
+// project-level configurations. The project-level file wins and the user-level
+// file fills the gaps. Target configuration is not merged; each target's block
+// is resolved per invocation by [resolveDelivered].
+func mergeConfigs(user, project *fileConfig) *mergedConfig {
+	return &mergedConfig{
+		timeout: pickSetting(user.timeout(), project.timeout()),
+		tmp:     pickSetting(user.tmp(), project.tmp()),
 	}
-	maps.Copy(m.targets, project.Targets)
-
-	m.timeout = pickSetting(user.timeout(), project.timeout())
-	m.tmp = pickSetting(user.tmp(), project.tmp())
-	return m
 }
 
-// keyInModule reports whether the target key's import path is the module
-// modPath or a package within it.
-func keyInModule(key, modPath string) bool {
-	imp := key
-	if before, _, ok := strings.Cut(key, "#"); ok {
-		imp = before
-	}
+// impInModule reports whether the import path imp is the module modPath or a
+// package within it.
+func impInModule(imp, modPath string) bool {
 	return imp == modPath || strings.HasPrefix(imp, modPath+"/")
+}
+
+// knownNodes returns the set of node-path keys, colon-joined, contributed by
+// every target in tgts whose import path is imp. Each target contributes every
+// non-empty prefix of its name path, recording both namespace nodes and leaf
+// target nodes; the set lets the resolver tell a child-node key from a setting
+// key.
+func knownNodes(tgts []*mkf.Target, localImp, imp string) map[string]bool {
+	known := make(map[string]bool)
+	for _, tgt := range tgts {
+		if targetImp(tgt, localImp) != imp {
+			continue
+		}
+		path := namePath(tgt.Name)
+		for i := 1; i <= len(path); i++ {
+			known[strings.Join(path[:i], ":")] = true
+		}
+	}
+	return known
+}
+
+// settingKeys returns a shallow copy of node keeping only its setting keys —
+// those whose colon-joined path (prefix plus the key) is not a known child
+// node. Child namespace and target keys are dropped so a delivered block never
+// carries a nested target's configuration.
+func settingKeys(
+	prefix []string,
+	node map[string]any,
+	known map[string]bool,
+) map[string]any {
+
+	base := strings.Join(prefix, ":")
+	out := make(map[string]any, len(node))
+	for key, val := range node {
+		full := key
+		if base != "" {
+			full = base + ":" + key
+		}
+		if known[full] {
+			continue
+		}
+		out[key] = val
+	}
+	return out
+}
+
+// resolveTargetBlock walks the nested target tree rooted at root along the
+// invoked target's node path and returns its nearest-level settings block. It
+// descends as far as both root and path allow, then walks back up to the first
+// node carrying at least one setting key, returning that node's setting keys
+// with child-node keys stripped. The boolean is false when no node on the path
+// carries settings. known reports which colon-joined node paths name a child
+// namespace or target.
+func resolveTargetBlock(
+	root map[string]any,
+	path []string,
+	known map[string]bool,
+) (map[string]any, bool) {
+
+	type level struct {
+		prefix []string
+		node   map[string]any
+	}
+
+	chain := []level{{nil, root}}
+	node := root
+	for _, comp := range path {
+		child, ok := node[comp].(map[string]any)
+		if !ok {
+			break
+		}
+		prev := chain[len(chain)-1].prefix
+		prefix := append(append([]string{}, prev...), comp)
+		chain = append(chain, level{prefix, child})
+		node = child
+	}
+
+	for i := len(chain) - 1; i >= 0; i-- {
+		blk := settingKeys(chain[i].prefix, chain[i].node, known)
+		if len(blk) > 0 {
+			return blk, true
+		}
+	}
+	return nil, false
+}
+
+// resolveDelivered resolves the configuration block delivered to tgt. It looks
+// up tgt's import path in the project-level tree first and returns its
+// nearest-level block when present; otherwise, unless tgt's import path lies
+// within modPath, it falls back to the user-level tree. tgts supplies the
+// discovered targets used to distinguish child-node keys from settings. The
+// boolean is false when neither tree carries a block for tgt.
+func resolveDelivered(
+	tgt *mkf.Target,
+	localImp, modPath string,
+	userTgts, projectTgts map[string]any,
+	tgts []*mkf.Target,
+) (map[string]any, bool) {
+
+	imp := targetImp(tgt, localImp)
+	path := namePath(tgt.Name)
+	known := knownNodes(tgts, localImp, imp)
+
+	if root, ok := projectTgts[imp].(map[string]any); ok {
+		if blk, ok := resolveTargetBlock(root, path, known); ok {
+			return blk, true
+		}
+	}
+	if modPath != "" && impInModule(imp, modPath) {
+		return nil, false
+	}
+	if root, ok := userTgts[imp].(map[string]any); ok {
+		if blk, ok := resolveTargetBlock(root, path, known); ok {
+			return blk, true
+		}
+	}
+	return nil, false
 }
 
 // pickSetting returns project when it is non-nil, otherwise user.
@@ -315,8 +422,10 @@ func (cfg *config) applyFileConfig(env []string) error {
 		return err
 	}
 
-	merged := mergeConfigs(user, project, moduleImportPath(cfg.src))
-	cfg.targetCfg = merged.targets
+	cfg.userTargets = user.Targets
+	cfg.projectTargets = project.Targets
+
+	merged := mergeConfigs(user, project)
 
 	set := make(map[string]bool)
 	cfg.fs.Visit(func(f *flag.Flag) { set[f.Name] = true })
@@ -343,17 +452,34 @@ func (cfg *config) applyFileConfig(env []string) error {
 	return nil
 }
 
-// deliverTargetConfig places tgt's configuration block, if any, into the ring
-// meta-store under [gomake.ConfigMetaKey] so the running target can read it
-// with [gomake.TargetConfig]. It is a no-op when tgt is nil or unconfigured.
-// For an in-process target this is the whole delivery; for a target compiled
-// into a makefile subprocess, [goMake.Execute] ferries the same value across
-// the process boundary via [targetConfigArg].
-func deliverTargetConfig(rng *ring.Ring, cfg *config, tgt *mkf.Target) error {
-	if tgt == nil || len(cfg.targetCfg) == 0 {
+// deliverTargetConfig places tgt's nearest-level configuration block, if any,
+// into the ring meta-store under [gomake.ConfigMetaKey] so the running target
+// can read it with [gomake.TargetConfig]. tgts supplies the discovered targets
+// used to distinguish child-node keys from settings. It is a no-op when tgt is
+// nil or no configuration file carries a block for it. For an in-process target
+// this is the whole delivery; for a target compiled into a makefile subprocess,
+// [goMake.Execute] ferries the same value across the process boundary via
+// [targetConfigArg].
+func deliverTargetConfig(
+	rng *ring.Ring,
+	cfg *config,
+	tgt *mkf.Target,
+	tgts []*mkf.Target,
+) error {
+
+	if tgt == nil ||
+		(len(cfg.userTargets) == 0 && len(cfg.projectTargets) == 0) {
 		return nil
 	}
-	blk, ok := cfg.targetCfg[canonicalKey(tgt, localImportPath(cfg.src))]
+
+	blk, ok := resolveDelivered(
+		tgt,
+		localImportPath(cfg.src),
+		moduleImportPath(cfg.src),
+		cfg.userTargets,
+		cfg.projectTargets,
+		tgts,
+	)
 	if !ok {
 		return nil
 	}
@@ -405,29 +531,27 @@ func runCheckConfig(rng *ring.Ring, cfg *config, stock []*mkf.Target) error {
 	return nil
 }
 
-// checkConfigReport builds the "--check-config" report. It lists the canonical
-// key of every target in tgts (local targets, whose [mkf.Target.ImpSpec] is
-// empty, resolve their import path from localImp) and reports the soft problems
-// gomake tolerates during a normal run: a project-level target key matching no
-// discovered target, and a non-absolute settings.tmp in either file.
+// checkConfigReport builds the "--check-config" report. It lists every
+// discovered target grouped by import path (local targets, whose
+// [mkf.Target.ImpSpec] is empty, resolve their import path from localImp),
+// naming each target by its kebab node path, and reports the soft problems
+// gomake tolerates during a normal run (see [checkConfigProblems]).
 func checkConfigReport(
 	tgts []*mkf.Target,
 	localImp string,
 	user, project *fileConfig,
 ) string {
 
-	valid := make(map[string]bool, len(tgts))
-	keys := make([]string, 0, len(tgts))
+	imps := make(map[string]map[string]bool)
 	for _, tgt := range tgts {
-		key := canonicalKey(tgt, localImp)
-		if !valid[key] {
-			valid[key] = true
-			keys = append(keys, key)
+		imp := targetImp(tgt, localImp)
+		if imps[imp] == nil {
+			imps[imp] = make(map[string]bool)
 		}
+		imps[imp][strings.Join(namePath(tgt.Name), ":")] = true
 	}
-	sort.Strings(keys)
 
-	problems := checkConfigProblems(valid, user, project)
+	problems := checkConfigProblems(imps, user, project)
 
 	var b strings.Builder
 	if len(problems) == 0 {
@@ -439,21 +563,36 @@ func checkConfigReport(
 		}
 	}
 
-	b.WriteString("\nconfig keys:\n")
-	if len(keys) == 0 {
+	b.WriteString("\ntargets:\n")
+	if len(imps) == 0 {
 		b.WriteString("  (no targets)\n")
 	}
-	for _, key := range keys {
-		b.WriteString("  " + key + "\n")
+	paths := make([]string, 0, len(imps))
+	for imp := range imps {
+		paths = append(paths, imp)
+	}
+	sort.Strings(paths)
+	for _, imp := range paths {
+		b.WriteString("  " + imp + ":\n")
+		names := make([]string, 0, len(imps[imp]))
+		for name := range imps[imp] {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			b.WriteString("    " + name + "\n")
+		}
 	}
 	return b.String()
 }
 
 // checkConfigProblems returns the soft configuration problems, in report order:
-// non-absolute settings.tmp values (user then project) followed by sorted
-// project-level target keys absent from valid.
+// non-absolute settings.tmp values (user then project), sorted project-level
+// import keys whose value is not a mapping, then sorted project-level import
+// keys matching no discovered target. validImps holds the discovered import
+// paths keyed to their target names.
 func checkConfigProblems(
-	valid map[string]bool,
+	validImps map[string]map[string]bool,
 	user, project *fileConfig,
 ) []string {
 
@@ -469,15 +608,23 @@ func checkConfigProblems(
 		}
 	}
 
-	unmatched := make([]string, 0)
-	for key := range project.Targets {
-		if !valid[key] {
-			unmatched = append(unmatched, key)
+	var malformed, unmatched []string
+	for imp, blk := range project.Targets {
+		if _, ok := blk.(map[string]any); !ok {
+			malformed = append(malformed, imp)
+			continue
+		}
+		if validImps[imp] == nil {
+			unmatched = append(unmatched, imp)
 		}
 	}
+	sort.Strings(malformed)
 	sort.Strings(unmatched)
-	for _, key := range unmatched {
-		problems = append(problems, "project target key has no target: "+key)
+	for _, imp := range malformed {
+		problems = append(problems, "project config is not a mapping: "+imp)
+	}
+	for _, imp := range unmatched {
+		problems = append(problems, "project import path has no target: "+imp)
 	}
 	return problems
 }

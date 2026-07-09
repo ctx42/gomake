@@ -1826,8 +1826,9 @@ func Test_Main_targetConfig(t *testing.T) {
 
 	yaml := "version: 1\n" +
 		"targets:\n" +
-		"  " + prjkit.GoModName + "#Show:\n" +
-		"    message: hello-from-config\n"
+		"  " + prjkit.GoModName + ":\n" +
+		"    show:\n" +
+		"      message: hello-from-config\n"
 	oskit.Write(t, yaml, prj.Root(), configFileName)
 
 	rng := tst.Ring(

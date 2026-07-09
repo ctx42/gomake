@@ -99,9 +99,13 @@ type config struct {
 	// without a target name, for example when requesting to run default target.
 	target string
 
-	// Merged per-target configuration blocks from the gomake.yaml files, keyed
-	// by canonical target key. Populated by [config.applyFileConfig].
-	targetCfg map[string]any
+	// User-level target configuration tree, keyed by import path. Populated by
+	// [config.applyFileConfig].
+	userTargets map[string]any
+
+	// Project-level target configuration tree, keyed by import path. Populated
+	// by [config.applyFileConfig].
+	projectTargets map[string]any
 }
 
 // newConfig returns new instance of [config].

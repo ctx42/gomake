@@ -25,7 +25,7 @@ import (
 func Test_newConfig(t *testing.T) {
 	// Tripwire: a new config field must gain an assertion below, not just a
 	// bumped count.
-	assert.Fields(t, 18, config{})
+	assert.Fields(t, 19, config{})
 
 	t.Run("no args", func(t *testing.T) {
 		// --- Given ---
@@ -55,7 +55,8 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, cfg.args)
 		assert.Equal(t, -1, cfg.targetIdx)
 		assert.Empty(t, cfg.target)
-		assert.Equal(t, 0, len(cfg.targetCfg))
+		assert.Equal(t, 0, len(cfg.userTargets))
+		assert.Equal(t, 0, len(cfg.projectTargets))
 	})
 
 	t.Run("option work dir absolute", func(t *testing.T) {
