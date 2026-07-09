@@ -1,3 +1,7 @@
+## v0.17.0 (Thu, 09 Jul 2026 15:06:45 UTC)
+- fix(cli): print error when tmp dir cannot be prepared.
+- refactor(version): source placeholders and var names from xdef.
+
 ## v0.16.0 (Wed, 08 Jul 2026 14:37:40 UTC)
 - feat(docs): add favicons, social preview image, and meta.
 - docs: update TASKS.md with stdout/stderr check and GitHub vulnerability toggle steps.
