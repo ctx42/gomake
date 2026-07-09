@@ -6,8 +6,7 @@ require (
 	github.com/ctx42/ring v0.7.1
 	github.com/ctx42/testing v0.55.0
 	github.com/ctx42/testkit v0.7.0
+	github.com/ctx42/xdef v0.3.0
 	github.com/ctx42/xflag v0.10.0
 	github.com/goccy/go-yaml v1.19.2
 )
-
-require github.com/ctx42/xdef v0.1.0 // indirect

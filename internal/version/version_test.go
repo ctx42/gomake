@@ -10,6 +10,7 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/xdef/pkg/xdef"
 
 	"github.com/ctx42/gomake/pkg/gomake"
 )
@@ -41,9 +42,9 @@ func Test_PopulateVersion(t *testing.T) {
 
 		// --- Then ---
 		_, rev, hash, state, _ := Get()
-		assert.Equal(t, NotSet, rev)
-		assert.Equal(t, NotSet, hash)
-		assert.Equal(t, NotSet, state)
+		assert.Equal(t, xdef.NotSet, rev)
+		assert.Equal(t, xdef.NotSet, hash)
+		assert.Equal(t, xdef.NotSet, state)
 	})
 
 	t.Run("published build no vcs", func(t *testing.T) {
@@ -58,8 +59,8 @@ func Test_PopulateVersion(t *testing.T) {
 		// --- Then ---
 		_, rev, hash, state, _ := Get()
 		assert.Equal(t, "v1.2.3", rev)
-		assert.Equal(t, NotSet, hash)
-		assert.Equal(t, NotSet, state)
+		assert.Equal(t, xdef.NotSet, hash)
+		assert.Equal(t, xdef.NotSet, state)
 	})
 
 	t.Run("build info with vcs", func(t *testing.T) {
@@ -94,7 +95,7 @@ func Test_PopulateVersion(t *testing.T) {
 
 		// --- Then ---
 		_, _, _, _, ccid := Get()
-		assert.Equal(t, NotSet, ccid)
+		assert.Equal(t, xdef.NotSet, ccid)
 	})
 
 	t.Run("ccid from env", func(t *testing.T) {
@@ -120,7 +121,7 @@ func Test_orNotSet_tabular(t *testing.T) {
 		s    string
 		want string
 	}{
-		{"empty returns NotSet", "", NotSet},
+		{"empty returns NotSet", "", xdef.NotSet},
 		{"non-empty returned as is", "v1.2", "v1.2"},
 		{"whitespace is non-empty", " ", " "},
 	}
@@ -154,14 +155,14 @@ func Test_Version_tabular(t *testing.T) {
 		{
 			"only rev",
 			"my-cmd",
-			"v1.2", NotSet, NotSet, NotSet, NotSet,
+			"v1.2", xdef.NotSet, xdef.NotSet, xdef.NotSet, xdef.NotSet,
 			"my-cmd v1.2, hash: <not set>, build date: <not set>, " +
 				"scm state: <not set>, cc tag: <not set>",
 		},
 		{
 			"unset",
 			"my-cmd",
-			NotSet, NotSet, NotSet, NotSet, NotSet,
+			xdef.NotSet, xdef.NotSet, xdef.NotSet, xdef.NotSet, xdef.NotSet,
 			"my-cmd <not set>, hash: <not set>, build date: <not set>, " +
 				"scm state: <not set>, cc tag: <not set>",
 		},
@@ -188,27 +189,46 @@ func Test_Version_tabular(t *testing.T) {
 }
 
 func Test_LDFlags(t *testing.T) {
-	// --- Given ---
-	saveVars(t)
+	t.Run("formats all fields", func(t *testing.T) {
+		// --- Given ---
+		saveVars(t)
 
-	buildDate = "2000-01-02T03:04:05Z"
-	scmRev = "v1.2"
-	scmHash = "12ab34"
-	scmState = "clean"
-	ccid = "my-cc-tag"
+		buildDate = "2000-01-02T03:04:05Z"
+		scmRev = "v1.2"
+		scmHash = "12ab34"
+		scmState = "clean"
+		ccid = "my-cc-tag"
 
-	// --- When ---
-	have := LDFlags()
+		// --- When ---
+		have := LDFlags()
 
-	// --- Then ---
-	want := "" +
-		"-X github.com/ctx42/gomake/internal/version.buildDate=" +
-		"2000-01-02T03:04:05Z " +
-		"-X github.com/ctx42/gomake/internal/version.scmRev=v1.2 " +
-		"-X github.com/ctx42/gomake/internal/version.scmHash=12ab34 " +
-		"-X github.com/ctx42/gomake/internal/version.scmState=clean " +
-		"-X github.com/ctx42/gomake/internal/version.ccid=my-cc-tag"
-	assert.Equal(t, want, have)
+		// --- Then ---
+		want := "" +
+			"-X github.com/ctx42/gomake/internal/version.buildDate=" +
+			"2000-01-02T03:04:05Z " +
+			"-X github.com/ctx42/gomake/internal/version.scmRev=v1.2 " +
+			"-X github.com/ctx42/gomake/internal/version.scmHash=12ab34 " +
+			"-X github.com/ctx42/gomake/internal/version.scmState=clean " +
+			"-X github.com/ctx42/gomake/internal/version.ccid=my-cc-tag"
+		assert.Equal(t, want, have)
+	})
+
+	t.Run("names come from xdef", func(t *testing.T) {
+		// The injected field names are sourced from xdef so they never drift
+		// from the names gmgo injects into other projects. Guard that linkage.
+		// --- Given ---
+		saveVars(t)
+
+		// --- When ---
+		have := LDFlags()
+
+		// --- Then ---
+		assert.Contain(t, "."+xdef.VarBuildDate+"=", have)
+		assert.Contain(t, "."+xdef.VarScmRev+"=", have)
+		assert.Contain(t, "."+xdef.VarScmHash+"=", have)
+		assert.Contain(t, "."+xdef.VarScmState+"=", have)
+		assert.Contain(t, "."+xdef.VarCcid+"=", have)
+	})
 }
 
 func Test_buildInfoFields_tabular(t *testing.T) {

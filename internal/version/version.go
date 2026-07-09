@@ -10,13 +10,10 @@ import (
 	"time"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"github.com/ctx42/xdef/pkg/xdef"
 
 	"github.com/ctx42/gomake/pkg/gomake"
 )
-
-// NotSet is the placeholder value for build-metadata variables that
-// were not populated via ldflags at compile time.
-const NotSet = "<not set>"
 
 // importPath is the package path used in -X linker definitions.
 const importPath = "github.com/ctx42/gomake/internal/version"
@@ -24,19 +21,19 @@ const importPath = "github.com/ctx42/gomake/internal/version"
 // Variables set by ldflags representing the build version.
 var (
 	// buildDate holds the UTC RFC-3339 timestamp of the build.
-	buildDate = NotSet
+	buildDate = xdef.NotSet
 
 	// scmRev holds the source control revision tag, e.g. "v1.2.3".
-	scmRev = NotSet
+	scmRev = xdef.NotSet
 
 	// scmHash holds the short commit hash, e.g. "12ab23c".
-	scmHash = NotSet
+	scmHash = xdef.NotSet
 
 	// scmState represents the working directory state: clean, dirty.
-	scmState = NotSet
+	scmState = xdef.NotSet
 
 	// ccid represents CI/CD job identifier.
-	ccid = NotSet
+	ccid = xdef.NotSet
 )
 
 // Get returns the current build-metadata values: date, rev, hash, state, cc.
@@ -56,9 +53,9 @@ func Set(date, rev, hash, state, cc string) {
 // PopulateVersion reads version metadata embedded by the Go toolchain in info
 // and stores the results in the package variables. The module version and the
 // vcs.revision/vcs.modified build settings are used when present and
-// meaningful; any field info does not carry is recorded as [NotSet]. It relies
-// only on the Go toolchain and never shells out to a VCS such as git, so
-// installation works on machines that have only Go installed. The CI/CD job
+// meaningful; any field info does not carry is recorded as [xdef.NotSet]. It
+// relies only on the Go toolchain and never shells out to a VCS such as git,
+// so installation works on machines that have only Go installed. The CI/CD job
 // identifier is read from the [gomake.CCIDEnvKey] environment variable.
 func PopulateVersion(rng *ring.Ring, info *debug.BuildInfo) {
 	rev, hash, state := buildInfoFields(info)
@@ -72,10 +69,10 @@ func PopulateVersion(rng *ring.Ring, info *debug.BuildInfo) {
 	)
 }
 
-// orNotSet returns s when it is non-empty, otherwise [NotSet].
+// orNotSet returns s when it is non-empty, otherwise [xdef.NotSet].
 func orNotSet(s string) string {
 	if s == "" {
-		return NotSet
+		return xdef.NotSet
 	}
 	return s
 }
@@ -99,11 +96,11 @@ func Version(cmd string) string {
 // `go build -ldflags`.
 func LDFlags() string {
 	flags := []string{
-		ldflag("buildDate", buildDate),
-		ldflag("scmRev", scmRev),
-		ldflag("scmHash", scmHash),
-		ldflag("scmState", scmState),
-		ldflag("ccid", ccid),
+		ldflag(xdef.VarBuildDate, buildDate),
+		ldflag(xdef.VarScmRev, scmRev),
+		ldflag(xdef.VarScmHash, scmHash),
+		ldflag(xdef.VarScmState, scmState),
+		ldflag(xdef.VarCcid, ccid),
 	}
 	return strings.Join(flags, " ")
 }
