@@ -1,3 +1,6 @@
+## v0.20.1 (Fri, 10 Jul 2026 20:26:03 UTC)
+- fix(builtin): honor namespace for external target imports.
+
 ## v0.20.0 (Fri, 10 Jul 2026 19:29:09 UTC)
 - feat(config): accept a []byte config block in TargetConfig.
 
