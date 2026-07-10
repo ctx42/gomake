@@ -42,26 +42,29 @@ version: 1
 #   # environment; falls back to <os-temp-dir>/gomake when unset.
 #   tmp: /abs/path/to/tmp
 
-# targets — per-target configuration. Each block is keyed by the target's
-# canonical origin:
+# targets — per-target configuration. A nested tree keyed first by import path
+# and then by the target's invocation-path names — the lower-case, kebab-cased
+# identifiers "gomake --list" prints, split on ":". A namespace becomes a
+# nesting level; a target's own settings live under its name. The key follows
+# the target's home package, so renaming an import with //gomake:import does
+# not change it.
 #
-#   <import-path>#<name>
+# GoMake delivers the nearest-level block: it walks from the target's own node
+# up toward the import-path root and uses the first node that carries settings,
+# so namespace-level keys are shared by every target beneath them while a
+# target's own block shadows them. A block never includes a nested target's
+# keys.
 #
-# <name> is the Go identifier in the target's own package: a plain function
-# contributes its function name (Deploy); a namespaced method contributes
-# <Receiver>.<Method> (Project.Setup). The key follows the target's home
-# package, so renaming an import with //gomake:import does not change it.
-#
-# Run "gomake --check-config" to print the exact key for every discovered
-# target. A block's contents are opaque to GoMake and never validated — the
-# target decodes its own block with gomake.TargetConfig.
+# Run "gomake --check-config" to print every discovered target grouped by
+# import path. A block's contents are opaque to GoMake and never validated —
+# the target decodes its own block with gomake.TargetConfig.
 #
 # targets:
-#   # A plain function target.
-#   github.com/acme/tasks#Deploy:
-#     region: eu
-#     hosts: [web-1, web-2]
-#
-#   # A namespaced method target.
-#   example.com/proj#Project.Setup:
-#     dirs: [cmd, internal]
+#   github.com/acme/tasks:            # import path
+#     deploy:                         # target :deploy
+#       region: eu
+#       hosts: [web-1, web-2]
+#     go:                             # namespace :go:*
+#       timeout: 5m                   # shared by every :go target
+#       lint:                         # sub-namespace :go:lint:*
+#         version: v2.13.0            # shared by :go:lint and its children
