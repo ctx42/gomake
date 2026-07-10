@@ -1,3 +1,8 @@
+## v0.19.0 (Fri, 10 Jul 2026 14:30:22 UTC)
+- docs(config): document target config internals and fix template.
+- feat(config)!: add typed path-based config value access.
+- docs(dev): fix table formatting and align columns in markdown files.
+
 ## v0.18.0 (Thu, 09 Jul 2026 20:51:42 UTC)
 - feat(config)!: nest gomake.yaml targets by import path and name.
 
