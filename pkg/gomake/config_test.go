@@ -14,7 +14,7 @@ import (
 )
 
 // configFrom builds a [Config] from a JSON block by delivering it through the
-// ring meta store, mirroring how gomake feeds a target at run time.
+// ring meta store as a string, mirroring how gomake feeds a target at run time.
 func configFrom(t tester.T, jsn string) *Config {
 	t.Helper()
 	rng := ring.New()
@@ -23,7 +23,22 @@ func configFrom(t tester.T, jsn string) *Config {
 }
 
 func Test_TargetConfig(t *testing.T) {
-	t.Run("decodes json block", func(t *testing.T) {
+	t.Run("decodes byte block", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, []byte(`{"region":"eu","count":3}`))
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.True(t, cfg.Has("region"))
+		assert.Equal(t, "eu", must.Value(GetCfg[string](cfg, "region")))
+		assert.Equal(t, 3, must.Value(GetCfg[int](cfg, "count")))
+	})
+
+	t.Run("decodes string block", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		rng.MetaSet(ConfigMetaKey, `{"region":"eu","count":3}`)
@@ -50,7 +65,7 @@ func Test_TargetConfig(t *testing.T) {
 		assert.False(t, cfg.Has("region"))
 	})
 
-	t.Run("non-string meta value", func(t *testing.T) {
+	t.Run("unsupported meta value type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		rng.MetaSet(ConfigMetaKey, 123)

@@ -40,20 +40,29 @@ type Config struct {
 
 // TargetConfig decodes the running target's configuration block from the ring
 // meta store and returns it. The block comes from the target's entry in a
-// gomake.yaml file. When the target has no configuration, which includes a
-// meta value present but not a string, it returns an empty [Config] and a nil
-// error; it returns an error only when a present block is not valid JSON.
+// gomake.yaml file. gomake stores it as a string; a []byte is also accepted so
+// a caller that embeds gomake and sets the meta value itself may use either.
+// When the target has no configuration, which includes a meta value present
+// but neither string nor []byte, it returns an empty [Config] and a nil error;
+// it returns an error only when a present block is not valid JSON.
 func TargetConfig(rng *ring.Ring) (*Config, error) {
 	cfg := &Config{data: map[string]any{}}
 	raw, ok := rng.MetaLookup(ConfigMetaKey)
 	if !ok {
 		return cfg, nil
 	}
-	text, ok := raw.(string)
-	if !ok {
+	var data []byte
+	switch val := raw.(type) {
+	case []byte:
+		data = val
+
+	case string:
+		data = []byte(val)
+
+	default:
 		return cfg, nil
 	}
-	if err := json.Unmarshal([]byte(text), &cfg.data); err != nil {
+	if err := json.Unmarshal(data, &cfg.data); err != nil {
 		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
 	return cfg, nil
