@@ -1,3 +1,6 @@
+## v0.20.0 (Fri, 10 Jul 2026 19:29:09 UTC)
+- feat(config): accept a []byte config block in TargetConfig.
+
 ## v0.19.0 (Fri, 10 Jul 2026 14:30:22 UTC)
 - docs(config): document target config internals and fix template.
 - feat(config)!: add typed path-based config value access.
