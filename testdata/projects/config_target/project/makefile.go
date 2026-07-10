@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -14,12 +15,14 @@ import (
 
 // Show prints the message from its gomake.yaml configuration block.
 func Show(_ context.Context, rng *ring.Ring) error {
-	var cfg struct {
-		Message string `json:"message"`
-	}
-	if err := gomake.TargetConfig(rng, &cfg); err != nil {
+	cfg, err := gomake.TargetConfig(rng)
+	if err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(rng.Stdout(), "message=%s", cfg.Message)
+	msg, err := gomake.GetCfg[string](cfg, "message")
+	if err != nil && !errors.Is(err, gomake.ErrMiss) {
+		return err
+	}
+	_, _ = fmt.Fprintf(rng.Stdout(), "message=%s", msg)
 	return nil
 }

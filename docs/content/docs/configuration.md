@@ -133,7 +133,7 @@ gomake's ring meta store  ──────►  in-process target reads it here
     │   5. makefile compiled to its own binary → run as a subprocess
     │      ferry JSON as --gomake-config=<json>; the generated main strips
     ▼      the argument and re-stores it under the same key
-subprocess ring meta store  ────►  6. target decodes with gomake.TargetConfig
+subprocess ring meta store  ────►  6. target reads via TargetConfig + GetCfg[T]
 ```
 
 Step by step:
@@ -151,10 +151,10 @@ Step by step:
    target's block are left behind.
 
 3. **Convert YAML to JSON.** The selected block is re-encoded from YAML into a
-   JSON string with `encoding/json`. A target therefore decodes JSON, not YAML,
-   and tags its fields with `json:"..."`. YAML scalars, sequences, and mappings
-   become their natural JSON counterparts (string, number, bool, array,
-   object).
+   JSON string with `encoding/json`. A target therefore reads JSON values, not
+   YAML, and a struct decoded from the block tags its fields with `json:"..."`.
+   YAML scalars, sequences, and mappings become their natural JSON counterparts
+   (string, number, bool, array, object).
 
 4. **Store in the ring meta store.** GoMake places the JSON string in the ring
    meta store under the exported key `gomake.ConfigMetaKey`. For a target run
@@ -169,18 +169,21 @@ Step by step:
    as a positional argument — and re-stores its value under
    `gomake.ConfigMetaKey` in the subprocess ring.
 
-6. **Decode in the target.** `gomake.TargetConfig` looks the JSON string up by
-   key and unmarshals it into your value.
+6. **Read in the target.** `gomake.TargetConfig` looks the JSON string up by
+   key and decodes it once into a `*Config`; `gomake.GetCfg[T]` then pulls typed
+   values from it by path.
 
 The environment is deliberately never used to carry configuration; it is left
 free for a target's own override logic. A target that has no matching block
-sees an unset meta key, and `TargetConfig` leaves your value untouched.
+sees an unset meta key, so `TargetConfig` returns an empty `Config` and every
+`GetCfg` on it returns `ErrMiss`.
 
 ## Reading configuration in a target
 
 A target receives only its own configuration block, as a JSON value in the ring
-meta store. Decode it into any type with `gomake.TargetConfig`, which uses the
-standard-library JSON decoder — no extra dependency is required.
+meta store. Build a `*gomake.Config` from the ring once with
+`gomake.TargetConfig`, then read typed values by path with the generic
+`gomake.GetCfg[T]` — no extra dependency is required.
 
 Given this project-level block:
 
@@ -201,14 +204,14 @@ GoMake delivers it to the target as the JSON string:
 {"region":"eu","hosts":["web-1","web-2"],"replicas":3,"dry_run":false}
 ```
 
-which the target decodes into a struct — or any JSON-compatible type, such as a
-`map[string]any`:
+which the target reads value by value:
 
 ```go
 package main
 
 import (
     "context"
+    "errors"
 
     "github.com/ctx42/ring/pkg/ring"
 
@@ -217,27 +220,54 @@ import (
 
 // Deploy reads its configuration and deploys accordingly.
 func Deploy(_ context.Context, rng *ring.Ring) error {
-    var cfg struct {
-        Region   string   `json:"region"`
-        Hosts    []string `json:"hosts"`
-        Replicas int      `json:"replicas"`
-        DryRun   bool     `json:"dry_run"`
-    }
-    if err := gomake.TargetConfig(rng, &cfg); err != nil {
+    cfg, err := gomake.TargetConfig(rng)
+    if err != nil {
         return err
     }
-    // cfg holds its zero value when the target has no configuration; supply
-    // your own defaults for the fields you require.
-    _ = cfg
+
+    region, err := gomake.GetCfg[string](cfg, "region")
+    if err != nil && !errors.Is(err, gomake.ErrMiss) {
+        return err
+    }
+    hosts, err := gomake.GetCfg[[]string](cfg, "hosts")
+    if err != nil && !errors.Is(err, gomake.ErrMiss) {
+        return err
+    }
+    // region is "" and hosts is nil when their keys are absent; supply your
+    // own defaults for the values you require.
+    _, _ = region, hosts
     return nil
 }
 ```
 
-`TargetConfig` returns an error only when the block is present but fails to
-decode into `v` (for example, a type mismatch); a missing block is not an
-error. The block is opaque to GoMake, so it is validated only here, against
-your own type — a typo in a key name silently leaves that field at its zero
-value.
+### The `GetCfg[T]` contract
+
+`GetCfg[T](cfg, path)` resolves `path` against the block and returns the
+value as `T`:
+
+- **Path.** Dot-separated, resolved against each node's type: a map segment is
+  a key, an array segment a zero-based index (`"lint.file"`, `"hosts.0"`). Wrap
+  a segment in single quotes to address a key that itself contains a dot — an
+  import path, say — as in `"modules.'github.com/acme/app'.package"`.
+- **Types.** The value is converted through a JSON round-trip, so `T` may be a
+  scalar, a slice, a map, or a json-tagged struct (`GetCfg[[]string]`,
+  `GetCfg[Deploy]`). `time.Duration` is the one string conversion — it is parsed
+  with `time.ParseDuration`, so a YAML `timeout: 5m` reads as
+  `GetCfg[time.Duration](cfg, "timeout")`. `GetCfg[any]` returns the raw decoded
+  value.
+- **Strictness.** Conversion is strict: a number becomes an integer only when
+  it has no fractional part, and a value of the wrong JSON kind is rejected.
+- **Errors.** `ErrMiss` when the path is absent, out of range, or empty;
+  `ErrType` on a type mismatch or a failed duration parse. Use
+  `errors.Is(err, gomake.ErrMiss)` to treat an optional key as a default, and
+  `cfg.Has(path)` to test presence without an error.
+
+Because Go methods cannot be generic, `GetCfg` is a package-level function
+taking the `*Config` as its first argument, not a method on `Config`.
+
+The block is opaque to GoMake and validated only here, against the type you
+ask for — a typo in a path resolves to `ErrMiss` rather than a compile error,
+so cover the paths your target reads with tests.
 
 A target never sees the `settings` section or another target's block. When one
 target calls another as a plain Go function, GoMake applies no configuration to

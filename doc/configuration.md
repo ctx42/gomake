@@ -13,9 +13,11 @@ JSON string:
 - **Key:** `gomake.ConfigMetaKey` (`pkg/gomake/config.go`), whose value is
   `github.com/ctx42/gomake/pkg/gomake.targetConfig`.
 - **Value:** the target's resolved settings block, `json.Marshal`ed.
-- **Read:** `gomake.TargetConfig(rng, &v)` — `MetaLookup` + `json.Unmarshal`
-  (`pkg/gomake/config.go`). A missing key, or a non-string value, leaves `v`
-  untouched and returns nil; only a decode failure is an error.
+- **Read:** `gomake.TargetConfig(rng)` returns a `*gomake.Config` — it
+  `MetaLookup`s the key and `json.Unmarshal`s the block once into a
+  `map[string]any` (`pkg/gomake/config.go`). A missing key or a non-string
+  value yields an empty `Config` and a nil error; only a malformed block is an
+  error.
 
 The environment is deliberately never used to carry configuration — it stays
 free for a target's own override logic.
@@ -94,20 +96,32 @@ construction.
 
 ## Consumer side
 
-The target — in-process or subprocess — reads the block identically:
+The target — in-process or subprocess — reads the block identically. It
+constructs a `*gomake.Config` once, then pulls typed values by dotted path with
+the generic `gomake.GetCfg[T]`:
 
 ```go
 func Show(_ context.Context, rng *ring.Ring) error {
-    var cfg struct {
-        Message string `json:"message"`
-    }
-    if err := gomake.TargetConfig(rng, &cfg); err != nil {
+    cfg, err := gomake.TargetConfig(rng)
+    if err != nil {
         return err
     }
-    // cfg is the zero value when the target has no block.
+    msg, err := gomake.GetCfg[string](cfg, "message")
+    if err != nil && !errors.Is(err, gomake.ErrMiss) {
+        return err
+    }
+    // msg is "" when the block has no "message" key.
     ...
 }
 ```
+
+`GetCfg[T]` resolves the path against the block, then converts the value to
+`T` through a JSON round-trip, so `T` may be a scalar, slice, map, or a
+json-tagged struct; `time.Duration` is parsed from a string, and `GetCfg[any]`
+returns the raw value. It returns `ErrMiss` when the path is absent and
+`ErrType` on a type mismatch. Because methods cannot be generic in Go,
+`GetCfg` is a free function taking the `*Config` as its first argument, not a
+method. `Config.Has(path)` tests presence without an `errors.Is` dance.
 
 See `testdata/projects/config_target/project/makefile.go`.
 

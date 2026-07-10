@@ -40,7 +40,7 @@ helpers operate on those values.
 | Area                | Helpers                                                                                                               |
 |---------------------|-----------------------------------------------------------------------------------------------------------------------|
 | Target context      | `TargetName`, `WithTargetName`                                                                                        |
-| Configuration       | `TargetConfig`, `ConfigMetaKey`                                                                                       |
+| Configuration       | `TargetConfig`, `Config`, `GetCfg`, `GetCfgDefault`, `Has`, `ConfigMetaKey`, `ErrMiss`, `ErrType`                     |
 | Module & paths      | `Root`, `PathExists`, `FileExists`, `DirExists`, `ReadFile`                                                           |
 | Environment         | `Getenv`, `LookupEnv`, `GetGOOS`, `GetGOARCH`, `EnvSplit`, `EnvJoin`, `EnvSplitOrdered`, `Expander`, `PrettyPrintEnv` |
 | Interactive input   | `ReadLine`, `ReadChar`                                                                                                |

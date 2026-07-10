@@ -29,12 +29,20 @@ func ExampleTargetConfig() {
 	rng := ring.New()
 	rng.MetaSet(gomake.ConfigMetaKey, `{"region":"eu"}`)
 
-	var cfg struct {
-		Region string `json:"region"`
-	}
-	_ = gomake.TargetConfig(rng, &cfg)
-	fmt.Println(cfg.Region)
+	cfg, _ := gomake.TargetConfig(rng)
+	region, _ := gomake.GetCfg[string](cfg, "region")
+	fmt.Println(region)
 	// Output: eu
+}
+
+func ExampleGetCfg() {
+	rng := ring.New()
+	rng.MetaSet(gomake.ConfigMetaKey, `{"lint":{"version":"v2.13.0"}}`)
+
+	cfg, _ := gomake.TargetConfig(rng)
+	version, _ := gomake.GetCfg[string](cfg, "lint.version")
+	fmt.Println(version)
+	// Output: v2.13.0
 }
 
 func ExampleExitStatus() {
