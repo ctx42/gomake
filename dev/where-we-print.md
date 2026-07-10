@@ -8,24 +8,24 @@ function, not every individual print call.
 
 ## `gomake` binary (`cmd/gomake` -> `cli.Main`)
 
-| Function                | File                                  | What it prints                                                                              |
-|-------------------------|---------------------------------------|---------------------------------------------------------------------------------------------|
-| `cli.Main`              | `internal/cli/main.go:42`             | Bulk of it: version, help, all error lines to stderr; shell-completion to **stdout** (`:92`) |
+| Function                | File                                  | What it prints                                                                                              |
+|-------------------------|---------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| `cli.Main`              | `internal/cli/main.go:42`             | Bulk of it: version, help, all error lines to stderr; shell-completion to **stdout** (`:92`)                |
 | `cli.(*goMake).Execute` | `internal/cli/cli.go:118`             | **The task runner** — wires the compiled makefile subprocess `Stdout`/`Stderr` to the terminal (`:156-157`) |
-| `cli.(*goMake).Compile` | `internal/cli/cli.go:103`             | `"Compiling makefile..."` progress to stderr (via `withProgress`)                           |
-| `cli.withProgress`      | `internal/cli/progress.go:19`         | Progress/spinner to the writer it's handed (always `rng.Stderr()`)                          |
-| `cli.runWithoutCompile` | `internal/cli/main.go:266`            | Error lines to stderr (`:277`, `:281`)                                                      |
-| `cli.PrepareTargets`    | `internal/cli/pull_orchestrate.go:21` | Announces each external-target import to stderr (`:30`)                                      |
-| `cli.runCheckConfig`    | `internal/cli/config_file.go:386`     | Config-check report to stderr (`:404`)                                                      |
+| `cli.(*goMake).Compile` | `internal/cli/cli.go:103`             | `"Compiling makefile..."` progress to stderr (via `withProgress`)                                           |
+| `cli.withProgress`      | `internal/cli/progress.go:19`         | Progress/spinner to the writer it's handed (always `rng.Stderr()`)                                          |
+| `cli.runWithoutCompile` | `internal/cli/main.go:266`            | Error lines to stderr (`:277`, `:281`)                                                                      |
+| `cli.PrepareTargets`    | `internal/cli/pull_orchestrate.go:21` | Announces each external-target import to stderr (`:30`)                                                     |
+| `cli.runCheckConfig`    | `internal/cli/config_file.go:386`     | Config-check report to stderr (`:404`)                                                                      |
 
 ## Generated makefile binary (embedded template) + `mkf` runtime
 
-| Function                  | File                          | What it prints                                                                       |
-|---------------------------|-------------------------------|--------------------------------------------------------------------------------------|
-| `run` (template)          | `internal/cli/gen_main.go:78` | **Top-level of the generated binary** (embedded, has `{{...}}` placeholders); panics/errors to stderr |
-| `mkf.(*Makefile).Execute` | `internal/mkf/makefile.go:177`| Help output to stderr (`:189`); orchestrates the target run                          |
-| `mkf.fTgtVersion`         | `internal/mkf/makefile.go:224`| `:version` core target -> stderr (`:226`)                                            |
-| `mkf.fTgtList`            | `internal/mkf/makefile.go:232`| `:list` core target -> stderr (`:234`)                                               |
+| Function                  | File                           | What it prints                                                                                        |
+|---------------------------|--------------------------------|-------------------------------------------------------------------------------------------------------|
+| `run` (template)          | `internal/cli/gen_main.go:78`  | **Top-level of the generated binary** (embedded, has `{{...}}` placeholders); panics/errors to stderr |
+| `mkf.(*Makefile).Execute` | `internal/mkf/makefile.go:177` | Help output to stderr (`:189`); orchestrates the target run                                           |
+| `mkf.fTgtVersion`         | `internal/mkf/makefile.go:224` | `:version` core target -> stderr (`:226`)                                                             |
+| `mkf.fTgtList`            | `internal/mkf/makefile.go:232` | `:list` core target -> stderr (`:234`)                                                                |
 
 ## `install` binary (`cmd/install`)
 
