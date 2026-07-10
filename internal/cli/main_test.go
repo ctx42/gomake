@@ -1228,6 +1228,94 @@ func mainTargetTimeouts(t *testing.T) {
 		})
 }
 
+func Test_applyExternalTargetMeta(t *testing.T) {
+	t.Run("config injected under the namespace key", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+		content := "imports:\n" +
+			"  - import: a.com/pkg\n" +
+			"    namespace: db\n" +
+			"    config:\n" +
+			"      host: db.internal\n"
+		oskit.Write(t, content, dir, TargetsFile)
+
+		// --- When ---
+		applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		have, ok := rng.MetaLookup("db")
+		assert.True(t, ok)
+		assert.Equal(t, `{"host":"db.internal"}`, have)
+	})
+
+	t.Run("config injected under the path base key", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+		content := "imports:\n" +
+			"  - import: a.com/pkg\n" +
+			"    config:\n" +
+			"      host: db.internal\n"
+		oskit.Write(t, content, dir, TargetsFile)
+
+		// --- When ---
+		applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		have, ok := rng.MetaLookup("pkg")
+		assert.True(t, ok)
+		assert.Equal(t, `{"host":"db.internal"}`, have)
+	})
+
+	t.Run("import without config sets no meta", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+		content := "imports:\n  - import: a.com/pkg\n    namespace: db\n"
+		oskit.Write(t, content, dir, TargetsFile)
+
+		// --- When ---
+		applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		_, ok := rng.MetaLookup("db")
+		assert.False(t, ok)
+	})
+
+	t.Run("absent targets file is a no-op", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+
+		// --- When ---
+		applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		_, ok := rng.MetaLookup("pkg")
+		assert.False(t, ok)
+	})
+
+	t.Run("malformed targets file is a no-op", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+		oskit.Write(t, "{bad yaml}", dir, TargetsFile)
+
+		// --- When ---
+		applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		_, ok := rng.MetaLookup("pkg")
+		assert.False(t, ok)
+	})
+}
+
 func Test_RunWithoutCompile(t *testing.T) {
 	t.Run("call target with arguments", func(t *testing.T) {
 		// --- Given ---

@@ -194,6 +194,81 @@ func Test_TargetsFromSpecs(t *testing.T) {
 	})
 }
 
+func Test_TargetsFromImports(t *testing.T) {
+	t.Run("namespace prefixes root targets", func(t *testing.T) {
+		// --- Given ---
+		imports := []Import{
+			{
+				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
+				Namespace: "myns",
+			},
+		}
+
+		rng := ring.New()
+
+		// --- When ---
+		tgs, err := TargetsFromImports(rng, imports)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"myns:pkg0"}, tgs.Names())
+	})
+
+	t.Run("namespace prefixes type-based targets", func(t *testing.T) {
+		// --- Given ---
+		imports := []Import{
+			{
+				Path:      "github.com/ctx42/gomake/testdata/imports/pkg4",
+				Namespace: "myns",
+			},
+		}
+
+		rng := ring.New()
+
+		// --- When ---
+		tgs, err := TargetsFromImports(rng, imports)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"myns:ns:m0", "myns:ns:m1"}, tgs.Names())
+	})
+
+	t.Run("empty namespace leaves targets unprefixed", func(t *testing.T) {
+		// --- Given ---
+		imports := []Import{
+			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
+		}
+
+		rng := ring.New()
+
+		// --- When ---
+		tgs, err := TargetsFromImports(rng, imports)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"pkg0"}, tgs.Names())
+	})
+
+	t.Run("namespace applied to built-in targets", func(t *testing.T) {
+		// --- Given ---
+		imports := []Import{
+			{
+				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
+				Namespace: "myns",
+			},
+		}
+
+		rng := ring.New()
+
+		// --- When ---
+		tgs, err := TargetsFromImports(rng, imports, BuiltInCB)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{":myns:pkg0"}, tgs.Names())
+	})
+}
+
 func Test_Targets_Add(t *testing.T) {
 	t.Run("add not existing", func(t *testing.T) {
 		// --- Given ---

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ctx42/gomake/internal/builtin"
 	"github.com/ctx42/gomake/internal/cli"
+	"github.com/ctx42/gomake/internal/parser"
 )
 
 // main is called by `go generate` in builtin.go. It reads [cli.TargetsFile]
@@ -25,12 +26,20 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	cfg, err := cli.LoadExternalTargets(modRoot)
+	cfg, err := cli.LoadExternalTargets(filepath.Join(modRoot, cli.TargetsFile))
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	if err = builtin.GenMain(cfg.Paths()); err != nil {
+	entries := cfg.Imports()
+	imports := make([]parser.Import, 0, len(entries))
+	for _, ent := range entries {
+		imports = append(imports, parser.Import{
+			Path:      ent.Path,
+			Namespace: ent.Namespace,
+		})
+	}
+	if err = builtin.GenImports(imports); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

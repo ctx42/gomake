@@ -12,6 +12,7 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 
 	"github.com/ctx42/gomake/internal/builtin"
+	"github.com/ctx42/gomake/internal/parser"
 )
 
 // PrepareTargets runs PrepareExternalTargets, then loads the resulting config
@@ -49,11 +50,18 @@ func prepareExternalTargets(rng *ring.Ring, wd string) error {
 	return regenBuiltins(rng, wd, cfg)
 }
 
-// regenBuiltins runs builtin.GenMain to regenerate
-// internal/builtin/targets.go.
+// regenBuiltins runs builtin.GenImports to regenerate
+// internal/builtin/targets.go, carrying each import's namespace.
 func regenBuiltins(rng *ring.Ring, wd string, cfg *ImportsConfig) error {
-	err := builtin.GenMain(
-		cfg.Paths(),
+	imports := make([]parser.Import, 0, len(cfg.imports))
+	for _, ent := range cfg.imports {
+		imports = append(imports, parser.Import{
+			Path:      ent.Path,
+			Namespace: ent.Namespace,
+		})
+	}
+	err := builtin.GenImports(
+		imports,
 		builtin.WithGenDst(filepath.Join(wd, "internal", "builtin")),
 		builtin.WithGenEnv(rng),
 		builtin.WithoutGenEmptySrc,

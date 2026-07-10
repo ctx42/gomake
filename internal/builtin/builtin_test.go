@@ -295,3 +295,32 @@ func Test_GenMain(t *testing.T) {
 		assert.NoFileExist(t, prj.Path("data", mainEmptyFN))
 	})
 }
+
+func Test_GenImports(t *testing.T) {
+	t.Run("namespace prefixes generated target names", func(t *testing.T) {
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+
+		imports := []parser.Import{
+			{
+				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
+				Namespace: "myns",
+			},
+		}
+		opts := []GenOption{
+			WithoutGenEmptySrc,
+			WithGenDst(prj.Root()),
+		}
+
+		// --- When ---
+		err := GenImports(imports, opts...)
+
+		// --- Then ---
+		assert.NoError(t, err)
+
+		have := oskit.ReadFileStr(t, prj.Path(targetsFN))
+		assert.Contain(t, `PkgNS:       "myns",`, have)
+		assert.Contain(t, `Name:        ":myns:pkg0",`, have)
+	})
+}

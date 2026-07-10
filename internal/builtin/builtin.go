@@ -140,10 +140,22 @@ func WithGenDst(dst string) GenOption {
 func WithoutGenEmptySrc(opts *genOpts) { opts.empty = false }
 
 // GenMain is an entry point for the program called by "go generate".
-// It takes an import spec list and generates code describing built-in targets.
-// It will overwrite the files if they exist. By default, "builtin" package
-// name is used, the dst path is current working directory, and all three files
-// are generated.
+// It takes an import spec list and generates code describing built-in targets,
+// registering every target in the root namespace. Use [GenImports] to compile
+// in targets under a namespace.
+func GenMain(specs []string, opts ...GenOption) error {
+	imports := make([]parser.Import, len(specs))
+	for i, spec := range specs {
+		imports[i] = parser.Import{Path: spec}
+	}
+	return GenImports(imports, opts...)
+}
+
+// GenImports generates code describing built-in targets from the given
+// imports, each of which may carry a namespace prefixing the target names its
+// package contributes. It overwrites the files if they exist. By default, the
+// "builtin" package name is used, the dst path is the current working
+// directory, and all three files are generated.
 //
 // The destination tree (dst and dst/data) is created if missing, so callers
 // need not pre-create it.
@@ -153,7 +165,7 @@ func WithoutGenEmptySrc(opts *genOpts) { opts.empty = false }
 //   - dst/[targetsFN]
 //   - dst/data/[mainFN]
 //   - dst/data/[mainEmptyFN]
-func GenMain(specs []string, opts ...GenOption) error {
+func GenImports(imports []parser.Import, opts ...GenOption) error {
 	def := genOpts{
 		name:  "builtin",
 		empty: true,
@@ -173,7 +185,7 @@ func GenMain(specs []string, opts ...GenOption) error {
 	var code []byte
 
 	// Generate code for built-in targets to include in builtin package.
-	tgs, err := parser.TargetsFromSpecs(def.rng, specs, parser.BuiltInCB)
+	tgs, err := parser.TargetsFromImports(def.rng, imports, parser.BuiltInCB)
 	if err != nil {
 		return fmt.Errorf("parsing target specs: %w", err)
 	}

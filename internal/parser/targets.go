@@ -43,18 +43,51 @@ func TargetsFromList(ts ...*mkf.Target) (*Targets, error) {
 	return tgs, nil
 }
 
+// Import identifies an external target package to compile in. Namespace, when
+// non-empty, prefixes every target name the package contributes.
+type Import struct {
+	// Path is the Go import path (spec) of the target package.
+	Path string
+
+	// Namespace prefixes the names of all targets from the package. Empty
+	// registers the targets in the root namespace.
+	Namespace string
+}
+
 // TargetsFromSpecs returns a list of targets in given import specs.
 // For targets from each spec it applies provided call back function(s) and
-// then merges them into one list of targets.
+// then merges them into one list of targets. All targets are registered in the
+// root namespace; use [TargetsFromImports] to apply a namespace.
 func TargetsFromSpecs(
 	rng *ring.Ring,
 	specs []string,
 	fns ...TgsMapCB,
 ) (*Targets, error) {
 
+	imports := make([]Import, len(specs))
+	for i, spec := range specs {
+		imports[i] = Import{Path: spec}
+	}
+	return TargetsFromImports(rng, imports, fns...)
+}
+
+// TargetsFromImports returns the targets found in the given import packages.
+// Each import's namespace is applied to its targets, the callbacks fns are
+// applied to every target, and the results are merged into one list.
+func TargetsFromImports(
+	rng *ring.Ring,
+	imports []Import,
+	fns ...TgsMapCB,
+) (*Targets, error) {
+
 	all := NewTargets()
-	for _, spec := range specs {
-		pkg, err := NewPackage(rng, spec, withPkgSpec)
+	for _, imp := range imports {
+		pkg, err := NewPackage(
+			rng,
+			imp.Path,
+			withPkgSpec,
+			withPkgNS(imp.Namespace),
+		)
 		if err != nil {
 			return nil, err
 		}
