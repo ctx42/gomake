@@ -137,6 +137,13 @@ go run github.com/ctx42/gomake/cmd/install@latest --targets=./targets.yaml
 go run github.com/ctx42/gomake/cmd/install@latest --targets=https://example.com/targets.yaml
 ```
 
+Or forward `--targets` through the install script with `sh -s --`:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh -s -- --targets=./targets.yaml
+curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh -s -- --targets=https://example.com/targets.yaml
+```
+
 ### Embedding a CI/CD tag
 
 ```shell

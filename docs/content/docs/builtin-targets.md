@@ -63,7 +63,10 @@ Passing `--targets` to `go run github.com/ctx42/gomake/cmd/install@latest`
 runs the target-preparation step, which:
 
 1. Reads the supplied `targets.yaml`.
-2. Runs `go get <import-path>` for each listed package.
+2. Runs `go get <import-path>` for each listed package. The exception is a
+   local `--targets` file inside a Go module (see [Developing targets
+   locally](#developing-targets-locally)): that module is resolved from disk
+   through a temporary Go workspace, so `go get` is skipped for its packages.
 3. Calls `builtin.GenMain`, which parses each package for target functions and
    generates `internal/builtin/targets.go`.
 4. Compiles the generated file into the gomake binary.
@@ -102,6 +105,27 @@ To regenerate `internal/builtin/targets.go` without a full reinstall:
 ```shell
 go generate ./internal/builtin/
 ```
+
+---
+
+## Developing targets locally
+
+While developing a target package you can build a gomake binary from its
+unpublished source, without pushing to a module proxy. Point `--targets` at a
+local `targets.yaml` that lives inside the target's Go module:
+
+```shell
+GOBIN=$PWD/dist go run ./cmd/install --targets=/path/to/module/targets.yaml
+```
+
+When the `--targets` file sits inside a Go module, `cmd/install` resolves that
+module from disk through a temporary Go workspace instead of fetching it with
+`go get`. Your local, uncommitted edits are compiled straight into the binary,
+and `go.mod` is left untouched — no `replace` or `require` is added. Re-run the
+command after each edit to rebuild.
+
+Only the module containing the `targets.yaml` is resolved locally; imports from
+any other module still come from the proxy via `go get`.
 
 ---
 
