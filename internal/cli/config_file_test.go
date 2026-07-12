@@ -475,7 +475,7 @@ func Test_settingKeys(t *testing.T) {
 }
 
 func Test_resolveTargetBlock_tabular(t *testing.T) {
-	// Tree mirrors the plan's gmgo example: a "go" ns_root carrying a shared
+	// Tree mirrors the plan's gomake example: a "go" ns_root carrying a shared
 	// timeout, a "lint" sub-namespace, and a "build" target with its own block.
 	root := map[string]any{
 		"go": map[string]any{

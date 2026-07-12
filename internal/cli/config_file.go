@@ -559,7 +559,9 @@ func checkConfigReport(
 	} else {
 		b.WriteString("gomake.yaml: problems found\n")
 		for _, prob := range problems {
-			b.WriteString("  - " + prob + "\n")
+			b.WriteString("  - ")
+			b.WriteString(prob)
+			b.WriteString("\n")
 		}
 	}
 
@@ -573,14 +575,18 @@ func checkConfigReport(
 	}
 	sort.Strings(paths)
 	for _, imp := range paths {
-		b.WriteString("  " + imp + ":\n")
+		b.WriteString("  ")
+		b.WriteString(imp)
+		b.WriteString(":\n")
 		names := make([]string, 0, len(imps[imp]))
 		for name := range imps[imp] {
 			names = append(names, name)
 		}
 		sort.Strings(names)
 		for _, name := range names {
-			b.WriteString("    " + name + "\n")
+			b.WriteString("    ")
+			b.WriteString(name)
+			b.WriteString("\n")
 		}
 	}
 	return b.String()
