@@ -28,7 +28,7 @@ func Test_PrepareExternalTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir)
+		err := prepareExternalTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -43,7 +43,7 @@ func Test_PrepareExternalTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir)
+		err := prepareExternalTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -59,7 +59,7 @@ func Test_PrepareExternalTargets(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir)
+		err := prepareExternalTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorContain(t, "go get example.com/pkg@v1.0.0", err)
@@ -135,7 +135,7 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := PrepareTargets(rng.Ring(), dir)
+		err := PrepareTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -149,11 +149,41 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := PrepareTargets(rng.Ring(), dir)
+		err := PrepareTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
 	})
+}
+
+func Test_underModule_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		importPath string
+		mod        string
+		want       bool
+	}{
+		{"empty mod matches nothing", "example.com/mod", "", false},
+		{"exact module match", "example.com/mod", "example.com/mod", true},
+		{"package under module", "example.com/mod/pkg", "example.com/mod",
+			true},
+		{"unrelated module", "example.com/other", "example.com/mod", false},
+		{"prefix but not a path boundary", "example.com/module",
+			"example.com/mod", false},
+		{"version suffix ignored", "example.com/mod/pkg@v1.2.0",
+			"example.com/mod", true},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := underModule(tc.importPath, tc.mod)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
 }
 
 func Test_runGoInDir(t *testing.T) {

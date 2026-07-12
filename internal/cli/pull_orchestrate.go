@@ -18,9 +18,11 @@ import (
 // PrepareTargets runs PrepareExternalTargets, then loads the resulting config
 // and announces each external target import to rng.Stderr(). It is the single
 // call used by install and build scripts to prepare and announce external
-// target imports.
-func PrepareTargets(rng *ring.Ring, wd string) error {
-	if err := prepareExternalTargets(rng, wd); err != nil {
+// target imports. Imports under skipMod (an empty string disables this) are a
+// module a Go workspace already provides from disk, so their `go get` is
+// skipped.
+func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
+	if err := prepareExternalTargets(rng, wd, skipMod); err != nil {
 		return err
 	}
 	cfg, err := LoadExternalTargets(filepath.Join(wd, TargetsFile))
@@ -35,19 +37,36 @@ func PrepareTargets(rng *ring.Ring, wd string) error {
 
 // prepareExternalTargets reads `wd/targets.yaml`, runs go get for each
 // listed import, and regenerates `internal/builtin/targets.go`. It's called by
-// install and build scripts before compiling the binary.
-func prepareExternalTargets(rng *ring.Ring, wd string) error {
+// install and build scripts before compiling the binary. Imports under skipMod
+// are provided by a Go workspace and their `go get` is skipped.
+func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
 	cfg, err := LoadExternalTargets(filepath.Join(wd, TargetsFile))
 	if err != nil {
 		return err
 	}
 	for _, ent := range cfg.imports {
+		if underModule(ent.Path, skipMod) {
+			continue
+		}
 		if err = runGoInDir(rng, wd, "get", ent.Path); err != nil {
 			_ = runGoInDir(rng, wd, "mod", "tidy")
 			return fmt.Errorf("go get %s: %w", ent.Path, err)
 		}
 	}
 	return regenBuiltins(rng, wd, cfg)
+}
+
+// underModule reports whether the import path belongs to module mod: either
+// the package is the module itself or lives beneath it. A version suffix on
+// the import path is ignored. An empty mod matches nothing.
+func underModule(importPath, mod string) bool {
+	if mod == "" {
+		return false
+	}
+	if i := strings.Index(importPath, "@"); i >= 0 {
+		importPath = importPath[:i]
+	}
+	return importPath == mod || strings.HasPrefix(importPath, mod+"/")
 }
 
 // regenBuiltins runs builtin.GenImports to regenerate

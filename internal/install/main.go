@@ -48,6 +48,11 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 // are all skipped. With imports present it builds from a writable tree (a temp
 // copy for a published build), writes the effective targets.yaml, regenerates
 // the builtins, then compiles.
+//
+// When tgs is a local path inside a Go module, that module is resolved from
+// disk through a temporary Go workspace (see [setupWorkspace]) rather than
+// fetched with go get, so an unpublished target module is compiled in and the
+// build tree's go.mod is left untouched.
 func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) error {
 	wd, err := os.Getwd()
 	if err != nil {
@@ -99,13 +104,37 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) error {
 		defer cleanup()
 		buildDir = tmp
 	}
+
+	// A devel build compiles in place. Regenerating the builtins would leave
+	// the working tree with a targets.go importing external modules that only
+	// resolve inside the temporary workspace, breaking the next `go build` or
+	// `go run`. Snapshot those artifacts and restore them after the build; the
+	// binary already carries the compiled-in targets.
+	if devel {
+		restore, serr := snapshotGenerated(buildDir)
+		if serr != nil {
+			return fmt.Errorf("gomake: %w", serr)
+		}
+		defer restore()
+	}
+
+	// Local --targets in a Go module: resolve that module from disk via a
+	// temporary workspace so the build compiles in unpublished edits without
+	// go get, keeping go.mod untouched. skipMod names the module whose imports
+	// the workspace provides; its go get is skipped below.
+	skipMod, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+	if err != nil {
+		return fmt.Errorf("gomake: %w", err)
+	}
+	defer cleanup()
+
 	if tgs != "" {
 		out := filepath.Join(buildDir, cli.TargetsFile)
 		if err = os.WriteFile(out, cfg.Raw(), 0o644); err != nil {
 			return fmt.Errorf("gomake: write targets: %w", err)
 		}
 	}
-	if err = cli.PrepareTargets(rng, buildDir); err != nil {
+	if err = cli.PrepareTargets(rng, buildDir, skipMod); err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
 	return Build(rng, buildDir, dst, ldflags)
@@ -154,6 +183,126 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 		return "", fmt.Errorf("go mod download %s: empty Dir", module)
 	}
 	return info.Dir, nil
+}
+
+// setupWorkspace enables disk resolution of a local --targets module. When tgs
+// is a filesystem path whose directory lies inside a Go module, it creates a
+// temporary Go workspace covering both buildDir and that module, points the
+// build subprocess environment at it via GOWORK, and returns the module's
+// import path so the caller can skip `go get` for its packages. Resolving from
+// the workspace instead of the proxy keeps buildDir's go.mod untouched and
+// compiles in unpublished local edits.
+//
+// It returns an empty module path and a no-op cleanup when tgs is empty, is a
+// URL, or its directory is not inside a module: the caller then falls back to
+// `go get`. The returned cleanup removes the workspace file and unsets GOWORK;
+// it is always safe to call.
+func setupWorkspace(env ring.Environ, buildDir, tgs string) (
+	string,
+	func(),
+	error,
+) {
+	noop := func() {}
+	if tgs == "" ||
+		strings.HasPrefix(tgs, "http://") ||
+		strings.HasPrefix(tgs, "https://") {
+		return "", noop, nil
+	}
+	mod, root, ok := moduleAt(env, filepath.Dir(tgs))
+	if !ok {
+		return "", noop, nil
+	}
+
+	wsDir, err := os.MkdirTemp("", "gomake-work-*")
+	if err != nil {
+		return "", noop, err
+	}
+	cleanup := func() {
+		env.EnvUnset("GOWORK")
+		_ = os.RemoveAll(wsDir)
+	}
+	env.EnvSet("GOWORK", filepath.Join(wsDir, "go.work"))
+	if err = goWorkInit(env, wsDir, buildDir, root); err != nil {
+		cleanup()
+		return "", noop, err
+	}
+	return mod, cleanup, nil
+}
+
+// moduleAt reports the Go module that dir belongs to, returning the module's
+// import path and root directory. The ok result is false when dir is not
+// inside a module or the toolchain reports no usable module, signalling the
+// caller to fall back to `go get`.
+func moduleAt(env ring.Environ, dir string) (mod, root string, ok bool) {
+	cmd := exec.Command("go", "list", "-m", "-f", "{{.Path}}::{{.Dir}}")
+	cmd.Env = env.EnvAll()
+	cmd.Dir = dir
+	out, err := cmd.Output()
+	if err != nil {
+		return "", "", false
+	}
+	mod, root, ok = strings.Cut(strings.TrimSpace(string(out)), "::")
+	if !ok || mod == "" || root == "" {
+		return "", "", false
+	}
+	return mod, root, true
+}
+
+// goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the
+// workspace file that lists both modules.
+func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
+	cmd := exec.Command("go", "work", "init", buildDir, modRoot)
+	cmd.Env = env.EnvAll()
+	cmd.Dir = wsDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		msg := strings.TrimSpace(string(out))
+		return fmt.Errorf("go work init: %w: %s", err, msg)
+	}
+	return nil
+}
+
+// snapshotGenerated records the current contents of the files a full in-source
+// build overwrites — the effective targets.yaml and the two generated builtin
+// sources — and returns a function that restores them. Restoring undoes the
+// regeneration so the working tree is left byte-identical and still compiles
+// without the temporary workspace. Only files that exist at snapshot time are
+// tracked; an absent path is left untouched (never created). In a real module
+// all three are committed, so the tree is fully restored. The returned function
+// is meant to run via defer after the build.
+func snapshotGenerated(buildDir string) (func(), error) {
+	// These mirror cli.PrepareTargets's outputs: the effective targets config
+	// and builtin.GenImports's two generated files.
+	paths := []string{
+		filepath.Join(buildDir, cli.TargetsFile),
+		filepath.Join(buildDir, "internal", "builtin", "targets.go"),
+		filepath.Join(buildDir, "internal", "builtin", "data",
+			"targets_main.go_"),
+	}
+	type snapshot struct {
+		data []byte
+		mode os.FileMode
+	}
+	saved := make(map[string]snapshot, len(paths))
+	for _, pth := range paths {
+		info, err := os.Stat(pth)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		data, err := os.ReadFile(pth)
+		if err != nil {
+			return nil, err
+		}
+		saved[pth] = snapshot{data: data, mode: info.Mode()}
+	}
+	return func() {
+		for pth, snap := range saved {
+			_ = os.WriteFile(pth, snap.data, snap.mode)
+		}
+	}, nil
 }
 
 // copyToTemp copies the read-only module source at srcDir into a fresh temp
