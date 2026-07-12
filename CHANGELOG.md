@@ -1,3 +1,7 @@
+## v0.21.0 (Sun, 12 Jul 2026 12:44:40 UTC)
+- build(deps): bump xdef to v0.5.0 and testkit to v0.8.0.
+- refactor(cli): split concatenated WriteString calls.
+
 ## v0.20.1 (Fri, 10 Jul 2026 20:26:03 UTC)
 - fix(builtin): honor namespace for external target imports.
 
