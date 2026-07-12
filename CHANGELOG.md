@@ -1,3 +1,9 @@
+## v0.22.0 (Sun, 12 Jul 2026 19:29:08 UTC)
+- feat(install): resolve local --targets modules via a Go workspace.
+- test(clitest): isolate user config in TestEnv.
+- docs: remove dev/ maintainer notes.
+- docs: document local target development via workspace.
+
 ## v0.21.0 (Sun, 12 Jul 2026 12:44:40 UTC)
 - build(deps): bump xdef to v0.5.0 and testkit to v0.8.0.
 - refactor(cli): split concatenated WriteString calls.
