@@ -100,7 +100,7 @@ func LDFlags() string {
 		ldflag(xdef.VarScmRev, scmRev),
 		ldflag(xdef.VarScmHash, scmHash),
 		ldflag(xdef.VarScmState, scmState),
-		ldflag(xdef.VarCcid, ccid),
+		ldflag(xdef.VarCCID, ccid),
 	}
 	return strings.Join(flags, " ")
 }

@@ -215,7 +215,8 @@ func Test_LDFlags(t *testing.T) {
 
 	t.Run("names come from xdef", func(t *testing.T) {
 		// The injected field names are sourced from xdef so they never drift
-		// from the names gmgo injects into other projects. Guard that linkage.
+		// from the names gomake injects into other projects. Guard that
+		// linkage.
 		// --- Given ---
 		saveVars(t)
 
@@ -227,7 +228,7 @@ func Test_LDFlags(t *testing.T) {
 		assert.Contain(t, "."+xdef.VarScmRev+"=", have)
 		assert.Contain(t, "."+xdef.VarScmHash+"=", have)
 		assert.Contain(t, "."+xdef.VarScmState+"=", have)
-		assert.Contain(t, "."+xdef.VarCcid+"=", have)
+		assert.Contain(t, "."+xdef.VarCCID+"=", have)
 	})
 }
 
