@@ -17,6 +17,7 @@ import (
 func Test_TestEnv(t *testing.T) {
 	// --- Given ---
 	tspy := tester.New(t)
+	tspy.ExpectTempDir(1)
 	tspy.Close()
 
 	// --- When ---

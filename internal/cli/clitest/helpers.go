@@ -18,8 +18,11 @@ import (
 
 // TestEnv returns environment with minimum number of variables.
 //
+// GOCACHE is derived from `go env`, and XDG_CONFIG_HOME is set to an isolated
+// empty temp directory so user-level gomake.yaml resolution never reads the
+// developer's real $HOME/.config/gomake/gomake.yaml.
+//
 // Variables set form the current environment (if they are set):
-//   - GOCACHE
 //   - GOROOT
 //   - GO111MODULE
 //   - GOPATH
@@ -34,6 +37,10 @@ func TestEnv(t tester.T) []string {
 
 	env := make([]string, 0, 10)
 	env = append(env, "GOCACHE="+goCache(t))
+
+	// Point user config at an empty dir; HOME stays real for git, but a real
+	// $HOME/.config/gomake/gomake.yaml must not leak into config resolution.
+	env = append(env, "XDG_CONFIG_HOME="+t.TempDir())
 
 	env = fromEnv("GOROOT", env)
 	env = fromEnv("GO111MODULE", env)
