@@ -9,6 +9,7 @@ import (
 
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
+	"github.com/ctx42/xflag/pkg/xflag"
 )
 
 func Test_emptyTargetsNote_tabular(t *testing.T) {
@@ -31,7 +32,7 @@ func Test_emptyTargetsNote_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
-			fs := flag.NewFlagSet("install", flag.ContinueOnError)
+			fs := xflag.NewFlagSet("install", flag.ContinueOnError)
 			tgs := fs.String("targets", "", "")
 			must.Nil(fs.Parse(tc.args))
 

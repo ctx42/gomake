@@ -24,12 +24,13 @@ import (
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"github.com/ctx42/xflag/pkg/xflag"
 
 	"github.com/ctx42/gomake/internal/install"
 )
 
 func main() {
-	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	fs := xflag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	usage := "path or URL to a targets.yaml file"
 	targets := fs.String("targets", "", usage)
 	_ = fs.Parse(os.Args[1:])
@@ -52,17 +53,11 @@ func main() {
 // emptyTargetsNote returns the note to print when --targets was set on fs with
 // an empty value tgs. It returns "" when the flag was absent or non-empty, so
 // that an explicit --targets= is reported rather than treated as an error.
-func emptyTargetsNote(fs *flag.FlagSet, tgs string) string {
+func emptyTargetsNote(fs *xflag.FlagSet, tgs string) string {
 	if strings.TrimSpace(tgs) != "" {
 		return ""
 	}
-	set := false
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "targets" {
-			set = true
-		}
-	})
-	if !set {
+	if !fs.WasSet("targets") {
 		return ""
 	}
 	return "no external targets provided"
