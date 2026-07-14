@@ -1,3 +1,7 @@
+## v0.23.0 (Tue, 14 Jul 2026 10:38:19 UTC)
+- feat(install): report empty --targets= instead of proceeding silently.
+- refactor(install): detect empty --targets= via xflag WasSet.
+
 ## v0.22.0 (Sun, 12 Jul 2026 19:29:08 UTC)
 - feat(install): resolve local --targets modules via a Go workspace.
 - test(clitest): isolate user config in TestEnv.
