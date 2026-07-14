@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
 
@@ -28,13 +29,41 @@ import (
 )
 
 func main() {
-	targets := flag.String("targets", "", "path or URL to a targets.yaml file")
-	flag.Parse()
+	fs := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	usage := "path or URL to a targets.yaml file"
+	targets := fs.String("targets", "", usage)
+	_ = fs.Parse(os.Args[1:])
 
 	rng := ring.New()
+
+	// An explicitly empty --targets= is not an error: report that no external
+	// targets were provided and continue installing.
+	if note := emptyTargetsNote(fs, *targets); note != "" {
+		_, _ = fmt.Fprintln(rng.Stderr(), note)
+	}
+
 	info, _ := debug.ReadBuildInfo()
 	if err := install.Main(rng, info, *targets); err != nil {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
 		os.Exit(1)
 	}
+}
+
+// emptyTargetsNote returns the note to print when --targets was set on fs with
+// an empty value tgs. It returns "" when the flag was absent or non-empty, so
+// that an explicit --targets= is reported rather than treated as an error.
+func emptyTargetsNote(fs *flag.FlagSet, tgs string) string {
+	if strings.TrimSpace(tgs) != "" {
+		return ""
+	}
+	set := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "targets" {
+			set = true
+		}
+	})
+	if !set {
+		return ""
+	}
+	return "no external targets provided"
 }
