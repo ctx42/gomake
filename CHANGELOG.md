@@ -1,3 +1,6 @@
+## v0.24.0 (Wed, 15 Jul 2026 20:01:44 UTC)
+- fix(install): resolve external targets against the build tree.
+
 ## v0.23.0 (Tue, 14 Jul 2026 10:38:19 UTC)
 - feat(install): report empty --targets= instead of proceeding silently.
 - refactor(install): detect empty --targets= via xflag WasSet.
