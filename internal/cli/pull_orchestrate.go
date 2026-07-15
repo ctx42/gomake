@@ -82,6 +82,7 @@ func regenBuiltins(rng *ring.Ring, wd string, cfg *ImportsConfig) error {
 	err := builtin.GenImports(
 		imports,
 		builtin.WithGenDst(filepath.Join(wd, "internal", "builtin")),
+		builtin.WithGenWorkDir(wd),
 		builtin.WithGenEnv(rng),
 		builtin.WithoutGenEmptySrc,
 	)

@@ -263,21 +263,25 @@ func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
 }
 
 // snapshotGenerated records the current contents of the files a full in-source
-// build overwrites — the effective targets.yaml and the two generated builtin
-// sources — and returns a function that restores them. Restoring undoes the
-// regeneration so the working tree is left byte-identical and still compiles
-// without the temporary workspace. Only files that exist at snapshot time are
-// tracked; an absent path is left untouched (never created). In a real module
-// all three are committed, so the tree is fully restored. The returned function
-// is meant to run via defer after the build.
+// build overwrites — the effective targets.yaml, the two generated builtin
+// sources, and the go.mod/go.sum that `go get` rewrites — and returns a
+// function that restores them. Restoring undoes the regeneration so the working
+// tree is left byte-identical and still compiles without the temporary
+// workspace. Only files that exist at snapshot time are tracked; an absent path
+// is left untouched (never created). In a real module all are committed, so the
+// tree is fully restored. The returned function is meant to run via defer after
+// the build.
 func snapshotGenerated(buildDir string) (func(), error) {
-	// These mirror cli.PrepareTargets's outputs: the effective targets config
-	// and builtin.GenImports's two generated files.
+	// These mirror cli.PrepareTargets's outputs: the effective targets config,
+	// builtin.GenImports's two generated files, and the go.mod/go.sum that its
+	// `go get` step rewrites to add the external target modules.
 	paths := []string{
 		filepath.Join(buildDir, cli.TargetsFile),
 		filepath.Join(buildDir, "internal", "builtin", "targets.go"),
 		filepath.Join(buildDir, "internal", "builtin", "data",
 			"targets_main.go_"),
+		filepath.Join(buildDir, "go.mod"),
+		filepath.Join(buildDir, "go.sum"),
 	}
 	type snapshot struct {
 		data []byte

@@ -207,7 +207,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, imports)
+		tgs, err := TargetsFromImports(rng, "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -226,7 +226,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, imports)
+		tgs, err := TargetsFromImports(rng, "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -242,7 +242,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, imports)
+		tgs, err := TargetsFromImports(rng, "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -261,7 +261,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, imports, BuiltInCB)
+		tgs, err := TargetsFromImports(rng, "", imports, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)

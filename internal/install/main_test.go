@@ -681,6 +681,31 @@ func Test_snapshotGenerated(t *testing.T) {
 			oskit.ReadFileStr(t, build, "internal", "builtin", "targets.go"))
 	})
 
+	t.Run("restores go.mod and go.sum", func(t *testing.T) {
+		// --- Given ---
+		// The devel install runs go get in the working tree, mutating go.mod
+		// and go.sum; restore must return both to their pre-build contents.
+		build := t.TempDir()
+		oskit.MkdirAll(t, build, "internal", "builtin", "data")
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", build, "go.mod")
+		oskit.Write(t, "h1:original\n", build, "go.sum")
+		restore, err := snapshotGenerated(build)
+		must.Nil(err)
+
+		// go get rewrites both files during the build.
+		oskit.Write(t, "module example.test\n\ngo 1.24\n\nrequire x v1\n",
+			build, "go.mod")
+		oskit.Write(t, "h1:changed\n", build, "go.sum")
+
+		// --- When ---
+		restore()
+
+		// --- Then ---
+		assert.Equal(t, "module example.test\n\ngo 1.24\n",
+			oskit.ReadFileStr(t, build, "go.mod"))
+		assert.Equal(t, "h1:original\n", oskit.ReadFileStr(t, build, "go.sum"))
+	})
+
 	t.Run("leaves an absent file untouched", func(t *testing.T) {
 		// --- Given ---
 		// targets.go is absent at snapshot time; the build then creates it. An

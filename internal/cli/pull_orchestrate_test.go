@@ -127,6 +127,42 @@ func Test_regenBuiltins_writesToCompiledPackage(t *testing.T) {
 	oskit.Stat(t, wd, append(append([]string{}, parts...), "targets.go")...)
 }
 
+func Test_regenBuiltins_resolvesImportFromBuildDir(t *testing.T) {
+	// A published install copies the module source to a temp build tree and
+	// runs from an unrelated working directory. regenBuiltins must resolve each
+	// import spec against the build tree's go.mod, not the process working
+	// directory, or `go list` reports "no required module provides package".
+
+	// --- Given ---
+	rng := ringtest.New(t)
+
+	wd := t.TempDir()
+	oskit.MkdirAll(t, wd, "fakepkg")
+	oskit.Write(t, "module example.com/fakepkg\n\ngo 1.24\n", wd, "fakepkg",
+		"go.mod")
+	oskit.Write(t, "package fakepkg\n", wd, "fakepkg", "fakepkg.go")
+	gomod := "module test.example.com\n\ngo 1.24\n\n" +
+		"require example.com/fakepkg v0.0.0\n\n" +
+		"replace example.com/fakepkg => ./fakepkg\n"
+	oskit.Write(t, gomod, wd, "go.mod")
+	oskit.MkdirAll(t, wd, "internal", "builtin", "data")
+
+	// A working directory with no go.mod, mimicking a published install run
+	// from wherever `go run ...@latest` was invoked.
+	t.Chdir(t.TempDir())
+
+	cfg := &ImportsConfig{
+		imports: []ImportEntry{{Path: "example.com/fakepkg"}},
+	}
+
+	// --- When ---
+	err := regenBuiltins(rng.Ring(), wd, cfg)
+
+	// --- Then ---
+	assert.NoError(t, err)
+	oskit.Stat(t, wd, "internal", "builtin", "targets.go")
+}
+
 func Test_PrepareTargets(t *testing.T) {
 	t.Run("the absent file succeeds and prints nothing", func(t *testing.T) {
 		// --- Given ---

@@ -28,6 +28,15 @@ func withPkgNS(ns string) func(*Package) {
 	return func(pkg *Package) { pkg.PkgNS = ns }
 }
 
+// withPkgDir is a [NewPackage] option setting the directory `go list` runs in
+// to resolve an import spec. It matters only for import specs, whose resolution
+// depends on the go.mod of the module rooted at dir; an empty dir falls back to
+// the process working directory. Apply it after [withPkgSpec], which clears the
+// package path.
+func withPkgDir(dir string) func(*Package) {
+	return func(pkg *Package) { pkg.ImpPath = dir }
+}
+
 // module represents Go module.
 type module struct {
 	// Import spec (github.com/ctx42/gomake).

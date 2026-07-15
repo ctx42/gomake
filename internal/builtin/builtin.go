@@ -113,6 +113,10 @@ type genOpts struct {
 	// current working directory is used.
 	dst string
 
+	// Directory whose go.mod resolves the import specs, if empty string then
+	// the current working directory is used.
+	dir string
+
 	// Generate [mainEmptyFN] file. Default: true.
 	empty bool
 }
@@ -133,6 +137,13 @@ func WithGenEnv(rng *ring.Ring) GenOption {
 // generate files. By default, empty string meaning current working directory.
 func WithGenDst(dst string) GenOption {
 	return func(opts *genOpts) { opts.dst = dst }
+}
+
+// WithGenWorkDir is option for [GenMain] setting the directory whose go.mod
+// resolves the import specs. By default, empty string meaning the current
+// working directory.
+func WithGenWorkDir(dir string) GenOption {
+	return func(opts *genOpts) { opts.dir = dir }
 }
 
 // WithoutGenEmptySrc is option for [GenMain] turning off generating
@@ -185,7 +196,12 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	var code []byte
 
 	// Generate code for built-in targets to include in builtin package.
-	tgs, err := parser.TargetsFromImports(def.rng, imports, parser.BuiltInCB)
+	tgs, err := parser.TargetsFromImports(
+		def.rng,
+		def.dir,
+		imports,
+		parser.BuiltInCB,
+	)
 	if err != nil {
 		return fmt.Errorf("parsing target specs: %w", err)
 	}
