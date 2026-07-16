@@ -175,5 +175,5 @@ func ldflag(field, value string) string {
 // needsLDQuote reports whether the ldflag definition string contains
 // characters that require shell quoting.
 func needsLDQuote(def string) bool {
-	return strings.ContainsAny(def, " \t\"'\\")
+	return strings.ContainsAny(def, " \t\"'\\\n\r")
 }
