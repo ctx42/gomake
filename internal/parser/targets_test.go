@@ -131,12 +131,14 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("duplicated target error", func(t *testing.T) {
 		// --- Given ---
+		// Both packages expose hello/bye; the tagged one needs the gomake
+		// build tag so go list includes its files.
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/projects/simple_tagged/project",
 			"github.com/ctx42/gomake/testdata/projects/simple_untagged/project",
 		}
 
-		rng := ring.New()
+		rng := SetBuildTag(ring.New())
 
 		// --- When ---
 		tgs, err := TargetsFromSpecs(rng, impSpecs)

@@ -17,7 +17,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath)
+		_, pkg, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAstEmpty, err)
@@ -31,7 +31,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath)
+		_, pkg, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstParse, err)
@@ -45,7 +45,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath)
+		_, pkg, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -60,9 +60,10 @@ func Test_astFiles(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
 		absPath := modkit.Path(relPath)
+		files := []string{"makefile.go"}
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, "makefile.go")
+		_, pkg, err := astFiles(absPath, files)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -73,13 +74,30 @@ func Test_astFiles(t *testing.T) {
 		assert.Equal(t, "main", fil.Name.Name)
 	})
 
+	t.Run("error - empty file list does not scan dir", func(t *testing.T) {
+		// --- Given ---
+		// Directory has makefile.go; an explicit empty list must not fall
+		// back to scanning the directory (build-tag / go-list fidelity).
+		relPath := "testdata/projects/simple_untagged/project"
+		absPath := modkit.Path(relPath)
+		files := []string{}
+
+		// --- When ---
+		_, pkg, err := astFiles(absPath, files)
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrAstEmpty, err)
+		assert.ErrorContain(t, absPath, err)
+		assert.Nil(t, pkg)
+	})
+
 	t.Run("untagged files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_untagged/project"
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath)
+		_, pkg, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -96,7 +114,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath)
+		_, pkg, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
@@ -113,7 +131,7 @@ func Test_astAndDocPkg(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		astPkg, docPkg, err := astAndDocPkg(absPath)
+		astPkg, docPkg, err := astAndDocPkg(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -130,7 +148,7 @@ func Test_astAndDocPkg(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		astPkg, docPkg, err := astAndDocPkg(absPath)
+		astPkg, docPkg, err := astAndDocPkg(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)

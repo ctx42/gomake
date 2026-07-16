@@ -68,11 +68,11 @@ func NewTestHelper(
 	}
 
 	// Use only files in the package to built AST.
-	var files []string
+	files := make([]string, 0, len(tst.pkg.Files))
 	for _, name := range tst.pkg.Files {
 		files = append(files, filepath.Join(tst.pkg.ImpPath, name))
 	}
-	tst.files, tst.docPkg, err = astAndDocPkg(impPath, files...)
+	tst.files, tst.docPkg, err = astAndDocPkg(impPath, files)
 	if err != nil {
 		t.Error(err)
 		return nil

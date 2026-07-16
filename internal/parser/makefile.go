@@ -70,11 +70,12 @@ func MakefileFromPackage(rng *ring.Ring, pkg *Package) (*Makefile, error) {
 func (pmf *Makefile) addTargets() (*doc.Package, error) {
 	pkg := pmf.pkg
 
-	var files []string
+	// Always non-nil so an empty go-list selection is not a dir scan.
+	files := make([]string, 0, len(pkg.Files))
 	for _, name := range pkg.Files {
 		files = append(files, filepath.Join(pkg.ImpPath, name))
 	}
-	astPkg, docPkg, err := astAndDocPkg(pkg.ImpPath, files...)
+	astPkg, docPkg, err := astAndDocPkg(pkg.ImpPath, files)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +117,10 @@ func (pmf *Makefile) adGmImports(fil *ast.File) error {
 	}
 	for _, pkg := range pks {
 		var docPkg *doc.Package
-		_, docPkg, err = astAndDocPkg(pkg.ImpPath, pkg.Files...)
+		// Non-nil even when empty: empty import packages must not re-scan.
+		impFiles := make([]string, len(pkg.Files))
+		copy(impFiles, pkg.Files)
+		_, docPkg, err = astAndDocPkg(pkg.ImpPath, impFiles)
 		if err != nil {
 			return err
 		}

@@ -19,15 +19,19 @@ import (
 // file set and a map from the absolute path to parsed [ast.File]. Returns error
 // if none or more than one package name is found, or a parse error occurred.
 //
+// A nil files means scan every non-directory *.go under impPath. A non-nil
+// files (including empty) uses only that list so an empty go-list selection
+// yields [ErrAstEmpty] instead of re-scanning the directory.
+//
 // go/parser.ParseFile is used instead of go/packages because go/packages
 // invokes the full build system; ParseFile is sufficient for AST-only parsing.
 func astFiles(
 	impPath string,
-	files ...string,
+	files []string,
 ) (*token.FileSet, map[string]*ast.File, error) {
 
 	var toparse []string
-	if len(files) > 0 {
+	if files != nil {
 		toparse = make([]string, 0, len(files))
 		for _, f := range files {
 			if !filepath.IsAbs(f) {
@@ -83,14 +87,15 @@ func astFiles(
 }
 
 // astAndDocPkg returns the parsed AST files and documentation for the package
-// at impPath (or the given subset of files). Returns error if none or more
-// than one package is detected or a parse error occurred.
+// at impPath (or the given subset of files). A nil files scans the directory;
+// a non-nil files list is used as-is (see astFiles). Returns error if none
+// or more than one package is detected or a parse error occurred.
 func astAndDocPkg(
 	impPath string,
-	files ...string,
+	files []string,
 ) (map[string]*ast.File, *doc.Package, error) {
 
-	set, fls, err := astFiles(impPath, files...)
+	set, fls, err := astFiles(impPath, files)
 	if err != nil {
 		return nil, nil, err
 	}

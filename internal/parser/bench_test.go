@@ -32,7 +32,7 @@ func Benchmark_AstAndDocPkg_local(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := astAndDocPkg(dir); err != nil {
+		if _, _, err := astAndDocPkg(dir, nil); err != nil {
 			b.Fatal(err)
 		}
 	}
