@@ -203,11 +203,19 @@ func (cfg *config) parse(env, args []string) error {
 		cfg.wd = filepath.Join(wd, cfg.wd)
 	}
 
+	if cfg.timeout < 0 {
+		return mkf.ErrInvTimeout
+	}
+
 	// Load gomake.yaml files; this also resolves the temporary directory and
 	// the timeout from the settings section when not set by option or
 	// environment.
 	if err = cfg.applyFileConfig(env); err != nil {
 		return err
+	}
+
+	if cfg.timeout < 0 {
+		return mkf.ErrInvTimeout
 	}
 
 	if !filepath.IsAbs(cfg.tmp) {

@@ -435,6 +435,9 @@ func (cfg *config) applyFileConfig(env []string) error {
 		if err != nil {
 			return fmt.Errorf("%w: settings.timeout: %w", errCfgParse, err)
 		}
+		if dur < 0 {
+			return mkf.ErrInvTimeout
+		}
 		cfg.timeout = dur
 	}
 
