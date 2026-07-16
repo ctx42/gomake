@@ -125,8 +125,9 @@ func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	isURL := strings.HasPrefix(tgs, "http://") ||
-		strings.HasPrefix(tgs, "https://")
+	lower := strings.ToLower(tgs)
+	isURL := strings.HasPrefix(lower, "http://") ||
+		strings.HasPrefix(lower, "https://")
 	if isURL {
 		return fetchExternalTargets(ctx, tgs)
 	}
