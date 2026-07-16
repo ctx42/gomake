@@ -315,6 +315,17 @@ func Test_GetCfg(t *testing.T) {
 		assert.Equal(t, int64(9007199254740993), have)
 	})
 
+	t.Run("error - null value", func(t *testing.T) {
+		// --- Given ---
+		cfg := configFrom(t, `{"timeout":null}`)
+
+		// --- When ---
+		_, err := GetCfg[string](cfg, "timeout")
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrType, err)
+	})
+
 	t.Run("any returns copy of map", func(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"version":"v1"}}`)

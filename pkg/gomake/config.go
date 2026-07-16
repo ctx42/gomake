@@ -69,6 +69,13 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	if err := dec.Decode(&cfg.data); err != nil {
 		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
+	if dec.More() {
+		return nil, fmt.Errorf("gomake: target config: trailing data")
+	}
+	if cfg.data == nil {
+		// Root null / non-object leaves data nil; treat as empty object.
+		cfg.data = map[string]any{}
+	}
 	return cfg, nil
 }
 
@@ -196,6 +203,12 @@ func GetCfg[T any](cfg *Config, path string) (T, error) {
 		// Deep-copy maps and slices so callers cannot mutate the snapshot.
 		*ptr = cloneCfgValue(raw)
 		return out, nil
+	}
+
+	// JSON null is present but not a typed value; reject for concrete T so
+	// GetCfgDefault does not treat it as a zero value.
+	if raw == nil {
+		return out, fmt.Errorf("%w: %q: null", ErrType, path)
 	}
 
 	data, err := json.Marshal(raw)
