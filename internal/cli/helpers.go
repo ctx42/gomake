@@ -791,7 +791,10 @@ func allTargets(
 		return combined, nil
 	}
 	if _, err := os.Stat(filepath.Join(cfg.src, mkf.MakefileMain)); err != nil {
-		return combined, nil
+		if errors.Is(err, fs.ErrNotExist) {
+			return combined, nil
+		}
+		return nil, fmt.Errorf("stat %s: %w", mkf.MakefileMain, err)
 	}
 
 	// Parse targets directly from source — no build dir, no `go mod` edit,

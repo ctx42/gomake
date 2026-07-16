@@ -230,11 +230,7 @@ func Main(
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {
-			if _, ok := errors.AsType[*errCompile](err); ok {
-				fail(rng, err)
-				return mkf.ExitCodeCompile
-			}
-			return failCode(rng, err)
+			return compileFailCode(rng, err)
 		}
 		return 0
 	}
@@ -252,8 +248,7 @@ func Main(
 	}
 	if err = gmk.Execute(ctx, rng); err != nil {
 		if _, ok := errors.AsType[*errCompile](err); ok {
-			fail(rng, err)
-			return mkf.ExitCodeCompile
+			return compileFailCode(rng, err)
 		}
 		if errors.Is(err, flag.ErrHelp) {
 			return 0
@@ -264,6 +259,20 @@ func Main(
 		return gomake.ExitStatus(err)
 	}
 	return 0
+}
+
+// compileFailCode reports a compile failure. Context cancel/deadline wrapped
+// in *errCompile use the context exit codes, not ExitCodeCompile.
+func compileFailCode(rng *ring.Ring, err error) int {
+	if errors.Is(err, context.DeadlineExceeded) ||
+		errors.Is(err, context.Canceled) {
+		return failCode(rng, err)
+	}
+	if _, ok := errors.AsType[*errCompile](err); ok {
+		fail(rng, err)
+		return mkf.ExitCodeCompile
+	}
+	return failCode(rng, err)
 }
 
 // applyExternalTargetMeta loads [gomake.TargetsFile] from srcDir and sets
