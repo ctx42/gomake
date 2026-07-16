@@ -66,11 +66,50 @@ func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 	if goarch := rng.EnvGet("GOARCH"); goarch != "" {
 		ctxt.GOARCH = goarch
 	}
+	// Start from Default tags, then GOFLAGS -tags, then meta build tag.
+	tags := append([]string{}, ctxt.BuildTags...)
+	tags = append(tags, goFlagsTags(rng.EnvGet("GOFLAGS"))...)
 	if tag := GetBuildTag(rng); tag != "" {
-		// Append like `go list -tags` so GOFLAGS/default tags are kept.
-		ctxt.BuildTags = append(append([]string{}, ctxt.BuildTags...), tag)
+		tags = append(tags, tag)
 	}
+	ctxt.BuildTags = tags
 	return ctxt.ImportDir(dir, 0)
+}
+
+// goFlagsTags extracts build tags from a GOFLAGS value (e.g. "-tags=a,b"
+// or "-tags a,b"). Other flags are ignored.
+func goFlagsTags(goflags string) []string {
+	if goflags == "" {
+		return nil
+	}
+	fields := strings.Fields(goflags)
+	var out []string
+	for i := 0; i < len(fields); i++ {
+		f := fields[i]
+		switch {
+		case strings.HasPrefix(f, "-tags="):
+			out = append(out, splitTags(strings.TrimPrefix(f, "-tags="))...)
+		case f == "-tags" || f == "--tags":
+			if i+1 < len(fields) {
+				i++
+				out = append(out, splitTags(fields[i])...)
+			}
+		}
+	}
+	return out
+}
+
+// splitTags splits a comma-separated tags list into non-empty tags.
+func splitTags(s string) []string {
+	parts := strings.Split(s, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // importSpec returns the import path of the package at dir given its module
