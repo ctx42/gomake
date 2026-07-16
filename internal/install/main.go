@@ -4,6 +4,7 @@
 package install
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -53,7 +54,7 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 // disk through a temporary Go workspace (see [setupWorkspace]) rather than
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
-func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) error {
+func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
@@ -111,11 +112,20 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) error {
 	// `go run`. Snapshot those artifacts and restore them after the build; the
 	// binary already carries the compiled-in targets.
 	if devel {
-		restore, serr := snapshotGenerated(buildDir)
-		if serr != nil {
-			return fmt.Errorf("gomake: %w", serr)
+		var restore func() error
+		restore, err = snapshotGenerated(buildDir)
+		if err != nil {
+			return fmt.Errorf("gomake: %w", err)
 		}
-		defer restore()
+		defer func() {
+			if rerr := restore(); rerr != nil {
+				if err != nil {
+					err = errors.Join(err, rerr)
+				} else {
+					err = fmt.Errorf("gomake: restore generated: %w", rerr)
+				}
+			}
+		}()
 	}
 
 	// Local --targets in a Go module: resolve that module from disk via a
@@ -149,7 +159,7 @@ func effectiveImports(srcDir, tgs string) (*cli.ImportsConfig, error) {
 	if tgs != "" {
 		pth = tgs
 	}
-	cfg, err := cli.LoadExternalTargets(pth)
+	cfg, err := cli.LoadExternalTargets(context.Background(), pth)
 	if err != nil {
 		return nil, err
 	}
@@ -167,9 +177,20 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	cmd.Env = env.EnvAll()
 	out, err := cmd.Output()
 	if err != nil {
+		// go mod download -json puts the structured Error on stdout; stderr is
+		// often empty for module-resolution failures.
+		detail := strings.TrimSpace(string(out))
 		if e, ok := errors.AsType[*exec.ExitError](err); ok {
-			msg := strings.TrimSpace(string(e.Stderr))
-			return "", fmt.Errorf("module download %s: %w: %s", module, e, msg)
+			if detail == "" {
+				detail = strings.TrimSpace(string(e.Stderr))
+			}
+			if detail != "" {
+				return "", fmt.Errorf("module download %s: %w: %s", module, e, detail)
+			}
+			return "", fmt.Errorf("module download %s: %w", module, e)
+		}
+		if detail != "" {
+			return "", fmt.Errorf("module download %s: %w: %s", module, err, detail)
 		}
 		return "", fmt.Errorf("module download %s: %w", module, err)
 	}
@@ -271,7 +292,7 @@ func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
 // is left untouched (never created). In a real module all are committed, so the
 // tree is fully restored. The returned function is meant to run via defer after
 // the build.
-func snapshotGenerated(buildDir string) (func(), error) {
+func snapshotGenerated(buildDir string) (func() error, error) {
 	// These mirror cli.PrepareTargets's outputs: the effective targets config,
 	// builtin.GenImports's two generated files, and the go.mod/go.sum that its
 	// `go get` step rewrites to add the external target modules.
@@ -302,10 +323,14 @@ func snapshotGenerated(buildDir string) (func(), error) {
 		}
 		saved[pth] = snapshot{data: data, mode: info.Mode()}
 	}
-	return func() {
+	return func() error {
+		var rerr error
 		for pth, snap := range saved {
-			_ = os.WriteFile(pth, snap.data, snap.mode)
+			if werr := os.WriteFile(pth, snap.data, snap.mode); werr != nil {
+				rerr = errors.Join(rerr, fmt.Errorf("restore %s: %w", pth, werr))
+			}
 		}
+		return rerr
 	}, nil
 }
 

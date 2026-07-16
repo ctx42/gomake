@@ -672,7 +672,7 @@ func Test_snapshotGenerated(t *testing.T) {
 			build, "internal", "builtin", "targets.go")
 
 		// --- When ---
-		restore()
+		assert.NoError(t, restore())
 
 		// --- Then ---
 		assert.Equal(t, "imports: original\n",
@@ -698,7 +698,7 @@ func Test_snapshotGenerated(t *testing.T) {
 		oskit.Write(t, "h1:changed\n", build, "go.sum")
 
 		// --- When ---
-		restore()
+		assert.NoError(t, restore())
 
 		// --- Then ---
 		assert.Equal(t, "module example.test\n\ngo 1.24\n",
@@ -718,7 +718,7 @@ func Test_snapshotGenerated(t *testing.T) {
 			build, "internal", "builtin", "targets.go")
 
 		// --- When ---
-		restore()
+		assert.NoError(t, restore())
 
 		// --- Then ---
 		pth := filepath.Join(build, "internal", "builtin", "targets.go")
