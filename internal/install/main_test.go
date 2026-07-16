@@ -119,10 +119,9 @@ func Test_installTo(t *testing.T) {
 		err := installTo(rng.Ring(), info, t.TempDir(), tgs)
 
 		// --- Then ---
+		// go get runs only on the full path (fast path skips it). Snapshot
+		// restore removes the temporary targets.yaml written for the attempt.
 		assert.ErrorContain(t, "go get example.com/pkg@v1.0.0", err)
-		// The effective targets.yaml was written into the build tree.
-		pth := filepath.Join(src, "targets.yaml")
-		assert.FileContain(t, "example.com/pkg", pth)
 	})
 
 	t.Run("error - targets file cannot be written", func(t *testing.T) {
@@ -248,10 +247,10 @@ func Test_installTo(t *testing.T) {
 			"adding external target example.com/fakepkg",
 			tst.Stderr(),
 		)
-		// The regenerated targets landed in the package the binary compiles,
-		// not the pre-refactor pkg/builtin.
+		// Snapshot restore leaves the working tree clean: regenerated
+		// targets.go is removed when it did not exist before the install.
 		gen := filepath.Join(src, "internal", "builtin", "targets.go")
-		assert.True(t, oskit.PathExists(t, gen))
+		assert.False(t, oskit.PathExists(t, gen))
 		assert.False(t, oskit.PathExists(t, filepath.Join(src, "pkg")))
 	})
 }
@@ -583,10 +582,11 @@ func Test_setupWorkspace(t *testing.T) {
 		assert.True(t, oskit.PathExists(t, work))
 		assert.FileContain(t, "use", work)
 
-		// Cleanup unsets GOWORK and removes the workspace file.
+		// Cleanup restores GOWORK=off and removes the workspace file.
 		cleanup()
-		_, set = rng.EnvLookup("GOWORK")
-		assert.False(t, set)
+		workVal, set := rng.EnvLookup("GOWORK")
+		assert.True(t, set)
+		assert.Equal(t, "off", workVal)
 		assert.False(t, oskit.PathExists(t, work))
 	})
 }
@@ -710,10 +710,10 @@ func Test_snapshotGenerated(t *testing.T) {
 		assert.Equal(t, "h1:original\n", oskit.ReadFileStr(t, build, "go.sum"))
 	})
 
-	t.Run("leaves an absent file untouched", func(t *testing.T) {
+	t.Run("removes a file created after snapshot", func(t *testing.T) {
 		// --- Given ---
-		// targets.go is absent at snapshot time; the build then creates it. An
-		// absent file is not tracked, so restore leaves it in place.
+		// targets.go is absent at snapshot time; the build then creates it.
+		// Restore must delete it so the tree stays clean.
 		build := t.TempDir()
 		oskit.MkdirAll(t, build, "internal", "builtin", "data")
 		restore, err := snapshotGenerated(build)
@@ -726,7 +726,7 @@ func Test_snapshotGenerated(t *testing.T) {
 
 		// --- Then ---
 		pth := filepath.Join(build, "internal", "builtin", "targets.go")
-		assert.True(t, oskit.PathExists(t, pth))
+		assert.False(t, oskit.PathExists(t, pth))
 	})
 
 	t.Run("error - a generated path cannot be read", func(t *testing.T) {

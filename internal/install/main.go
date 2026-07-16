@@ -60,6 +60,10 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 		return fmt.Errorf("gomake: %w", err)
 	}
 
+	// Isolate go tool invocations from the caller's ambient workspace;
+	// setupWorkspace may override with a private workfile when needed.
+	rng.EnvSet("GOWORK", "off")
+
 	// Build metadata embedded by the Go toolchain gives both the version to
 	// record and the installation mode: "(devel)" for `go run ./cmd/install`,
 	// an actual version for `go run ...@version`.
@@ -239,7 +243,8 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 		return "", noop, err
 	}
 	cleanup := func() {
-		env.EnvUnset("GOWORK")
+		// Restore isolation, not the caller's ambient GOWORK.
+		env.EnvSet("GOWORK", "off")
 		_ = os.RemoveAll(wsDir)
 	}
 	env.EnvSet("GOWORK", filepath.Join(wsDir, "go.work"))
@@ -255,18 +260,27 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 // inside a module or the toolchain reports no usable module, signalling the
 // caller to fall back to `go get`.
 func moduleAt(env ring.Environ, dir string) (mod, root string, ok bool) {
+	// GOWORK=off so a multi-module ambient workspace does not emit multiple
+	// Path::Dir lines that break Cut parsing.
 	cmd := exec.Command("go", "list", "-m", "-f", "{{.Path}}::{{.Dir}}")
-	cmd.Env = env.EnvAll()
+	cmd.Env = ring.EnvSet(env.EnvAll(), "GOWORK", "off")
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
 		return "", "", false
 	}
-	mod, root, ok = strings.Cut(strings.TrimSpace(string(out)), "::")
-	if !ok || mod == "" || root == "" {
-		return "", "", false
+	// Take the first non-empty line (main module for this directory).
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		mod, root, ok = strings.Cut(line, "::")
+		if ok && mod != "" && root != "" {
+			return mod, root, true
+		}
 	}
-	return mod, root, true
+	return "", "", false
 }
 
 // goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the
@@ -288,10 +302,9 @@ func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
 // sources, and the go.mod/go.sum that `go get` rewrites — and returns a
 // function that restores them. Restoring undoes the regeneration so the working
 // tree is left byte-identical and still compiles without the temporary
-// workspace. Only files that exist at snapshot time are tracked; an absent path
-// is left untouched (never created). In a real module all are committed, so the
-// tree is fully restored. The returned function is meant to run via defer after
-// the build.
+// workspace. Paths that did not exist at snapshot time are deleted on restore
+// if the build created them. The returned function is meant to run via defer
+// after the build.
 func snapshotGenerated(buildDir string) (func() error, error) {
 	// These mirror cli.PrepareTargets's outputs: the effective targets config,
 	// builtin.GenImports's two generated files, and the go.mod/go.sum that its
@@ -305,13 +318,15 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 		filepath.Join(buildDir, "go.sum"),
 	}
 	type snapshot struct {
-		data []byte
-		mode os.FileMode
+		data    []byte
+		mode    os.FileMode
+		existed bool
 	}
 	saved := make(map[string]snapshot, len(paths))
 	for _, pth := range paths {
 		info, err := os.Stat(pth)
 		if errors.Is(err, fs.ErrNotExist) {
+			saved[pth] = snapshot{existed: false}
 			continue
 		}
 		if err != nil {
@@ -321,11 +336,19 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 		if err != nil {
 			return nil, err
 		}
-		saved[pth] = snapshot{data: data, mode: info.Mode()}
+		saved[pth] = snapshot{data: data, mode: info.Mode(), existed: true}
 	}
 	return func() error {
 		var rerr error
 		for pth, snap := range saved {
+			if !snap.existed {
+				if werr := os.Remove(pth); werr != nil &&
+					!errors.Is(werr, fs.ErrNotExist) {
+					rerr = errors.Join(rerr,
+						fmt.Errorf("remove %s: %w", pth, werr))
+				}
+				continue
+			}
 			if werr := os.WriteFile(pth, snap.data, snap.mode); werr != nil {
 				rerr = errors.Join(rerr, fmt.Errorf("restore %s: %w", pth, werr))
 			}
