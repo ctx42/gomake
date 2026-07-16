@@ -581,7 +581,10 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 
 	dstWork := filepath.Join(dst, "go.work")
 	dstEnv := ring.EnvSet(base, "GOWORK", dstWork)
-	for from, to := range replace {
+	// Drop all rewritten uses first, then add destinations. Interleaving
+	// dropuse/use per map entry is order-dependent: dropuse "." after
+	// adding use "." for the makefile module would remove that entry.
+	for from := range replace {
 		out.Reset()
 		cmd = exec.Command("go", "work", "edit", "-dropuse", from)
 		cmd.Env = dstEnv
@@ -591,7 +594,8 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 		if err := cmd.Run(); err != nil {
 			return goEditErr(errGoWorkEdit, dstWork, out.String(), err)
 		}
-
+	}
+	for _, to := range replace {
 		out.Reset()
 		cmd = exec.Command("go", "work", "edit", "-use", to)
 		cmd.Env = dstEnv
