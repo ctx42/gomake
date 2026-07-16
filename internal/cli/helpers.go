@@ -354,8 +354,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
 			return nil, err
 		}
-		workDir := filepath.Dir(goWorkSrc)
-		if err = editGoWork(rng, workDir, buildDir, modRoot); err != nil {
+		if err = editGoWork(rng, goWorkSrc, buildDir, modRoot); err != nil {
 			return nil, err
 		}
 
@@ -460,20 +459,25 @@ func findGoWork(env ring.Environ, modRoot string) string {
 	}
 }
 
-// editGoWork examines the go.work file in dst and rewrites relative use
-// paths based on workDir (the directory that originally contained the
-// workspace file). Paths that resolve to modRoot become "." so the build
-// directory remains the workspace's main module; other relative paths
-// become absolute so siblings still resolve after the copy.
-func editGoWork(env ring.Environ, workDir, dst, modRoot string) error {
+// editGoWork rewrites relative use paths in the go.work file already copied
+// to dst. srcWork is the absolute path of the original workspace file (used
+// only to resolve relative use entries). Paths that resolve to modRoot become
+// "." so the build directory remains the workspace's main module; other
+// relative paths become absolute. GOWORK is pinned per command so ambient
+// GOWORK never mutates the caller's workfile.
+func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
+	workDir := filepath.Dir(srcWork)
+	base := env.EnvAll()
+	srcEnv := ring.EnvSet(base, "GOWORK", srcWork)
+
 	out := &bytes.Buffer{}
 	cmd := exec.Command("go", "work", "edit", "-json")
-	cmd.Env = env.EnvAll()
+	cmd.Env = srcEnv
 	cmd.Dir = workDir
 	cmd.Stdout = out
 	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
-		return goEditErr(errGoWorkEdit, workDir, out.String(), err)
+		return goEditErr(errGoWorkEdit, srcWork, out.String(), err)
 	}
 
 	var result struct {
@@ -482,7 +486,7 @@ func editGoWork(env ring.Environ, workDir, dst, modRoot string) error {
 		} `json:"Use"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return goEditErr(errGoWorkEdit, workDir, out.String(), err)
+		return goEditErr(errGoWorkEdit, srcWork, out.String(), err)
 	}
 
 	modRoot = filepath.Clean(modRoot)
@@ -503,25 +507,27 @@ func editGoWork(env ring.Environ, workDir, dst, modRoot string) error {
 		replace[dp] = pth
 	}
 
+	dstWork := filepath.Join(dst, "go.work")
+	dstEnv := ring.EnvSet(base, "GOWORK", dstWork)
 	for from, to := range replace {
 		out.Reset()
 		cmd = exec.Command("go", "work", "edit", "-dropuse", from)
-		cmd.Env = env.EnvAll()
+		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Run(); err != nil {
-			return goEditErr(errGoWorkEdit, dst, out.String(), err)
+			return goEditErr(errGoWorkEdit, dstWork, out.String(), err)
 		}
 
 		out.Reset()
 		cmd = exec.Command("go", "work", "edit", "-use", to)
-		cmd.Env = env.EnvAll()
+		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
 		cmd.Stderr = out
 		if err := cmd.Run(); err != nil {
-			return goEditErr(errGoWorkEdit, dst, out.String(), err)
+			return goEditErr(errGoWorkEdit, dstWork, out.String(), err)
 		}
 	}
 	return nil

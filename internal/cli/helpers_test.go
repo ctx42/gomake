@@ -780,12 +780,57 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, outPth, prjRoot)
+		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		have := exekit.New(t).ExeStderr(outPrj.Compile())
 		assert.Equal(t, "project called other\n", have)
+	})
+
+	t.Run("does not mutate source when GOWORK set", func(t *testing.T) {
+		// --- Given ---
+		prjSrc := modkit.Path("testdata/projects/workspace/project")
+		othSrc := modkit.Path("testdata/projects/workspace/other")
+
+		wsPth := oskit.MkdirTemp(t, "", "workspace")
+		othRoot := oskit.MkdirAll(t, wsPth, "other")
+		prjRoot := oskit.MkdirAll(t, wsPth, "project")
+
+		othPrj := prjkit.New(t, othRoot)
+		othPrj.ProjectFrom(othSrc)
+		othPrj.Rename("go.mod_", "go.mod")
+		othPrj.Close()
+
+		prjPrj := prjkit.New(t, prjRoot)
+		prjPrj.ProjectFrom(prjSrc)
+		prjPrj.Rename("go.mod_", "go.mod")
+		prjPrj.Rename("go.work_", "go.work")
+		prjPrj.Close()
+
+		srcWork := filepath.Join(prjRoot, "go.work")
+		before := oskit.ReadFileStr(t, srcWork)
+
+		outPth := oskit.MkdirTemp(t, "", "project")
+		outPrj := prjkit.New(t, outPth)
+		outPrj.ProjectFrom(prjRoot)
+		outPrj.Close()
+
+		// Ambient GOWORK points at the source workfile — edits must not
+		// follow it and rewrite the caller's workspace.
+		env := ring.New()
+		env.EnvSet("GOWORK", srcWork)
+
+		// --- When ---
+		err := editGoWork(env, srcWork, outPth, prjRoot)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, before, oskit.ReadFileStr(t, srcWork))
+		// Destination was rewritten (absolute sibling path).
+		dstWork := oskit.ReadFileStr(t, filepath.Join(outPth, "go.work"))
+		assert.NotEqual(t, before, dstWork)
+		assert.Contain(t, "use ", dstWork)
 	})
 
 	t.Run("no go.work in source", func(t *testing.T) {
@@ -795,7 +840,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, srcPth, dstPth, srcPth)
+		err := editGoWork(env, filepath.Join(srcPth, "go.work"), dstPth, srcPth)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
@@ -814,7 +859,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, srcPth, dstPth, srcPth)
+		err := editGoWork(env, filepath.Join(srcPth, "go.work"), dstPth, srcPth)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -846,7 +891,7 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, outPth, prjRoot)
+		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -878,7 +923,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, dstPth, prjRoot)
+		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), dstPth, prjRoot)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
