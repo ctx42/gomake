@@ -413,21 +413,47 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	return cu, nil
 }
 
-// stripBuildTag removes a //go:build gomake line from makefile source so the
-// out-of-source build can compile without the gomake tag. CRLF newlines are
-// normalized to LF first so Windows-sourced files match BuildTagLine.
+// stripBuildTag removes build-constraint lines that mention the gomake tag so
+// the out-of-source build can compile without -tags=gomake. CRLF is normalized
+// first. Matches exact BuildTagLine and compound lines such as
+// //go:build gomake && linux (and legacy // +build forms that include gomake).
 func stripBuildTag(filData, tagLine []byte) []byte {
+	_ = tagLine // retained for call-site compatibility
 	filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))
-	switch {
-	case bytes.HasPrefix(filData, tagLine):
-		return bytes.TrimLeft(filData[len(tagLine):], "\n")
-	default:
-		block := append([]byte{'\n'}, append(tagLine, '\n')...)
-		if i := bytes.Index(filData, block); i >= 0 {
-			return append(filData[:i+1], filData[i+len(block):]...)
+	lines := bytes.Split(filData, []byte("\n"))
+	out := make([][]byte, 0, len(lines))
+	skipNextBlank := false
+	for _, line := range lines {
+		if isGomakeConstraintLine(bytes.TrimSpace(line)) {
+			skipNextBlank = true
+			continue
 		}
-		return filData
+		if skipNextBlank {
+			skipNextBlank = false
+			if len(bytes.TrimSpace(line)) == 0 {
+				continue
+			}
+		}
+		out = append(out, line)
 	}
+	return bytes.Join(out, []byte("\n"))
+}
+
+// isGomakeConstraintLine reports whether line is a //go:build or // +build
+// constraint that mentions the gomake tag.
+func isGomakeConstraintLine(line []byte) bool {
+	s := string(line)
+	if !strings.HasPrefix(s, "//") {
+		return false
+	}
+	body := strings.TrimSpace(strings.TrimPrefix(s, "//"))
+	if strings.HasPrefix(body, "go:build ") {
+		return strings.Contains(body, "gomake")
+	}
+	if strings.HasPrefix(body, "+build ") {
+		return strings.Contains(body, "gomake")
+	}
+	return false
 }
 
 // findGoWork returns the path to the go.work file that applies to modRoot.
