@@ -16,4 +16,4 @@ func targetOSArch(_ context.Context, rng *ring.Ring) error {
 	return nil
 }
 
-func Bye(_ context.Context, _ ring.Ring) error { return nil }
+func Bye(_ context.Context, _ *ring.Ring) error { return nil }

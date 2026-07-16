@@ -161,6 +161,9 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 	inc := make(map[string][]*doc.Type)
 	// Matching namespace paths for above types.
 	pth := make(map[string][][]string)
+	// Complete namespace trails by type name, including methodless ns roots,
+	// so cross-file children can resolve without an existing method target.
+	complete := make(map[string][]string)
 
 	for _, typ := range tps {
 		nsp := breadcrumbs(typ)
@@ -173,6 +176,7 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 			pth[rel] = append(pth[rel], nsp[2:])
 			continue
 		}
+		complete[typ.Name] = nsp
 		if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
 			return err
 		}
@@ -180,14 +184,21 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 
 	prev := len(inc) // Number of incomplete types.
 	for len(inc) > 0 {
-		for rcv, tps := range inc {
-			tgt := tgs.withReceiver(rcv)
-			if tgt == nil {
+		for rcv, types := range inc {
+			nspParent, ok := complete[rcv]
+			if !ok {
+				if tgt := tgs.withReceiver(rcv); tgt != nil {
+					nspParent = tgt.Breadcrumbs
+					ok = true
+				}
+			}
+			if !ok {
 				continue
 			}
-			for i, typ := range tps {
-				nsp := append([]string{}, tgt.Breadcrumbs...)
+			for i, typ := range types {
+				nsp := append([]string{}, nspParent...)
 				nsp = append(nsp, pth[rcv][i]...)
+				complete[typ.Name] = nsp
 				if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
 					return err
 				}

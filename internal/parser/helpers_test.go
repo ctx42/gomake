@@ -689,7 +689,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		pks, err := gmImpPackages(rng, astFil.Decls...)
+		pks, err := gmImpPackages(rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -754,7 +754,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		pks, err := gmImpPackages(rng, astFil.Decls...)
+		pks, err := gmImpPackages(rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)

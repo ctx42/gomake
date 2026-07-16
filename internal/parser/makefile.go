@@ -110,7 +110,7 @@ func (pmf *Makefile) markDefault(vars ...*doc.Value) {
 // adGmImports resolves the file's `gomake:import` imports with [gmImpPackages]
 // and adds the function and type targets found in each imported package.
 func (pmf *Makefile) adGmImports(fil *ast.File) error {
-	pks, err := gmImpPackages(pmf.env, fil.Decls...)
+	pks, err := gmImpPackages(pmf.env, pmf.pkg.ImpPath, fil.Decls...)
 	if err != nil {
 		return err
 	}

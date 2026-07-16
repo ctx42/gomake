@@ -5,7 +5,6 @@ package parser
 
 import (
 	"errors"
-	"fmt"
 	"go/ast"
 	"go/doc"
 	"strings"
@@ -120,29 +119,29 @@ func targetName(pkgNS string, crumbs []string, funcName string) string {
 }
 
 // checkParams checks target parameters. For invalid parameters returns
-// [errInvArg] error.
+// [errInvArg] error. The second parameter must be `*ring.Ring` (pointer).
 func checkParams(params *ast.FieldList) error {
+	if params == nil || len(params.List) != 2 {
+		return errInvArg
+	}
+
 	ctxCnt := 0
 	argsCnt := 0
 
-	switch len(params.List) {
-	case 2:
-		typ := qIdent(params.List[0].Type)
-		if typ != "context.Context" {
-			return errInvArg
-		}
-		ctxCnt += len(params.List[0].Names)
-
-		typ = qIdent(params.List[1].Type)
-		// Known limitation: aliased ring imports (e.g. r "…/ring") are not
-		// recognised and will cause errInvArg here.
-		if typ != "ring.Ring" {
-			return errInvArg
-		}
-		argsCnt += len(params.List[1].Names)
-	default:
+	typ := qIdent(params.List[0].Type)
+	if typ != "context.Context" {
 		return errInvArg
 	}
+	ctxCnt += len(params.List[0].Names)
+
+	// Require an explicit pointer; qIdent strips * so compare StarExpr first.
+	// Known limitation: aliased ring imports (e.g. r "…/ring") are not
+	// recognised and will cause errInvArg here.
+	star, ok := params.List[1].Type.(*ast.StarExpr)
+	if !ok || qIdent(star.X) != "ring.Ring" {
+		return errInvArg
+	}
+	argsCnt += len(params.List[1].Names)
 
 	if ctxCnt > 1 || argsCnt > 1 {
 		return errInvArg
@@ -156,7 +155,7 @@ func checkResults(res *ast.FieldList) error {
 	if res.NumFields() != 1 {
 		return errInvResult
 	}
-	if fmt.Sprint(res.List[0].Type) != "error" {
+	if qIdent(res.List[0].Type) != "error" {
 		return errInvResult
 	}
 	return nil

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
 
@@ -42,12 +43,15 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	}
 
 	h := sha256.New()
-	for _, name := range []string{"go.mod", "go.sum"} {
+	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
 		data, rErr := os.ReadFile(filepath.Join(root, name))
 		if rErr == nil {
 			_, _ = fmt.Fprintf(h, "%s\n", name)
 			_, _ = h.Write(data)
 		}
+	}
+	if gowork := strings.TrimSpace(rng.EnvGet("GOWORK")); gowork != "" {
+		_, _ = fmt.Fprintf(h, "GOWORK:%s\n", gowork)
 	}
 	format := "spec:%s\ntag:%s\ngoos:%s\ngoarch:%s\ngo:%s\n"
 	_, _ = fmt.Fprintf(

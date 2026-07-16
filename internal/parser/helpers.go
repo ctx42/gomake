@@ -372,9 +372,11 @@ func gmImpSpec(is *ast.ImportSpec) (string, string) {
 func unquote(bl *ast.BasicLit) string { return strings.Trim(bl.Value, "\"`") }
 
 // gmImpPackages returns packages imported with a `gomake:import` comment.
-// Packages are resolved concurrently.
+// Packages are resolved concurrently against the go.mod of the module rooted
+// at dir (empty dir falls back to the process working directory).
 func gmImpPackages(
 	rng *ring.Ring,
+	dir string,
 	dcs ...ast.Decl,
 ) ([]*Package, error) {
 
@@ -408,7 +410,13 @@ func gmImpPackages(
 		wg.Add(1)
 		go func(i int, ns, imp string) {
 			defer wg.Done()
-			pkg, err := NewPackage(rng, imp, withPkgSpec, withPkgNS(ns))
+			pkg, err := NewPackage(
+				rng,
+				imp,
+				withPkgSpec,
+				withPkgNS(ns),
+				withPkgDir(dir),
+			)
 			if err != nil {
 				errc <- err
 				return
@@ -428,15 +436,26 @@ func gmImpPackages(
 // nil when variable is not declared or not set.
 func findDefault(vars ...*doc.Value) []string {
 	for _, v := range vars {
-		for i, name := range v.Names {
-			if name != "Default" || len(v.Decl.Specs) <= i {
+		for _, spec := range v.Decl.Specs {
+			vs, ok := spec.(*ast.ValueSpec)
+			if !ok {
 				continue
 			}
-			spec := v.Decl.Specs[i].(*ast.ValueSpec) //nolint:forcetypeassert
-			if len(spec.Values) == 0 {
-				return nil // Declared without an initializer.
+			for j, name := range vs.Names {
+				if name.Name != "Default" {
+					continue
+				}
+				if len(vs.Values) == 0 {
+					return nil // Declared without an initializer.
+				}
+				// Shared initializer for multi-name specs uses Values[0];
+				// per-name values use the matching index when present.
+				idx := 0
+				if j < len(vs.Values) {
+					idx = j
+				}
+				return codeRef(vs.Values[idx], nil)
 			}
-			return codeRef(spec.Values[0], nil)
 		}
 	}
 	return nil

@@ -172,6 +172,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
 		prj.Close()
 
 		rng := ring.New()
@@ -192,6 +194,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
 		prj.Close()
 
 		rng := ring.New()
