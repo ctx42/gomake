@@ -51,7 +51,7 @@ func (tst *TstProvider) Source() []byte {
 
 // implements [builtin.Provider].
 func (tst *TstProvider) PreRuns() []mkf.PreRunFn {
-	return tst.pre
+	return slices.Clone(tst.pre)
 }
 
 // TestTargets returns the test built-in target list.
