@@ -192,8 +192,12 @@ func runTarget(
 		select {
 		case itf := <-sig:
 			cxl() // Notify the running target the context has been canceled.
+			// Prefer a finished result, but not a cooperative cancel that
+			// only mirrors our signal — keep the 128+n interrupt exit code.
 			if err, ok := recvDone(done); ok {
-				return err
+				if err == nil || !errors.Is(err, context.Canceled) {
+					return err
+				}
 			}
 			if i, ok := itf.(syscall.Signal); ok {
 				return interruptedError(exitCodeSignal + int(i))

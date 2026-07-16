@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/check"
@@ -184,6 +185,39 @@ func Test_pickTarget(t *testing.T) {
 		assert.ErrorIs(t, ErrUnkTarget, err)
 		assert.Nil(t, haveTgt)
 		assert.Equal(t, []string{"unknown"}, args)
+	})
+}
+
+func Test_runTarget_signal_prefers_success_not_cancel(t *testing.T) {
+	// Cooperative targets that return ctx.Err() after cancel must still
+	// surface as interruptedError (128+n), not a plain context.Canceled.
+	t.Run("signal with cooperative cancel", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		tst := ringtest.New(t)
+		sig := make(chan os.Signal, 1)
+		defer signal.Stop(sig)
+		wd := must.Value(os.Getwd())
+
+		fn := func(c context.Context, _ *ring.Ring) error {
+			<-c.Done()
+			return c.Err()
+		}
+
+		// --- When ---
+		done := make(chan error, 1)
+		go func() {
+			done <- runTarget(ctx, sig, fn, wd, tst.Ring())
+		}()
+		// Let the target block on ctx.Done, then signal.
+		time.Sleep(20 * time.Millisecond)
+		sig <- syscall.SIGTERM
+		err := <-done
+
+		// --- Then ---
+		var ie interruptedError
+		assert.True(t, errors.As(err, &ie))
+		assert.Equal(t, exitCodeSignal+int(syscall.SIGTERM), ie.Signal())
 	})
 }
 
