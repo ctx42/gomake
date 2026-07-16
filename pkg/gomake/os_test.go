@@ -74,6 +74,24 @@ func Test_ExitStatus(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, 1, code)
 	})
+
+	t.Run("signal kill maps to 128 plus signal", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("signal kill exit codes are Unix-only")
+		}
+		// --- Given ---
+		cmd := exec.Command("sleep", "60")
+		assert.NoError(t, cmd.Start())
+		assert.NoError(t, cmd.Process.Kill())
+		err := cmd.Wait()
+
+		// --- When ---
+		code := ExitStatus(err)
+
+		// --- Then ---
+		// SIGKILL is 9 → 128+9 = 137 on Unix shells.
+		assert.Equal(t, 128+9, code)
+	})
 }
 
 func Test_HasRun(t *testing.T) {

@@ -8,11 +8,13 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+	"syscall"
 )
 
 // ExitStatus returns the exit status of the error if it's an instance of
 // [exec.ExitError] or it has method: ExitStatus() int. It returns 0 if err is
-// nil and 1 if err does not match the above criteria.
+// nil and 1 if err does not match the above criteria. For a process killed by
+// a signal on Unix, the value is 128+signal (shell convention), not -1.
 func ExitStatus(err error) int {
 	if err == nil {
 		return 0
@@ -25,9 +27,20 @@ func ExitStatus(err error) int {
 		return es.ExitStatus()
 	}
 
-	if ee, ok := errors.AsType[*exec.ExitError](err); ok {
-		if ex, ok := ee.Sys().(status); ok {
-			return ex.ExitStatus()
+	var ee *exec.ExitError
+	if !errors.As(err, &ee) {
+		return 1
+	}
+	if code := ee.ExitCode(); code >= 0 {
+		return code
+	}
+	// Unix: signal-terminated children report ExitCode -1; map to 128+n.
+	if ws, ok := ee.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+		return 128 + int(ws.Signal())
+	}
+	if ex, ok := ee.Sys().(status); ok {
+		if code := ex.ExitStatus(); code >= 0 {
+			return code
 		}
 	}
 	return 1
