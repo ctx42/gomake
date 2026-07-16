@@ -161,6 +161,40 @@ GOBIN wherever you want it to land — for example, a project-local `dist/`:
 GOBIN=$PWD/dist go run github.com/ctx42/gomake/cmd/install@latest
 ```
 
+### Installing from a local clone
+
+To build from a checked-out copy of the source instead of a published
+release — for instance to install unreleased changes on `master` — run the
+installer from the clone with `go run ./cmd/install`. It builds whatever is in
+your working tree; no tag, release, or module proxy is involved.
+
+```shell
+go run -buildvcs=true ./cmd/install
+```
+
+`--targets` and the other options work exactly as above:
+
+```shell
+go run -buildvcs=true ./cmd/install --targets=./targets.yaml
+```
+
+> [!IMPORTANT]
+> Pass `-buildvcs=true`. Under the default `-buildvcs=auto`, `go run` skips
+> version-control stamping, so the binary reports `<not set>` for its revision,
+> hash, and clean/dirty state. Forcing it on records them from the checked-out
+> commit:
+>
+> ```shell
+> gomake --version
+> # gomake v0.24.0, hash: ec7c8f1, build date: 2026-07-15T...Z, scm state: clean
+> ```
+
+> [!NOTE]
+> Use the package path `./cmd/install`, not a file path like
+> `cmd/install/install.go`. Building from an explicit file leaves the build
+> metadata empty, and the installer then mistakes the run for a published
+> install and fails.
+
 ---
 
 ## Quick start

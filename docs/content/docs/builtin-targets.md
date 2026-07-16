@@ -81,7 +81,10 @@ adding external target example.com/myorg/gomake-targets/docker
 adding external target example.com/myorg/gomake-targets/release
 ```
 
-Nothing is printed when `imports` is empty.
+Nothing is printed when `imports` is empty. Passing `--targets=` with an empty
+value — for example a shell variable that expanded to nothing — instead prints
+`no external targets provided` and continues the install with no external
+targets, so the empty expansion is not mistaken for an omitted flag.
 
 ---
 
@@ -115,7 +118,7 @@ unpublished source, without pushing to a module proxy. Point `--targets` at a
 local `targets.yaml` that lives inside the target's Go module:
 
 ```shell
-GOBIN=$PWD/dist go run ./cmd/install --targets=/path/to/module/targets.yaml
+GOBIN=$PWD/dist go run -buildvcs=true ./cmd/install --targets=/path/to/module/targets.yaml
 ```
 
 When the `--targets` file sits inside a Go module, `cmd/install` resolves that
@@ -123,6 +126,10 @@ module from disk through a temporary Go workspace instead of fetching it with
 `go get`. Your local, uncommitted edits are compiled straight into the binary,
 and `go.mod` is left untouched — no `replace` or `require` is added. Re-run the
 command after each edit to rebuild.
+
+The `-buildvcs=true` flag records the checked-out revision in the binary; see
+[Installing from a local clone]({{< relref "getting-started#installing-from-a-local-clone" >}})
+for why `go run` needs it.
 
 Only the module containing the `targets.yaml` is resolved locally; imports from
 any other module still come from the proxy via `go get`.

@@ -50,6 +50,31 @@ curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh
 
 See [Builtin targets]({{< relref "builtin-targets" >}}) for details.
 
+### Installing from a local clone
+
+To build from a checked-out copy of the source instead of a published
+release — for instance to install unreleased changes on `master` — run the
+installer from the clone. It builds whatever is in your working tree; no tag,
+release, or module proxy is involved:
+
+```shell
+go run -buildvcs=true ./cmd/install
+```
+
+`--targets` works the same way:
+
+```shell
+go run -buildvcs=true ./cmd/install --targets=./targets.yaml
+```
+
+Pass `-buildvcs=true`: under the default `-buildvcs=auto`, `go run` skips
+version-control stamping, so the binary reports `<not set>` for its revision,
+hash, and clean/dirty state; forcing it on records them from the checked-out
+commit. Use the package path `./cmd/install`, not a file path like
+`cmd/install/install.go` — building from an explicit file leaves the build
+metadata empty, and the installer then mistakes the run for a published
+install and fails.
+
 ---
 
 ## Your first makefile
