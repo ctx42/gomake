@@ -934,13 +934,21 @@ func allTargets(
 		return nil, fmt.Errorf("stat %s: %w", mkf.MakefileMain, err)
 	}
 
-	// Parse targets directly from source — no build dir, no `go mod` edit,
-	// one `go list` call instead of two.
+	// Parse targets directly from source — no build dir, no `go mod` edit.
+	// Restrict package files to valid makefile names so list/help match
+	// what prepare compiles.
 	parser.SetBuildTag(rng)
 	var err error
 	var pmf *parser.Makefile
 	analyzeAct := func() error {
-		pmf, err = parser.NewMakefile(rng, cfg.src)
+		var pkg *parser.Package
+		pkg, err = parser.NewPackage(rng, cfg.src)
+		if err != nil {
+			return err
+		}
+		keep, _ := selectMakefiles(pkg.Files)
+		pkg.Files = keep
+		pmf, err = parser.MakefileFromPackage(rng, pkg)
 		return err
 	}
 	err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)
