@@ -287,16 +287,14 @@ func (tgs *Targets) Names() []string {
 	return names
 }
 
-// MarkDefault marks target as default based on target's default code reference
-// (DefRef) and returns the target's name. Returns empty string if DefRef does
-// not match any target in the collection.
-//
-// The defaultness of targets currently marked as default will be cleared.
+// MarkDefault marks the first target whose DefRef matches as default and
+// returns its name. Returns empty string if DefRef does not match any target.
+// Other targets' Default flags are cleared so at most one default remains.
 func (tgs *Targets) MarkDefault(defRef string) string {
 	def := ""
 	for _, tgt := range tgs.list {
 		tgt.Default = false
-		if tgt.DefRef == defRef {
+		if def == "" && tgt.DefRef == defRef {
 			def = tgt.Name
 			tgt.Default = true
 		}
