@@ -6,6 +6,7 @@ package gomake
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 )
@@ -24,8 +25,12 @@ func Root(pth string, elem ...string) (string, error) {
 	}
 	start := pth
 	for {
-		if _, err := os.Stat(filepath.Join(pth, "go.mod")); err == nil {
+		_, err := os.Stat(filepath.Join(pth, "go.mod"))
+		if err == nil {
 			break
+		}
+		if !errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("gomake: root: %w", err)
 		}
 		parent := filepath.Dir(pth)
 		if parent == pth {
