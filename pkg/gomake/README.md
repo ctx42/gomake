@@ -31,9 +31,10 @@ import (
 	"fmt"
 
 	"github.com/ctx42/gomake/pkg/gomake"
+	"github.com/ctx42/ring/pkg/ring"
 )
 
-func target(ctx context.Context) error {
+func target(ctx context.Context, rng *ring.Ring) error {
 	name, ok := gomake.TargetName(ctx)
 	if !ok {
 		return fmt.Errorf("target name not set")
