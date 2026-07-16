@@ -265,7 +265,7 @@ func Main(
 // best-effort, and a missing or malformed targets file must not abort the run.
 func applyExternalTargetMeta(rng *ring.Ring, srcDir string) {
 	pth := filepath.Join(srcDir, TargetsFile)
-	cfg, err := LoadExternalTargets(pth)
+	cfg, err := LoadExternalTargets(context.Background(), pth)
 	if err != nil {
 		return
 	}

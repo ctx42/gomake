@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -300,7 +301,10 @@ func Test_LoadExternalTargets_tabular(t *testing.T) {
 			}
 
 			// --- When ---
-			cfg, err := LoadExternalTargets(filepath.Join(dir, TargetsFile))
+			cfg, err := LoadExternalTargets(
+				context.Background(),
+				filepath.Join(dir, TargetsFile),
+			)
 
 			// --- Then ---
 			if tc.err != nil {
@@ -328,7 +332,7 @@ func Test_LoadExternalTargets(t *testing.T) {
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		cfg, err := LoadExternalTargets(srv.URL)
+		cfg, err := LoadExternalTargets(context.Background(), srv.URL)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -348,7 +352,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		cfg, err := fetchExternalTargets(srv.URL)
+		cfg, err := fetchExternalTargets(context.Background(), srv.URL)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -365,7 +369,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		_, err := fetchExternalTargets(srv.URL)
+		_, err := fetchExternalTargets(context.Background(), srv.URL)
 
 		// --- Then ---
 		assert.ErrorContain(t, "HTTP 404", err)
@@ -373,7 +377,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 
 	t.Run("returns error on unreachable address", func(t *testing.T) {
 		// --- When ---
-		_, err := fetchExternalTargets("http://localhost:0/x")
+		_, err := fetchExternalTargets(context.Background(), "http://localhost:0/x")
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -381,7 +385,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 
 	t.Run("returns error for malformed URL", func(t *testing.T) {
 		// --- When ---
-		_, err := fetchExternalTargets("http://\x00invalid")
+		_, err := fetchExternalTargets(context.Background(), "http://\x00invalid")
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -396,7 +400,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		_, err := fetchExternalTargets(srv.URL)
+		_, err := fetchExternalTargets(context.Background(), srv.URL)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)

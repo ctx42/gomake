@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -25,7 +26,7 @@ func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
 	if err := prepareExternalTargets(rng, wd, skipMod); err != nil {
 		return err
 	}
-	cfg, err := LoadExternalTargets(filepath.Join(wd, TargetsFile))
+	cfg, err := LoadExternalTargets(context.Background(), filepath.Join(wd, TargetsFile))
 	if err != nil {
 		return err
 	}
@@ -40,7 +41,7 @@ func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
 // install and build scripts before compiling the binary. Imports under skipMod
 // are provided by a Go workspace and their `go get` is skipped.
 func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
-	cfg, err := LoadExternalTargets(filepath.Join(wd, TargetsFile))
+	cfg, err := LoadExternalTargets(context.Background(), filepath.Join(wd, TargetsFile))
 	if err != nil {
 		return err
 	}

@@ -7,6 +7,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,10 @@ func main() {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	cfg, err := cli.LoadExternalTargets(filepath.Join(modRoot, cli.TargetsFile))
+	cfg, err := cli.LoadExternalTargets(
+		context.Background(),
+		filepath.Join(modRoot, cli.TargetsFile),
+	)
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

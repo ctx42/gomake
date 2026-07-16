@@ -119,12 +119,16 @@ func (cfg *ImportsConfig) importLines() []string {
 // LoadExternalTargets loads a targets.yaml from pathOrURL. If pathOrURL begins
 // with "http://" or "https://" the file is fetched over HTTP; otherwise it is
 // read from the local filesystem. A missing local file returns an empty config
-// without error.
-func LoadExternalTargets(tgs string) (*ImportsConfig, error) {
+// without error. The context cancels in-flight HTTP fetches; local reads ignore
+// it except for a pre-check of ctx.Err().
+func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	isURL := strings.HasPrefix(tgs, "http://") ||
 		strings.HasPrefix(tgs, "https://")
 	if isURL {
-		return fetchExternalTargets(tgs)
+		return fetchExternalTargets(ctx, tgs)
 	}
 	cfg, err := readExternalTargets(tgs)
 	if errors.Is(err, os.ErrNotExist) {
@@ -135,9 +139,13 @@ func LoadExternalTargets(tgs string) (*ImportsConfig, error) {
 
 // fetchExternalTargets performs an HTTP GET for url, parses the response body
 // as targets.yaml, and returns the config with Raw set to the response body.
-// The GET is bounded by [fetchTimeout].
-func fetchExternalTargets(url string) (*ImportsConfig, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), fetchTimeout)
+// The GET is bounded by the shorter of [fetchTimeout] and ctx.
+func fetchExternalTargets(
+	ctx context.Context,
+	url string,
+) (*ImportsConfig, error) {
+
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
