@@ -154,6 +154,7 @@ func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 
 	cmd := exec.CommandContext(ctx, binPath, args...)
 	cmd.Env = env
+	cmd.Stdin = rng.Stdin()
 	cmd.Stdout = rng.Stdout()
 	cmd.Stderr = rng.Stderr()
 	cmd.Dir = gmk.cfg.wd
