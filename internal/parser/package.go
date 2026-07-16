@@ -158,7 +158,9 @@ func NewPackage(
 			// pruned module cache) and fall through to `go list`.
 			tmp := *pkg
 			if err := json.Unmarshal(data, &tmp); err == nil {
-				if _, sErr := os.Stat(tmp.ImpPath); sErr == nil {
+				if tmp.ImpSpec != "" && tmp.ImpSpec != pkg.ImpSpec {
+					// Wrong package for this key; fall through to go list.
+				} else if _, sErr := os.Stat(tmp.ImpPath); sErr == nil {
 					*pkg = tmp
 					return pkg, nil
 				}
