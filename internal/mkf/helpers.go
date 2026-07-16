@@ -43,7 +43,7 @@ const (
 	exitCodeSignal = 128
 
 	// ExitCodeCompile is exit code used when compilation of the makefiles and
-	// generated files filed.
+	// generated files failed.
 	ExitCodeCompile = 129
 )
 
@@ -137,13 +137,12 @@ func runTarget(
 
 	// Run the target in a goroutine. The channel is buffered so the single
 	// send (normal return, panic path, chdir-error path, or getwd-error path)
-	// never blocks when RunTarget has already returned via the signal or
+	// never blocks when runTarget has already returned via the signal or
 	// context-cancellation paths below. An unbuffered channel would leak the
 	// goroutine and skip its deferred os.Chdir, violating Execute's contract
-	// of restoring the original working directory.
-	// Buffered for the target result plus an optional cwd-restore error so
-	// neither send blocks when the wait loop returns early on signal/cancel.
-	done := make(chan error, 2)
+	// of restoring the original working directory. Buffer size 1 is enough:
+	// the deferred path always sends once, then closes.
+	done := make(chan error, 1)
 	go func() {
 		// Remember the working directory before running the target.
 		cwd, err := os.Getwd()
