@@ -160,7 +160,7 @@ func runTarget(
 			}
 			if rerr := os.Chdir(cwd); rerr != nil {
 				if tgtErr != nil {
-					done <- fmt.Errorf("%w (restore cwd: %v)", tgtErr, rerr)
+					done <- fmt.Errorf("%w (restore cwd: %w)", tgtErr, rerr)
 				} else {
 					done <- rerr
 				}
