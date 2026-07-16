@@ -66,8 +66,8 @@ func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 	if goarch := rng.EnvGet("GOARCH"); goarch != "" {
 		ctxt.GOARCH = goarch
 	}
-	if GetBuildTag(rng) != "" {
-		ctxt.BuildTags = []string{BuildTag}
+	if tag := GetBuildTag(rng); tag != "" {
+		ctxt.BuildTags = []string{tag}
 	}
 	return ctxt.ImportDir(dir, 0)
 }
