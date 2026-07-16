@@ -109,6 +109,7 @@ func Test_HasRun(t *testing.T) {
 
 	t.Run("forced exit", func(t *testing.T) {
 		// --- Given ---
+		// CommandContext kill still started the process → HasRun true.
 		ctx, cxl := context.WithTimeout(context.Background(), time.Second)
 		defer cxl()
 
@@ -121,7 +122,20 @@ func Test_HasRun(t *testing.T) {
 		ran := HasRun(c.Run())
 
 		// --- Then ---
-		assert.False(t, ran)
+		assert.True(t, ran)
+	})
+
+	t.Run("non-zero exit", func(t *testing.T) {
+		// --- Given ---
+		c := exec.Command(os.Args[0], "--exitCode", "99")
+		c.Stdout = io.Discard
+		c.Stderr = io.Discard
+
+		// --- When ---
+		ran := HasRun(c.Run())
+
+		// --- Then ---
+		assert.True(t, ran)
 	})
 }
 

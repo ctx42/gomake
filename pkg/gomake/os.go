@@ -34,24 +34,21 @@ func ExitStatus(err error) int {
 }
 
 // HasRun examines the error to determine if it was generated as a result of a
-// command running via [exec.Command]. If the error is nil, or the command ran
-// (even if it exited with a non-zero exit code), HasRun reports true. If the
-// error is an unrecognized type, or it is an error from [exec.Command] that
-// says the command failed to run (usually due to the command not existing or
-// not being executable), it reports false.
+// command running via [exec.Command]. If the error is nil, or the command
+// started (including a non-zero exit or a signal kill from a deadline), HasRun
+// reports true. If the error is an unrecognized type, or it is an error from
+// [exec.Command] that says the command failed to start (usually due to the
+// command not existing or not being executable), it reports false.
 func HasRun(err error) bool {
 	if err == nil {
 		return true
 	}
-	if target, ok := errors.AsType[*exec.ExitError](err); ok {
-		return target.Exited()
-	}
-	return false
+	var ee *exec.ExitError
+	return errors.As(err, &ee)
 }
 
-// GetGOOS returns GOOS value from the environment if not set runtime value is
-// used. When multiple values are set in the environment, the last one will be
-// used.
+// GetGOOS returns the GOOS value from env; if unset, it returns
+// [runtime.GOOS]. When the key appears more than once, the last value wins.
 func GetGOOS(env []string) string {
 	ret := runtime.GOOS
 	if val, exists := LookupEnv(env, "GOOS"); exists {
@@ -60,9 +57,8 @@ func GetGOOS(env []string) string {
 	return ret
 }
 
-// GetGOARCH returns GOARCH value from the environment, if not set runtime
-// value is used. When multiple values are set in the environment, the last one
-// will be used.
+// GetGOARCH returns the GOARCH value from env; if unset, it returns
+// [runtime.GOARCH]. When the key appears more than once, the last value wins.
 func GetGOARCH(env []string) string {
 	ret := runtime.GOARCH
 	if val, exists := LookupEnv(env, "GOARCH"); exists {
