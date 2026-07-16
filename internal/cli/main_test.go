@@ -1805,6 +1805,34 @@ func Test_main_error(t *testing.T) {
 		assert.Contain(t, mkf.ErrUnkTarget.Error(), tst.Stderr())
 	})
 
+	t.Run("--help target with timeout", func(t *testing.T) {
+		// --- Given ---
+		// Non-default --timeout rebuilds cfg.args with makefile flags before
+		// the target name; help must still resolve the target, not the duration.
+		tst := ringtest.New(t).WetStderr()
+		relPath := "testdata/projects/showcase_targets/project"
+		prj := gmt.NewProject(t)
+		prj.GoModInit()
+		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
+		prj.Close()
+		rng := tst.Ring(
+			"--src", prj.Root(),
+			"--tmp", prj.TempDir(),
+			"--timeout", "1s",
+			"--help", "say-hello",
+		)
+
+		// --- When ---
+		code := Main(context.Background(), rng, "1.0", builtin.Empty())
+
+		// --- Then ---
+		assert.Equal(t, 0, code)
+		assert.Contain(t, "say-hello", tst.Stderr())
+		assert.NotContain(t, mkf.ErrUnkTarget.Error(), tst.Stderr())
+	})
+
 	t.Run("execute compile error", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()

@@ -128,12 +128,14 @@ func Main(
 		if err != nil {
 			return failCode(rng, err)
 		}
-		out, err := mkf.HelpUsage(
-			binName,
-			cfg.args[1:],
-			cfg.fs,
-			all,
-		)
+		// HelpUsage expects positionals only (target name, if any). cfg.args
+		// also carries makefile flags such as --timeout / --wd, so pass the
+		// target name alone rather than slicing past a presumed argv0.
+		var helpArgs []string
+		if cfg.target != "" {
+			helpArgs = []string{cfg.target}
+		}
+		out, err := mkf.HelpUsage(binName, helpArgs, cfg.fs, all)
 		if err != nil {
 			fail(rng, err)
 			return 1
