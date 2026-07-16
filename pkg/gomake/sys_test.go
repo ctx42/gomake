@@ -220,3 +220,15 @@ func Test_ReadLine_tabular(t *testing.T) {
 		})
 	}
 }
+
+func Test_ReadLine_eofWithoutNewline(t *testing.T) {
+	// --- Given ---
+	rdr := bytes.NewBufferString("  last  ")
+
+	// --- When ---
+	have, err := ReadLine(rdr)
+
+	// --- Then ---
+	assert.ErrorIs(t, io.EOF, err)
+	assert.Equal(t, "last", have)
+}

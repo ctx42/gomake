@@ -474,9 +474,10 @@ func Test_GetCfgDefault(t *testing.T) {
 		cfg := configFrom(t, `{"count":3}`)
 
 		// --- When ---
-		_, err := GetCfgDefault(cfg, "count", "")
+		have, err := GetCfgDefault(cfg, "count", "def")
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
+		assert.Equal(t, "", have)
 	})
 }

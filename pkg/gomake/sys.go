@@ -48,6 +48,10 @@ func ReadFile(pth string) (string, error) {
 
 // ReadChar reads one rune from the reader and returns it as a string. It
 // returns [io.EOF] when the reader is empty.
+//
+// Each call wraps r in a new [bufio.Reader], so consecutive calls on the same
+// underlying reader may drop bytes buffered by a prior call. Prefer a single
+// call, or pass a shared [bufio.Reader] as r when reading more than once.
 func ReadChar(r io.Reader) (string, error) {
 	char, _, err := bufio.NewReader(r).ReadRune()
 	if err != nil {
@@ -56,12 +60,18 @@ func ReadChar(r io.Reader) (string, error) {
 	return string(char), nil
 }
 
-// ReadLine reads line delimited by "\n" from the reader. The prefix and
-// postfix whitespace are trimmed from the returned line.
+// ReadLine reads a line delimited by "\n" from the reader. Leading and trailing
+// whitespace are trimmed from a successfully read line. On error, any partial
+// content is also trimmed so EOF after a final line without a newline still
+// yields the line text with [io.EOF].
+//
+// Each call wraps r in a new [bufio.Reader]; see [ReadChar] for multi-call
+// caveats on the same underlying reader.
 func ReadLine(r io.Reader) (string, error) {
 	txt, err := bufio.NewReader(r).ReadString('\n')
+	txt = strings.TrimSpace(txt)
 	if err != nil {
 		return txt, err
 	}
-	return strings.TrimSpace(txt), nil
+	return txt, nil
 }

@@ -215,7 +215,8 @@ func GetCfgDefault[T any](cfg *Config, path string, def T) (T, error) {
 		return def, nil
 	}
 	if err != nil {
-		return def, err
+		var zero T
+		return zero, err
 	}
 	return val, nil
 }

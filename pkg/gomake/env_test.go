@@ -120,6 +120,26 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		assert.Equal(t, []string{"key0", "key2"}, haveOrder)
 	})
 
+	t.Run("duplicate key keeps last value once", func(t *testing.T) {
+		// --- Given ---
+		env := []string{
+			"key0=val0",
+			"key1=first",
+			"key0=last",
+		}
+
+		// --- When ---
+		haveMap, haveOrder := EnvSplitOrdered(env)
+
+		// --- Then ---
+		wantMap := map[string]string{
+			"key0": "last",
+			"key1": "first",
+		}
+		assert.Equal(t, wantMap, haveMap)
+		assert.Equal(t, []string{"key0", "key1"}, haveOrder)
+	})
+
 	t.Run("empty entry is skipped", func(t *testing.T) {
 		// --- Given ---
 		env := []string{

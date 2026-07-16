@@ -35,7 +35,9 @@ func EnvSplit(env []string) map[string]string {
 }
 
 // EnvSplitOrdered parses [os.Environ] results and returns it as a key value
-// map and a slice with the order of keys returned by [os.Environ].
+// map and a slice with the order of first-seen keys. When a key appears more
+// than once, the map keeps the last value and the order list keeps a single
+// entry at the key's first occurrence.
 func EnvSplitOrdered(env []string) (map[string]string, []string) {
 	k := make([]string, 0, 10)
 	m := make(map[string]string, 10)
@@ -44,13 +46,14 @@ func EnvSplitOrdered(env []string) (map[string]string, []string) {
 			continue
 		}
 		parts := strings.SplitN(s, "=", 2)
-		if len(parts) == 2 {
-			if parts[0] == "" {
-				continue
-			}
-			k = append(k, parts[0])
-			m[parts[0]] = parts[1]
+		if len(parts) != 2 || parts[0] == "" {
+			continue
 		}
+		key := parts[0]
+		if _, seen := m[key]; !seen {
+			k = append(k, key)
+		}
+		m[key] = parts[1]
 	}
 	return m, k
 }
