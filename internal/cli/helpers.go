@@ -775,7 +775,7 @@ func xflagVersion() string {
 }
 
 // goEditErr wraps a failed "go mod/work edit" with sentinel and the location,
-// appending the captured toolchain output or, when empty, the raw error.
+// appending the captured toolchain output and the underlying error.
 func goEditErr(sentinel error, where, out string, err error) error {
 	detail := strings.TrimSpace(out)
 	if detail == "" {
