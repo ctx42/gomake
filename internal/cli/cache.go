@@ -93,7 +93,16 @@ func binaryCacheKey(
 		}
 	}
 
+	// Toolchain / flag inputs that change the compiled binary.
 	_, _ = fmt.Fprintf(h, "ver:%s\ngoos:%s\ngoarch:%s\n", version, goos, goarch)
+	_, _ = fmt.Fprintf(h, "go:%s\n", runtime.Version())
+	for _, key := range []string{
+		"GOFLAGS", "CGO_ENABLED", "CGO_CFLAGS", "CGO_LDFLAGS", "GOTOOLCHAIN",
+	} {
+		if val := os.Getenv(key); val != "" {
+			_, _ = fmt.Fprintf(h, "%s:%s\n", key, val)
+		}
+	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
