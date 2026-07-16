@@ -361,11 +361,13 @@ func (tgs *Targets) importAliasMap() map[string]string {
 	sort.Strings(specs)
 
 	// alias -> ImpSpec already assigned; seed reserved names used by gen
-	// templates so user packages named context/ring/mkf get a free alias.
+	// templates and GoCode locals so user packages cannot shadow them.
 	taken := map[string]string{
 		"context": "reserved",
 		"ring":    "reserved",
 		"mkf":     "reserved",
+		"targets": "reserved",
+		"tgt":     "reserved",
 	}
 	out := make(map[string]string, len(pkgBySpec))
 	for _, spec := range specs {

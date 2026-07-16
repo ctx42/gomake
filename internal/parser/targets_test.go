@@ -834,7 +834,7 @@ func Test_Targets_GoImports(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("reserves context ring mkf names", func(t *testing.T) {
+	t.Run("reserves context ring mkf targets tgt names", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{
 			Name: "a", PkgName: "context", ImpSpec: "example.com/ctx",
@@ -842,8 +842,14 @@ func Test_Targets_GoImports(t *testing.T) {
 		tgt1 := &mkf.Target{
 			Name: "b", PkgName: "ring", ImpSpec: "example.com/rng",
 		}
+		tgt2 := &mkf.Target{
+			Name: "c", PkgName: "targets", ImpSpec: "example.com/tgs",
+		}
+		tgt3 := &mkf.Target{
+			Name: "d", PkgName: "tgt", ImpSpec: "example.com/tgt",
+		}
 		tgs := NewTargets()
-		assert.NoError(t, tgs.Add(tgt0, tgt1))
+		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2, tgt3))
 
 		// --- When ---
 		have := tgs.GoImports()
@@ -851,6 +857,8 @@ func Test_Targets_GoImports(t *testing.T) {
 		// --- Then ---
 		assert.Contain(t, "context2 ", have)
 		assert.Contain(t, "ring2 ", have)
+		assert.Contain(t, "targets2 ", have)
+		assert.Contain(t, "tgt2 ", have)
 	})
 
 	t.Run("same package name gets aliases", func(t *testing.T) {
