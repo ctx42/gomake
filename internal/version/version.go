@@ -146,7 +146,18 @@ func writeField(b *strings.Builder, label, val string) {
 
 // ldflag returns one -X definition for importPath.field=value. Values with
 // spaces or quotes are quoted so `go build` receives a single linker argument.
+// Values that contain both single and double quotes cannot be represented with
+// cmd/internal/quoted.Split without escaping, so those characters are replaced
+// with spaces before quoting.
 func ldflag(field, value string) string {
+	if strings.Contains(value, `"`) && strings.Contains(value, `'`) {
+		value = strings.Map(func(r rune) rune {
+			if r == '"' || r == '\'' {
+				return ' '
+			}
+			return r
+		}, value)
+	}
 	def := importPath + "." + field + "=" + value
 	if !needsLDQuote(def) {
 		return "-X " + def
