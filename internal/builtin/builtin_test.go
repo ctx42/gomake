@@ -47,10 +47,12 @@ func Test_newTargets(t *testing.T) {
 		tgs := newTargets(want, src, pre)
 
 		// --- Then ---
-		assert.Same(t, want, tgs.Targets())
+		assert.Equal(t, want, tgs.Targets())
+		assert.NotSame(t, want, tgs.Targets())
 		assert.Equal(t, string(src), string(tgs.Source()))
 		assert.Len(t, 1, tgs.PreRuns())
 		assert.Same(t, pre[0], tgs.PreRuns()[0])
+		assert.NotSame(t, pre, tgs.PreRuns())
 	})
 
 	t.Run("when no targets mainEmptyFN always used", func(t *testing.T) {
@@ -85,7 +87,8 @@ func Test_targets_Targets(t *testing.T) {
 	have := tgs.Targets()
 
 	// --- Then ---
-	assert.Same(t, want, have)
+	assert.Equal(t, want, have)
+	assert.NotSame(t, want, have)
 }
 
 func Test_targets_PreRuns(t *testing.T) {

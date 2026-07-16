@@ -94,9 +94,17 @@ func newTargets(tgs []*mkf.Target, src []byte, pre []mkf.PreRunFn) *targets {
 	}
 }
 
-func (tgs *targets) Targets() []*mkf.Target  { return tgs.tgs }
-func (tgs *targets) PreRuns() []mkf.PreRunFn { return tgs.pre }
-func (tgs *targets) Source() []byte          { return slices.Clone(tgs.src) }
+func (tgs *targets) Targets() []*mkf.Target {
+	return slices.Clone(tgs.tgs)
+}
+
+func (tgs *targets) PreRuns() []mkf.PreRunFn {
+	return slices.Clone(tgs.pre)
+}
+
+func (tgs *targets) Source() []byte {
+	return slices.Clone(tgs.src)
+}
 
 // GenOption is the signature for [GenMain] options.
 type GenOption func(*genOpts)
