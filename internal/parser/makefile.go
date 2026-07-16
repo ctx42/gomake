@@ -150,6 +150,10 @@ func (pmf *Makefile) adGmImports(fil *ast.File) error {
 		impFiles := make([]string, len(pkg.Files))
 		copy(impFiles, pkg.Files)
 		_, docPkg, err = astAndDocPkg(pkg.ImpPath, impFiles)
+		if errors.Is(err, ErrAstEmpty) {
+			// Soft-skip: same as main package when go list selected no files.
+			continue
+		}
 		if err != nil {
 			return err
 		}
