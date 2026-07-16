@@ -10,7 +10,8 @@ import (
 	"strings"
 )
 
-// PathExists returns true if the path exists.
+// PathExists reports whether the path exists. Any Stat error other than
+// existence (including permission errors) yields false.
 func PathExists(pth string) bool {
 	if _, err := os.Stat(pth); err != nil {
 		return false
@@ -18,7 +19,8 @@ func PathExists(pth string) bool {
 	return true
 }
 
-// FileExists returns true if the path exists and is a file.
+// FileExists reports whether the path exists and is a regular file (not a
+// directory). Any Stat error other than existence yields false.
 func FileExists(pth string) bool {
 	fi, err := os.Stat(pth)
 	if err != nil {
@@ -27,7 +29,8 @@ func FileExists(pth string) bool {
 	return !fi.IsDir()
 }
 
-// DirExists returns true if the path exists and is a directory.
+// DirExists reports whether the path exists and is a directory. Any Stat
+// error other than existence yields false.
 func DirExists(pth string) bool {
 	fi, err := os.Stat(pth)
 	if err != nil {
