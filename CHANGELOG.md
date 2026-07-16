@@ -1,3 +1,87 @@
+## v0.26.0 (Thu, 16 Jul 2026 11:54:31 UTC)
+- fix(cli): pass target name to HelpUsage.
+- fix(cli): widen makefile binary cache key.
+- fix: deliver GOMAKE_VERSION and PROJECT_DIR via env.
+- fix(gomake): treat any ExitError as HasRun.
+- fix(mkf): ignore deadline after target result.
+- fix(mkf): surface cwd restore errors and cover SIGTERM.
+- fix(cli): run PreRuns for builtins and MkdirAll tmp.
+- fix(cli): read GOMAKE_INSTALL_PATH from ring env.
+- fix(parser): harden import resolve, signatures, and cache.
+- fix(gomake): tighten GetCfgDefault, env split, and ReadLine.
+- fix(install): surface download stdout and restore errors.
+- fix(builtin): clone Targets and PreRuns slices.
+- fix(cli): cancel HTTP targets.yaml fetch via context.
+- fix(version): sanitize ldflag values with both quote types.
+- fix(clitest): top-level makefiles and fatal goCache.
+- fix(parser): treat empty file list as empty AST.
+- fix(cli): hash workspace and replace trees in cache key.
+- fix(cli): surface ErrNoGoMod when a target is named.
+- fix(cli): use exit 129 for --bin compile failures.
+- fix(cli): absolutize all relative go.work use paths.
+- fix(cli): locate go.work via walk and GOWORK.
+- fix(parser): alias imports when package names collide.
+- fix(gomake): deep-copy GetCfg any map and slice values.
+- fix(mkf): reject negative --timeout values.
+- fix(mkf): prefer finished target over cancel race.
+- fix(gomake): decode config numbers with json.Number.
+- fix(cli): strip gomake build tags from CRLF sources.
+- fix(install): trim whitespace-only --targets values.
+- fix(parser): use meta build tag in importDir.
+- fix(builtintest): clone PreRuns slice on return.
+- test(install): clear process PATH for go LookPath case.
+- fix(osarch): parse prerelease minors in majorMinor.
+- docs(gomake): fix target signature in package README.
+- fix(cli): map only missing makefile.go to errNoMakefile.
+- fix(mkf): correct ExitCodeCompile godoc and done channel.
+- docs(gomake): mention target config in package godoc.
+- test(version): assert PopulateVersion build date from clock.
+- fix(cli): pin GOWORK so editGoWork cannot touch the user file.
+- fix(parser): unique import aliases and method receiver vars.
+- fix(cli): pin GOWORK for compile and align binary cache.
+- fix(mkf): keep 128+n exit when signal races cooperative cancel.
+- fix(gomake): reject JSON null for typed GetCfg.
+- fix(parser): MarkDefault sets only the first matching DefRef.
+- fix(parser): write go list cache with rename.
+- fix(install): isolate GOWORK and restore created snapshot paths.
+- fix(cli): harden workspace discovery and go.work cache trees.
+- fix(parser): resolve Default import aliases and reserve names.
+- fix(gomake): map signal-killed processes to 128+n exit codes.
+- fix(install): treat HTTP targets schemes case-insensitively.
+- fix(version): quote ldflags that contain newlines.
+- fix(clitest): CRLF tag strip and fatal findMakefiles errors.
+- fix(cli): wire ring Stdin into makefile subprocess.
+- fix(parser): reserve targets and tgt import aliases.
+- fix(gomake): keep UseNumber when GetCfg decodes composites.
+- fix(cli): use unique temps when storing binary cache.
+- fix(parser): include GOFLAGS in list cache and unique temps.
+- fix(cli): accept HTTP targets URLs case-insensitively.
+- fix(parser): soft-skip empty gomake:import packages.
+- fix(parser): apply GOFLAGS -tags in importDir.
+- fix(cli): surface makefile Stat errors and compile cancel codes.
+- fix(cli): check user-level targets tree in --check-config.
+- fix(parser): accept spaced // gomake:ns_root comments.
+- fix(builtin): clone PreRuns at construction time.
+- fix(clitest): stop after Fatal on makefile read/write and goCache.
+- fix(gomake): surface non-NotExist Stat errors in Root.
+- fix(gomake): accept json.RawMessage in TargetConfig.
+- docs(gomake): clarify PathExists/FileExists/DirExists Stat errors.
+- fix(parser): strip * from pointer method receivers.
+- fix(parser): reject list-cache hits with wrong ImpSpec.
+- fix(parser): hash active go.work content in list cache.
+- fix(install): resolve devel source from module Root.
+- fix(cli): include toolchain env in binary cache key.
+- fix(cli): reject negative timeout from flags and yaml.
+- fix(cli): skip project yaml load for --version.
+- fix(cli): drop dead flag.ErrHelp check after Execute.
+- fix(mkf): wrap restore-cwd error with %w.
+- fix(cli): absolutize local go.mod/go.work replaces.
+- fix(cli): strip compound //go:build lines that mention gomake.
+- fix(cli): list/help only analyze valid makefile names.
+- docs(cli): align goEditErr comment with %w wrap.
+- fix(cli): drop all go.work uses before re-adding.
+- docs: align cache, config, and agent notes with runtime.
+
 ## v0.25.0 (Thu, 16 Jul 2026 07:48:12 UTC)
 - docs: document installing from a local clone.
 
