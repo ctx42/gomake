@@ -70,6 +70,8 @@ func (prj *Project) MakefilesFrom(src string) []string {
 			prj.t.Fatal(err)
 			continue
 		}
+		// Normalize CRLF so LF-only tag matching works on Windows sources.
+		filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))
 		switch {
 		case bytes.HasPrefix(filData, tagLine):
 			filData = bytes.TrimLeft(filData[len(tagLine):], "\n")

@@ -84,7 +84,7 @@ func findMakefiles(t tester.T, dir string) []string {
 
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 		return nil
 	}
 	var list []string
