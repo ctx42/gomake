@@ -350,10 +350,10 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		return nil, err
 	}
 
-	// Copy "go.work" file.
-	// Not covered by unit tests: requires a real module tree with go.work.
-	goWorkSrc := filepath.Join(filepath.Dir(mod.ModPath), "go.work")
-	if gomake.FileExists(goWorkSrc) {
+	// Copy "go.work" file (module root, parent walk, or GOWORK).
+	modRoot := filepath.Dir(mod.ModPath)
+	goWorkSrc := findGoWork(rng, modRoot)
+	if goWorkSrc != "" {
 		if content, err = os.ReadFile(goWorkSrc); err != nil {
 			return nil, err
 		}
@@ -361,21 +361,21 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
 			return nil, err
 		}
-		if err = editGoWork(rng, src, buildDir); err != nil {
+		workDir := filepath.Dir(goWorkSrc)
+		if err = editGoWork(rng, workDir, buildDir, modRoot); err != nil {
 			return nil, err
 		}
-	}
 
-	// Copy "go.work.sum" file.
-	// Not covered by unit tests: requires a real module tree with go.work.sum.
-	goWorkSumSrc := filepath.Join(filepath.Dir(mod.ModPath), "go.work.sum")
-	if gomake.FileExists(goWorkSumSrc) {
-		if content, err = os.ReadFile(goWorkSumSrc); err != nil {
-			return nil, err
-		}
-		goWorkDst := filepath.Join(buildDir, "go.work.sum")
-		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
-			return nil, err
+		// Sibling sum next to the discovered go.work, when present.
+		goWorkSumSrc := goWorkSrc + ".sum"
+		if gomake.FileExists(goWorkSumSrc) {
+			if content, err = os.ReadFile(goWorkSumSrc); err != nil {
+				return nil, err
+			}
+			sumDst := filepath.Join(buildDir, "go.work.sum")
+			if err = os.WriteFile(sumDst, content, 0600); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -416,11 +416,46 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	return cu, nil
 }
 
+// findGoWork returns the path to the go.work file that applies to modRoot.
+// It honors GOWORK when set (including "off"), otherwise walks from modRoot
+// toward the filesystem root like the Go toolchain. Empty means none.
+func findGoWork(env ring.Environ, modRoot string) string {
+	if env != nil {
+		if v := env.EnvGet("GOWORK"); v != "" {
+			if v == "off" {
+				return ""
+			}
+			pth := v
+			if !filepath.IsAbs(pth) {
+				pth = filepath.Join(modRoot, pth)
+			}
+			pth = filepath.Clean(pth)
+			if gomake.FileExists(pth) {
+				return pth
+			}
+			return ""
+		}
+	}
+	dir := modRoot
+	for {
+		pth := filepath.Join(dir, "go.work")
+		if _, err := os.Stat(pth); err == nil {
+			return pth
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return ""
+		}
+		dir = parent
+	}
+}
+
 // editGoWork examines the go.work file in dst and rewrites relative use
-// paths to absolute paths based on workDir (the directory that originally
-// contained the workspace file). The "." entry is left relative so it still
-// names the build directory after the file is copied.
-func editGoWork(env ring.Environ, workDir, dst string) error {
+// paths based on workDir (the directory that originally contained the
+// workspace file). Paths that resolve to modRoot become "." so the build
+// directory remains the workspace's main module; other relative paths
+// become absolute so siblings still resolve after the copy.
+func editGoWork(env ring.Environ, workDir, dst, modRoot string) error {
 	out := &bytes.Buffer{}
 	cmd := exec.Command("go", "work", "edit", "-json")
 	cmd.Env = env.EnvAll()
@@ -440,6 +475,7 @@ func editGoWork(env ring.Environ, workDir, dst string) error {
 		return goEditErr(errGoWorkEdit, workDir, out.String(), err)
 	}
 
+	modRoot = filepath.Clean(modRoot)
 	replace := make(map[string]string, len(result.Use))
 	for _, val := range result.Use {
 		dp := val.DiskPath
@@ -450,6 +486,10 @@ func editGoWork(env ring.Environ, workDir, dst string) error {
 			continue
 		}
 		pth := filepath.Clean(filepath.Join(workDir, dp))
+		if modRoot != "" && pth == modRoot {
+			replace[dp] = "."
+			continue
+		}
 		replace[dp] = pth
 	}
 

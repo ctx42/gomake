@@ -637,6 +637,76 @@ func Test_prepare(t *testing.T) {
 	})
 }
 
+func Test_findGoWork(t *testing.T) {
+	t.Run("at module root", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "go 1.22\nuse .\n", root, "go.work")
+		env := ring.New()
+
+		// --- When ---
+		have := findGoWork(env, root)
+
+		// --- Then ---
+		assert.Equal(t, filepath.Join(root, "go.work"), have)
+	})
+
+	t.Run("in parent directory", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		oskit.Write(t, "go 1.22\nuse .\n", base, "go.work")
+		mod := oskit.MkdirAll(t, base, "mod")
+		env := ring.New()
+
+		// --- When ---
+		have := findGoWork(env, mod)
+
+		// --- Then ---
+		assert.Equal(t, filepath.Join(base, "go.work"), have)
+	})
+
+	t.Run("GOWORK absolute", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		work := oskit.Write(t, "go 1.22\nuse .\n", base, "custom.work")
+		mod := oskit.MkdirAll(t, base, "mod")
+		env := ring.New()
+		env.EnvSet("GOWORK", work)
+
+		// --- When ---
+		have := findGoWork(env, mod)
+
+		// --- Then ---
+		assert.Equal(t, work, have)
+	})
+
+	t.Run("GOWORK off", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "go 1.22\nuse .\n", root, "go.work")
+		env := ring.New()
+		env.EnvSet("GOWORK", "off")
+
+		// --- When ---
+		have := findGoWork(env, root)
+
+		// --- Then ---
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		env := ring.New()
+
+		// --- When ---
+		have := findGoWork(env, root)
+
+		// --- Then ---
+		assert.Equal(t, "", have)
+	})
+}
+
 func Test_editGoWork(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
@@ -670,7 +740,7 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, outPth)
+		err := editGoWork(env, prjRoot, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -685,7 +755,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, srcPth, dstPth)
+		err := editGoWork(env, srcPth, dstPth, srcPth)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
@@ -704,7 +774,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, srcPth, dstPth)
+		err := editGoWork(env, srcPth, dstPth, srcPth)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -736,7 +806,7 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, outPth)
+		err := editGoWork(env, prjRoot, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -768,7 +838,7 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, prjRoot, dstPth)
+		err := editGoWork(env, prjRoot, dstPth, prjRoot)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
