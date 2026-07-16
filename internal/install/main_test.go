@@ -489,8 +489,12 @@ func Test_moduleCacheDir(t *testing.T) {
 
 	t.Run("error - go binary not in PATH", func(t *testing.T) {
 		// --- Given ---
+		// exec.Command resolves "go" via the process PATH (LookPath), not
+		// cmd.Env. Clear PATH before constructing the ring and the command.
+		empty := t.TempDir()
+		t.Setenv("PATH", empty)
 		env := ring.New()
-		t.Setenv("PATH", t.TempDir())
+		env.EnvSet("PATH", empty)
 
 		// --- When ---
 		_, err := moduleCacheDir(env, "example.com/mod@v1.0.0")
