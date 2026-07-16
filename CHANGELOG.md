@@ -1,3 +1,6 @@
+## v0.25.0 (Thu, 16 Jul 2026 07:48:12 UTC)
+- docs: document installing from a local clone.
+
 ## v0.24.0 (Wed, 15 Jul 2026 20:01:44 UTC)
 - fix(install): resolve external targets against the build tree.
 
