@@ -323,8 +323,10 @@ func (tgs *Targets) Map(fns ...TgsMapCB) {
 
 // importAliasMap returns a map from ImpSpec to the Go import alias that
 // generated code must use. When several imports share a package name, later
-// ones get a numeric suffix (pkg, pkg2, …) so selectors stay unique. Entries
-// that keep the default package name map to that name (no explicit alias).
+// ones get a numeric suffix (pkg, pkg2, …). Every alias is unique across the
+// whole set so a natural name like "foo2" cannot collide with a suffix alias.
+// Entries that keep the default package name map to that name (no explicit
+// alias line).
 func (tgs *Targets) importAliasMap() map[string]string {
 	// ImpSpec -> declared package name (first target wins).
 	pkgBySpec := make(map[string]string, 8)
@@ -347,35 +349,33 @@ func (tgs *Targets) importAliasMap() map[string]string {
 	}
 	sort.Strings(specs)
 
-	// How many ImpSpecs claim each package name.
-	count := make(map[string]int, len(pkgBySpec))
-	for _, spec := range specs {
-		count[pkgBySpec[spec]]++
-	}
-
-	// alias -> ImpSpec already assigned.
+	// alias -> ImpSpec already assigned; always resolve against taken.
 	taken := make(map[string]string, len(pkgBySpec))
 	out := make(map[string]string, len(pkgBySpec))
 	for _, spec := range specs {
-		base := pkgBySpec[spec]
-		alias := base
-		if count[base] > 1 {
-			// First keeps base; later get base2, base3, …
-			n := 1
-			for {
-				if n > 1 {
-					alias = fmt.Sprintf("%s%d", base, n)
-				}
-				if other, ok := taken[alias]; !ok || other == spec {
-					break
-				}
-				n++
-			}
-		}
+		alias := uniqueImportAlias(pkgBySpec[spec], taken, spec)
 		taken[alias] = spec
 		out[spec] = alias
 	}
 	return out
+}
+
+// uniqueImportAlias returns base when free, otherwise stem2, stem3, … where
+// stem is base with trailing digits stripped so "foo2" does not become "foo22".
+func uniqueImportAlias(base string, taken map[string]string, spec string) string {
+	if other, ok := taken[base]; !ok || other == spec {
+		return base
+	}
+	stem := strings.TrimRight(base, "0123456789")
+	if stem == "" {
+		stem = base
+	}
+	for n := 2; ; n++ {
+		alias := fmt.Sprintf("%s%d", stem, n)
+		if other, ok := taken[alias]; !ok || other == spec {
+			return alias
+		}
+	}
 }
 
 // GoImports returns unique imports tagged with a `gomake:import` comment.
@@ -458,14 +458,22 @@ func (tgs *Targets) GoCode(qt bool) string {
 			buf.WriteString("\n")
 		}
 		pkgID := tgs.codePkgName(tgt, aliases)
-		codeRef := tgt.CodeRef
-		if pkgID != tgt.PkgName && tgt.PkgName != MainName &&
-			strings.HasPrefix(codeRef, tgt.PkgName+".") {
-			codeRef = pkgID + codeRef[len(tgt.PkgName):]
+		gen := *tgt
+		if pkgID != tgt.PkgName && tgt.PkgName != MainName {
+			if gen.VarName != "" {
+				// Method receiver var must be unique per import alias.
+				gen.VarName = "_v" + pkgID + tgt.Receiver
+				gen.CodeRef = gen.VarName + "." + tgt.FuncName
+			} else if strings.HasPrefix(gen.CodeRef, tgt.PkgName+".") {
+				gen.CodeRef = pkgID + gen.CodeRef[len(tgt.PkgName):]
+			}
+			if strings.HasPrefix(gen.DefRef, tgt.PkgName+".") {
+				gen.DefRef = pkgID + gen.DefRef[len(tgt.PkgName):]
+			}
 		}
-		if tgt.VarName != "" {
+		if gen.VarName != "" {
 			// Define variable if it's not defined.
-			if _, ok := vars[tgt.VarName]; !ok {
+			if _, ok := vars[gen.VarName]; !ok {
 				var pkg string
 				// When target comes from imported package we
 				// need to add the package name qualifier.
@@ -473,17 +481,12 @@ func (tgs *Targets) GoCode(qt bool) string {
 					pkg = pkgID + "."
 				}
 				format := "var %s %s%s\n"
-				code = fmt.Sprintf(format, tgt.VarName, pkg, tgt.Receiver)
+				code = fmt.Sprintf(format, gen.VarName, pkg, tgt.Receiver)
 				buf.WriteString(code)
-				vars[tgt.VarName] = struct{}{}
+				vars[gen.VarName] = struct{}{}
 			}
 		}
-		// Rebuild Run body with the aliased CodeRef when needed.
-		runRef := codeRef
-		snippet := tgt.GoCode(qt)
-		if runRef != tgt.CodeRef {
-			snippet = strings.Replace(snippet, tgt.CodeRef, runRef, -1)
-		}
+		snippet := gen.GoCode(qt)
 		code = fmt.Sprintf("tgt = &%s\n", snippet)
 		code += "targets = append(targets, tgt)\n\n"
 		buf.WriteString(code)
