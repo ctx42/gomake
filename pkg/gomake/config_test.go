@@ -4,6 +4,7 @@
 package gomake
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -295,7 +296,23 @@ func Test_GetCfg(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, float64(3), have)
+		// Numbers stay as json.Number so large integers keep precision.
+		n, ok := have.(json.Number)
+		assert.True(t, ok)
+		assert.Equal(t, "3", string(n))
+	})
+
+	t.Run("large integer keeps precision", func(t *testing.T) {
+		// --- Given ---
+		// 2^53+1 is not exactly representable as float64.
+		cfg := configFrom(t, `{"big":9007199254740993}`)
+
+		// --- When ---
+		have, err := GetCfg[int64](cfg, "big")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, int64(9007199254740993), have)
 	})
 
 	t.Run("any returns copy of map", func(t *testing.T) {

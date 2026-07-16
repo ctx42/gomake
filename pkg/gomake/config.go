@@ -4,6 +4,7 @@
 package gomake
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,7 +63,10 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	default:
 		return cfg, nil
 	}
-	if err := json.Unmarshal(data, &cfg.data); err != nil {
+	// UseNumber keeps integers exact beyond float64 mantissa range.
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&cfg.data); err != nil {
 		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
 	return cfg, nil
