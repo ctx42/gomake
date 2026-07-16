@@ -228,9 +228,10 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 	error,
 ) {
 	noop := func() {}
+	lower := strings.ToLower(tgs)
 	if tgs == "" ||
-		strings.HasPrefix(tgs, "http://") ||
-		strings.HasPrefix(tgs, "https://") {
+		strings.HasPrefix(lower, "http://") ||
+		strings.HasPrefix(lower, "https://") {
 		return "", noop, nil
 	}
 	mod, root, ok := moduleAt(env, filepath.Dir(tgs))
