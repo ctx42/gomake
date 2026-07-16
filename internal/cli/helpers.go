@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"go/build"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -256,7 +257,10 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	// Source must contain [mkf.MakefileMain] file.
 	mkfMain := filepath.Join(src, mkf.MakefileMain)
 	if _, err = os.Stat(mkfMain); err != nil {
-		return nil, fmt.Errorf("%w in %s", errNoMakefile, src)
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, fmt.Errorf("%w in %s", errNoMakefile, src)
+		}
+		return nil, fmt.Errorf("stat %s: %w", mkfMain, err)
 	}
 
 	// Source directory must not contain [mkf.MakefileGen] file.
