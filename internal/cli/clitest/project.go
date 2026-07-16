@@ -68,7 +68,6 @@ func (prj *Project) MakefilesFrom(src string) []string {
 		srcPth = filepath.Join(prj.mkfFrom, srcPth)
 		if filData, err = os.ReadFile(srcPth); err != nil {
 			prj.t.Fatal(err)
-			continue
 		}
 		// Normalize CRLF so LF-only tag matching works on Windows sources.
 		filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))

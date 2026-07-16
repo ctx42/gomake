@@ -72,6 +72,7 @@ func goCache(t tester.T) string {
 	c.Stderr = out
 	if err := c.Run(); err != nil {
 		t.Fatal(err)
+		return ""
 	}
 	return strings.TrimSpace(out.String())
 }
