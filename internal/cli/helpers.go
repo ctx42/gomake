@@ -312,18 +312,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if filData, err = os.ReadFile(srcPth); err != nil {
 			return nil, err
 		}
-		switch {
-		case bytes.HasPrefix(filData, tagLine):
-			// Tag is at the very start of the file.
-			filData = bytes.TrimLeft(filData[len(tagLine):], "\n")
-		default:
-			// Tag is preceded by other content (e.g. copyright header).
-			// Remove "\n<tagLine>\n" to avoid doubling the blank line.
-			block := append([]byte{'\n'}, append(tagLine, '\n')...)
-			if i := bytes.Index(filData, block); i >= 0 {
-				filData = append(filData[:i+1], filData[i+len(block):]...)
-			}
-		}
+		filData = stripBuildTag(filData, tagLine)
 		dstPth := filepath.Join(buildDir, filepath.Base(srcPth))
 		if err = os.WriteFile(dstPth, filData, 0600); err != nil {
 			return nil, err
@@ -414,6 +403,23 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	}
 	cu.Files = append(cu.Files, cu.MainGen, cu.MainUser)
 	return cu, nil
+}
+
+// stripBuildTag removes a //go:build gomake line from makefile source so the
+// out-of-source build can compile without the gomake tag. CRLF newlines are
+// normalized to LF first so Windows-sourced files match BuildTagLine.
+func stripBuildTag(filData, tagLine []byte) []byte {
+	filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))
+	switch {
+	case bytes.HasPrefix(filData, tagLine):
+		return bytes.TrimLeft(filData[len(tagLine):], "\n")
+	default:
+		block := append([]byte{'\n'}, append(tagLine, '\n')...)
+		if i := bytes.Index(filData, block); i >= 0 {
+			return append(filData[:i+1], filData[i+len(block):]...)
+		}
+		return filData
+	}
 }
 
 // findGoWork returns the path to the go.work file that applies to modRoot.

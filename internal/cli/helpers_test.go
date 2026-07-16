@@ -637,6 +637,46 @@ func Test_prepare(t *testing.T) {
 	})
 }
 
+func Test_stripBuildTag_tabular(t *testing.T) {
+	tag := []byte(buildTagLine)
+	tt := []struct {
+		test string
+		in   string
+		want string
+	}{
+		{
+			"lf at start",
+			"//go:build gomake\n\npackage main\n",
+			"package main\n",
+		},
+		{
+			"crlf at start",
+			"//go:build gomake\r\n\r\npackage main\r\n",
+			"package main\n",
+		},
+		{
+			"crlf after header",
+			"// copyright\r\n//go:build gomake\r\n\r\npackage main\r\n",
+			"// copyright\npackage main\n",
+		},
+		{
+			"no tag",
+			"package main\n",
+			"package main\n",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.test, func(t *testing.T) {
+			// --- When ---
+			have := stripBuildTag([]byte(tc.in), tag)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, string(have))
+		})
+	}
+}
+
 func Test_findGoWork(t *testing.T) {
 	t.Run("at module root", func(t *testing.T) {
 		// --- Given ---
