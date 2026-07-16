@@ -416,16 +416,19 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	return cu, nil
 }
 
-// editGoWork examines go work file and replaces relative with absolute paths.
-func editGoWork(env ring.Environ, src, dst string) error {
+// editGoWork examines the go.work file in dst and rewrites relative use
+// paths to absolute paths based on workDir (the directory that originally
+// contained the workspace file). The "." entry is left relative so it still
+// names the build directory after the file is copied.
+func editGoWork(env ring.Environ, workDir, dst string) error {
 	out := &bytes.Buffer{}
 	cmd := exec.Command("go", "work", "edit", "-json")
 	cmd.Env = env.EnvAll()
-	cmd.Dir = src
+	cmd.Dir = workDir
 	cmd.Stdout = out
 	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
-		return goEditErr(errGoWorkEdit, src, out.String(), err)
+		return goEditErr(errGoWorkEdit, workDir, out.String(), err)
 	}
 
 	var result struct {
@@ -434,15 +437,20 @@ func editGoWork(env ring.Environ, src, dst string) error {
 		} `json:"Use"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		return goEditErr(errGoWorkEdit, src, out.String(), err)
+		return goEditErr(errGoWorkEdit, workDir, out.String(), err)
 	}
 
 	replace := make(map[string]string, len(result.Use))
 	for _, val := range result.Use {
-		if strings.HasPrefix(val.DiskPath, "../") {
-			pth := filepath.Join(src, val.DiskPath)
-			replace[val.DiskPath] = filepath.Clean(pth)
+		dp := val.DiskPath
+		if filepath.IsAbs(dp) {
+			continue
 		}
+		if filepath.Clean(dp) == "." {
+			continue
+		}
+		pth := filepath.Clean(filepath.Join(workDir, dp))
+		replace[dp] = pth
 	}
 
 	for from, to := range replace {

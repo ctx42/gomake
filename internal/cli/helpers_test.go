@@ -710,6 +710,40 @@ func Test_editGoWork(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("absolutizes dot-slash use paths", func(t *testing.T) {
+		// --- Given ---
+		env := ring.New()
+		wsPth := oskit.MkdirTemp(t, "", "workspace")
+		othRoot := oskit.MkdirAll(t, wsPth, "other")
+		prjRoot := oskit.MkdirAll(t, wsPth, "project")
+
+		othPrj := prjkit.New(t, othRoot)
+		othPrj.ProjectFrom(modkit.Path("testdata/projects/workspace/other"))
+		othPrj.Rename("go.mod_", "go.mod")
+		othPrj.Close()
+
+		prjPrj := prjkit.New(t, prjRoot)
+		prjPrj.ProjectFrom(modkit.Path("testdata/projects/workspace/project"))
+		prjPrj.Rename("go.mod_", "go.mod")
+		// use ./../other is unusual; use a path with ./ prefix that still
+		// points at the sibling via a cleaned relative form.
+		oskit.Write(t, "go 1.23\n\nuse .\nuse ./../other\n", prjRoot, "go.work")
+		prjPrj.Close()
+
+		outPth := oskit.MkdirTemp(t, "", "project")
+		outPrj := prjkit.New(t, outPth)
+		outPrj.ProjectFrom(prjRoot)
+		outPrj.Close()
+
+		// --- When ---
+		err := editGoWork(env, prjRoot, outPth)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		have := exekit.New(t).ExeStderr(outPrj.Compile())
+		assert.Equal(t, "project called other\n", have)
+	})
+
 	t.Run("no go.work in destination", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
