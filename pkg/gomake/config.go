@@ -57,6 +57,9 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	case []byte:
 		data = val
 
+	case json.RawMessage:
+		data = val
+
 	case string:
 		data = []byte(val)
 
