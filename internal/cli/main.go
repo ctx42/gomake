@@ -61,6 +61,12 @@ func Main(
 	}
 
 	rng = rng.SetArgs(cfg.args) // Config may have consumed some arguments.
+	// Public contract: GOMAKE_VERSION / GOMAKE_PROJECT_DIR are process env
+	// keys (see pkg/gomake). EnvSet puts them into the ring so EnvAll ferries
+	// them into the makefile subprocess; MetaSet keeps them for in-process
+	// meta readers.
+	rng.EnvSet(gomake.VersionEnvKey, ver)
+	rng.EnvSet(gomake.ProjectDirEnvKey, cfg.src)
 	rng.MetaSet(gomake.VersionEnvKey, ver)
 	rng.MetaSet(gomake.ProjectDirEnvKey, cfg.src)
 

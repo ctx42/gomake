@@ -10,21 +10,23 @@ import (
 	"text/tabwriter"
 )
 
-// CCIDEnvKey is the environment variable carrying the CI/CD job identifier
-// gomake records as build metadata. It is part of the public gomake contract:
-// a CI/CD pipeline sets it before installing so the value is embedded in the
-// built binary.
-const CCIDEnvKey = "GOMAKE_CCID"
+// Public gomake environment contract keys.
+const (
+	// CCIDEnvKey is the environment variable carrying the CI/CD job identifier
+	// gomake records as build metadata. A CI/CD pipeline sets it before
+	// installing so the value is embedded in the built binary.
+	CCIDEnvKey = "GOMAKE_CCID"
 
-// VersionEnvKey is the environment variable carrying the gomake version string.
-// It is part of the public gomake contract: the runtime sets it so a target can
-// read the version of the gomake tool that built the makefile.
-const VersionEnvKey = "GOMAKE_VERSION"
+	// VersionEnvKey is the environment variable carrying the gomake version
+	// string. The runtime sets it on the process environment (and ring meta)
+	// so a target can read the version of the gomake tool that invoked it.
+	VersionEnvKey = "GOMAKE_VERSION"
 
-// ProjectDirEnvKey is the environment variable carrying the project directory
-// (the --src path). It is part of the public gomake contract: the runtime sets
-// it so a target can locate the project root.
-const ProjectDirEnvKey = "GOMAKE_PROJECT_DIR"
+	// ProjectDirEnvKey is the environment variable carrying the project
+	// directory (the --src path). The runtime sets it on the process
+	// environment (and ring meta) so a target can locate the project root.
+	ProjectDirEnvKey = "GOMAKE_PROJECT_DIR"
+)
 
 // EnvSplit parses [os.Environ] results and returns it as a key value map.
 func EnvSplit(env []string) map[string]string {

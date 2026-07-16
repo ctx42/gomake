@@ -12,6 +12,7 @@ import (
 	"github.com/ctx42/testkit/pkg/pathkit"
 
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
+	"github.com/ctx42/gomake/pkg/gomake"
 )
 
 func Test_withPkgSpec(t *testing.T) {
@@ -347,7 +348,7 @@ func Test_NewPackage(t *testing.T) {
 		proj := modkit.Root()
 		spec := "example.com/cached/pkg"
 		rng := ring.New()
-		rng.EnvSet("GOMAKE_PROJECT_DIR", proj)
+		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
 		key, ok := listCacheKey(rng, proj, spec)
 		assert.True(t, ok)
 		storeListCache(key, []byte(`{"Name":"cached"}`))

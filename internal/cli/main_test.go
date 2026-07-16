@@ -23,6 +23,7 @@ import (
 	"github.com/ctx42/gomake/internal/builtin/builtintest"
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 	"github.com/ctx42/gomake/internal/mkf"
+	"github.com/ctx42/gomake/pkg/gomake"
 )
 
 func mainNoMakefileInWD(t *testing.T) {
@@ -1974,6 +1975,27 @@ func Test_Main(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, 0, code)
+}
+
+func Test_Main_setsContractEnv(t *testing.T) {
+	// --- Given ---
+	// --version returns early after EnvSet of the public contract keys.
+	tst := ringtest.New(t).WetStderr()
+	tmp := t.TempDir()
+	src := t.TempDir()
+	rng := tst.Ring("--version", "--tmp", tmp, "--src", src)
+	ver := "9.9.9-env"
+
+	// --- When ---
+	code := Main(context.Background(), rng, ver, builtin.Empty())
+
+	// --- Then ---
+	assert.Equal(t, 0, code)
+	assert.Equal(t, ver+"\n", tst.Stderr())
+	assert.Equal(t, ver, rng.EnvGet(gomake.VersionEnvKey))
+	assert.Equal(t, src, rng.EnvGet(gomake.ProjectDirEnvKey))
+	assert.Equal(t, ver, rng.MetaGet(gomake.VersionEnvKey))
+	assert.Equal(t, src, rng.MetaGet(gomake.ProjectDirEnvKey))
 }
 
 // prePanic is a pre-run hook that panics (exercises main's recover path).

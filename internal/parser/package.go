@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
+
+	"github.com/ctx42/gomake/pkg/gomake"
 )
 
 // PackageOpt is NewPackage option signature.
@@ -132,7 +134,7 @@ func NewPackage(
 	}
 
 	if pkg.ImpPath == "" && pkg.ImpSpec != "" && !filepath.IsAbs(pkg.ImpSpec) {
-		src := strings.TrimSpace(rng.EnvGet("GOMAKE_PROJECT_DIR"))
+		src := strings.TrimSpace(rng.EnvGet(gomake.ProjectDirEnvKey))
 		if src != "" {
 			pkg.ImpPath = src
 			if !filepath.IsAbs(pkg.ImpPath) {
