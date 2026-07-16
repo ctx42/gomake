@@ -6,7 +6,6 @@ package clitest
 import (
 	"bufio"
 	"bytes"
-	"io/fs"
 	"net/url"
 	"os"
 	"os/exec"
@@ -72,34 +71,31 @@ func goCache(t tester.T) string {
 	c.Stdout = out
 	c.Stderr = out
 	if err := c.Run(); err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	return strings.TrimSpace(out.String())
 }
 
-// findMakefiles returns list of "makefile*.go" files in the given directory.
+// findMakefiles returns the base names of "makefile*.go" files in dir only
+// (non-recursive). Nested directories are skipped so MakefilesFrom can join
+// each name with the source root safely.
 func findMakefiles(t tester.T, dir string) []string {
 	t.Helper()
 
-	var list []string
-	fn := func(s string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		name := d.Name()
-		ext := filepath.Ext(name)
-		if strings.HasPrefix(name, "makefile") && ext == ".go" {
-			list = append(list, name)
-		}
-		return nil
-	}
-
-	if err := filepath.WalkDir(dir, fn); err != nil {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
 		t.Error(err)
 		return nil
+	}
+	var list []string
+	for _, d := range entries {
+		if d.IsDir() {
+			continue
+		}
+		name := d.Name()
+		if strings.HasPrefix(name, "makefile") && filepath.Ext(name) == ".go" {
+			list = append(list, name)
+		}
 	}
 	return list
 }
@@ -123,7 +119,8 @@ func JoinImpSpec(t tester.T, base string, elem ...string) string {
 //	Name:       first
 //	Last Name:  second
 //
-// and calling `rowColValue("Last Name", 1, text)` would return string "second".
+// and calling `rowColValue("Last Name:", 1, text)` returns "second" (the header
+// must include the colon so Fields indexes align with data columns).
 func rowColValue(t tester.T, header string, column int, text string) string {
 	t.Helper()
 
