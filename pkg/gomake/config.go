@@ -189,7 +189,8 @@ func GetCfg[T any](cfg *Config, path string) (T, error) {
 	}
 
 	if ptr, ok := any(&out).(*any); ok {
-		*ptr = raw
+		// Deep-copy maps and slices so callers cannot mutate the snapshot.
+		*ptr = cloneCfgValue(raw)
 		return out, nil
 	}
 
@@ -219,4 +220,28 @@ func GetCfgDefault[T any](cfg *Config, path string, def T) (T, error) {
 		return zero, err
 	}
 	return val, nil
+}
+
+// cloneCfgValue returns a deep copy of v for map and slice values produced by
+// JSON decoding, so [GetCfg] with T=any cannot mutate the [Config] snapshot.
+// Scalars and other types are returned as-is.
+func cloneCfgValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(x))
+		for k, val := range x {
+			out[k] = cloneCfgValue(val)
+		}
+		return out
+
+	case []any:
+		out := make([]any, len(x))
+		for i, val := range x {
+			out[i] = cloneCfgValue(val)
+		}
+		return out
+
+	default:
+		return v
+	}
 }

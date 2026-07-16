@@ -298,6 +298,21 @@ func Test_GetCfg(t *testing.T) {
 		assert.Equal(t, float64(3), have)
 	})
 
+	t.Run("any returns copy of map", func(t *testing.T) {
+		// --- Given ---
+		cfg := configFrom(t, `{"lint":{"version":"v1"}}`)
+
+		// --- When ---
+		have, err := GetCfg[any](cfg, "lint")
+		assert.NoError(t, err)
+		m, ok := have.(map[string]any)
+		assert.True(t, ok)
+		m["version"] = "mutated"
+
+		// --- Then ---
+		assert.Equal(t, "v1", must.Value(GetCfg[string](cfg, "lint.version")))
+	})
+
 	t.Run("nested path", func(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"version":"v2.13.0"}}`)
