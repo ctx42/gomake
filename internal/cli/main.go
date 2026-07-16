@@ -6,7 +6,6 @@ package cli
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"io/fs"
 	"os"
@@ -249,9 +248,6 @@ func Main(
 	if err = gmk.Execute(ctx, rng); err != nil {
 		if _, ok := errors.AsType[*errCompile](err); ok {
 			return compileFailCode(rng, err)
-		}
-		if errors.Is(err, flag.ErrHelp) {
-			return 0
 		}
 		if !gomake.HasRun(err) {
 			fail(rng, err)
