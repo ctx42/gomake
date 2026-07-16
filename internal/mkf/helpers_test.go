@@ -317,6 +317,36 @@ func Test_runTarget(t *testing.T) {
 		assert.Equal(t, "", tst.Stderr())
 	})
 
+	t.Run("target canceled with SIGTERM", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		tst := ringtest.New(t).WetStdout()
+		sig := make(chan os.Signal, 1)
+		defer signal.Stop(sig)
+		wd := must.Value(os.Getwd())
+
+		started := func() bool {
+			return strings.HasPrefix(tst.Stdout(), "started ")
+		}
+
+		// --- When ---
+		done := make(chan struct{})
+		var err error
+		go func() {
+			err = runTarget(ctx, sig, TgtWaiting().Run, wd, tst.Ring())
+			close(done)
+		}()
+
+		// --- Then ---
+		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
+		sig <- syscall.SIGTERM
+		<-done
+
+		var e interruptedError
+		assert.ErrorAs(t, &e, err)
+		assert.Equal(t, 128+int(syscall.SIGTERM), e.Signal())
+	})
+
 	t.Run("cwd restored after timeout", func(t *testing.T) {
 		// --- Given ---
 		ctx, cxl := context.WithTimeout(t.Context(), 50*time.Millisecond)

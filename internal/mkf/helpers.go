@@ -141,7 +141,9 @@ func runTarget(
 	// context-cancellation paths below. An unbuffered channel would leak the
 	// goroutine and skip its deferred os.Chdir, violating Execute's contract
 	// of restoring the original working directory.
-	done := make(chan error, 1)
+	// Buffered for the target result plus an optional cwd-restore error so
+	// neither send blocks when the wait loop returns early on signal/cancel.
+	done := make(chan error, 2)
 	go func() {
 		// Remember the working directory before running the target.
 		cwd, err := os.Getwd()
@@ -151,23 +153,32 @@ func runTarget(
 			return
 		}
 
+		var tgtErr error
 		defer func() {
 			if v := recover(); v != nil {
 				rerr := RecoverError(v)
-				done <- fmt.Errorf("target panicked with: %w", rerr)
+				tgtErr = fmt.Errorf("target panicked with: %w", rerr)
 			}
-			_ = os.Chdir(cwd)
+			if rerr := os.Chdir(cwd); rerr != nil {
+				if tgtErr != nil {
+					done <- fmt.Errorf("%w (restore cwd: %v)", tgtErr, rerr)
+				} else {
+					done <- rerr
+				}
+			} else {
+				done <- tgtErr
+			}
 			close(done)
 		}()
 
 		// Change the working directory before executing the target.
 		if err = os.Chdir(wd); err != nil {
-			done <- err
+			tgtErr = err
 			return
 		}
 
 		// This is where the target is actually run.
-		done <- fn(ctx, rng)
+		tgtErr = fn(ctx, rng)
 	}()
 
 	// Handle interrupt and termination (containers send SIGTERM).
