@@ -7,7 +7,9 @@ import (
 	"runtime/debug"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/xdef/pkg/xdef"
@@ -35,13 +37,15 @@ func Test_PopulateVersion(t *testing.T) {
 	t.Run("nil info", func(t *testing.T) {
 		// --- Given ---
 		saveVars(t)
-		rng := ringtest.New(t)
+		fixed := time.Date(2000, 1, 2, 3, 4, 5, 0, time.UTC)
+		rng := ring.New(ring.WithClock(func() time.Time { return fixed }))
 
 		// --- When ---
-		PopulateVersion(rng.Ring(), nil)
+		PopulateVersion(rng, nil)
 
 		// --- Then ---
-		_, rev, hash, state, _ := Get()
+		date, rev, hash, state, _ := Get()
+		assert.Equal(t, "2000-01-02T03:04:05Z", date)
 		assert.Equal(t, xdef.NotSet, rev)
 		assert.Equal(t, xdef.NotSet, hash)
 		assert.Equal(t, xdef.NotSet, state)
