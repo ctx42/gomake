@@ -81,6 +81,32 @@ func mainNoMakefileInWD(t *testing.T) {
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
+	t.Run("no go module with target name", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		tst := ringtest.New(t).WetStderr()
+
+		prj := gmt.NewProject(t)
+		prj.Close()
+
+		rng := tst.Ring(
+			"--tmp", prj.TempDir(),
+			"--src", prj.Root(),
+			"hello",
+		)
+		ver := "1.2.3"
+		bip := builtintest.NewTstProvider()
+
+		// --- When ---
+		code := Main(ctx, rng, ver, bip)
+
+		// --- Then ---
+		assert.Equal(t, mkf.ExitCodeErr, code)
+		assert.Contain(t, gomake.ErrNoGoMod.Error(), tst.Stderr())
+		assert.NotContain(t, mkf.ErrUnkTarget.Error(), tst.Stderr())
+		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
+	})
+
 	t.Run("target name provided", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()

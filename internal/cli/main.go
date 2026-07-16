@@ -187,6 +187,11 @@ func Main(
 	err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)
 	switch {
 	case errors.Is(err, errNoMakefile) || errors.Is(err, gomake.ErrNoGoMod):
+		// Outside a module, report the real go.mod error rather than
+		// "unknown target" when the user named a target.
+		if errors.Is(err, gomake.ErrNoGoMod) && cfg.target != "" {
+			return failCode(rng, err)
+		}
 		if cfg.target != "" {
 			fail(rng, mkf.ErrUnkTarget)
 			return mkf.ExitCodeUnkTarget
