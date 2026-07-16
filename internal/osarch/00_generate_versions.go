@@ -272,8 +272,9 @@ func directive(pth, prefix string) string {
 	return ""
 }
 
-// majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", or "1.26"
-// to "1.26". It returns an empty string when the input has no major.minor.
+// majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", "1.26",
+// or a prerelease like "go1.26rc1" / "go1.26beta1" to "1.26". It returns an
+// empty string when the input has no major.minor.
 func majorMinor(v string) string {
 	v = strings.TrimPrefix(v, "go")
 	parts := strings.Split(v, ".")
@@ -283,10 +284,17 @@ func majorMinor(v string) string {
 	if _, err := strconv.Atoi(parts[0]); err != nil {
 		return ""
 	}
-	if _, err := strconv.Atoi(parts[1]); err != nil {
+	// Strip prerelease suffix from the minor (rc1, beta1, …).
+	min := parts[1]
+	i := 0
+	for i < len(min) && min[i] >= '0' && min[i] <= '9' {
+		i++
+	}
+	if i == 0 {
 		return ""
 	}
-	return parts[0] + "." + parts[1]
+	min = min[:i]
+	return parts[0] + "." + min
 }
 
 // verLess reports whether major.minor version a is older than b.
