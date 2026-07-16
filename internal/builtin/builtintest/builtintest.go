@@ -36,7 +36,7 @@ type TstProvider struct{ pre []mkf.PreRunFn }
 
 // NewTstProvider returns test built-in targets provider.
 func NewTstProvider(pre ...mkf.PreRunFn) *TstProvider {
-	return &TstProvider{pre: pre}
+	return &TstProvider{pre: slices.Clone(pre)}
 }
 
 // implements [builtin.Provider].

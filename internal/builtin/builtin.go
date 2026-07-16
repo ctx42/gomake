@@ -90,7 +90,7 @@ func newTargets(tgs []*mkf.Target, src []byte, pre []mkf.PreRunFn) *targets {
 	return &targets{
 		tgs: tgs,
 		src: src,
-		pre: pre,
+		pre: slices.Clone(pre),
 	}
 }
 
