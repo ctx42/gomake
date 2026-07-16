@@ -89,11 +89,19 @@ func loadListCache(key string) ([]byte, bool) {
 }
 
 // storeListCache writes the `go list` output for key to the cache. It is
-// advisory: errors are ignored.
+// advisory: errors are ignored. The write is rename-atomic so concurrent
+// readers never see a partial entry.
 func storeListCache(key string, data []byte) {
 	dir, err := listCacheDir()
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(filepath.Join(dir, key), data, 0600)
+	dst := filepath.Join(dir, key)
+	tmp := dst + ".tmp"
+	if err = os.WriteFile(tmp, data, 0600); err != nil {
+		return
+	}
+	if err = os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+	}
 }
