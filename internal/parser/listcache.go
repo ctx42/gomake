@@ -43,15 +43,50 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	}
 
 	h := sha256.New()
-	for _, name := range []string{"go.mod", "go.sum", "go.work", "go.work.sum"} {
+	for _, name := range []string{"go.mod", "go.sum"} {
 		data, rErr := os.ReadFile(filepath.Join(root, name))
 		if rErr == nil {
 			_, _ = fmt.Fprintf(h, "%s\n", name)
 			_, _ = h.Write(data)
 		}
 	}
-	if gowork := strings.TrimSpace(rng.EnvGet("GOWORK")); gowork != "" {
-		_, _ = fmt.Fprintf(h, "GOWORK:%s\n", gowork)
+	// Active workspace may be above the module root or set via GOWORK.
+	goworkEnv := strings.TrimSpace(rng.EnvGet("GOWORK"))
+	if goworkEnv != "" {
+		_, _ = fmt.Fprintf(h, "GOWORK:%s\n", goworkEnv)
+	}
+	workPath := ""
+	if goworkEnv != "" && goworkEnv != "off" {
+		workPath = goworkEnv
+		if !filepath.IsAbs(workPath) {
+			if abs, aErr := filepath.Abs(workPath); aErr == nil {
+				workPath = abs
+			}
+		}
+	} else if goworkEnv != "off" {
+		// Walk parents for go.work (same idea as cli.findGoWorkValue).
+		for dir := root; ; {
+			cand := filepath.Join(dir, "go.work")
+			if _, sErr := os.Stat(cand); sErr == nil {
+				workPath = cand
+				break
+			}
+			parent := filepath.Dir(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	if workPath != "" {
+		if data, rErr := os.ReadFile(workPath); rErr == nil {
+			_, _ = fmt.Fprintf(h, "go.work\n")
+			_, _ = h.Write(data)
+		}
+		if data, rErr := os.ReadFile(workPath + ".sum"); rErr == nil {
+			_, _ = fmt.Fprintf(h, "go.work.sum\n")
+			_, _ = h.Write(data)
+		}
 	}
 	// GOFLAGS changes go list file selection (e.g. -tags=…).
 	if goflags := strings.TrimSpace(rng.EnvGet("GOFLAGS")); goflags != "" {
