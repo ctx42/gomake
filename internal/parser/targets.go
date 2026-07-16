@@ -321,8 +321,68 @@ func (tgs *Targets) Map(fns ...TgsMapCB) {
 	}
 }
 
+// importAliasMap returns a map from ImpSpec to the Go import alias that
+// generated code must use. When several imports share a package name, later
+// ones get a numeric suffix (pkg, pkg2, …) so selectors stay unique. Entries
+// that keep the default package name map to that name (no explicit alias).
+func (tgs *Targets) importAliasMap() map[string]string {
+	// ImpSpec -> declared package name (first target wins).
+	pkgBySpec := make(map[string]string, 8)
+	for _, tgt := range tgs.List() {
+		if tgt.PkgName == MainName || tgt.ImpSpec == "" {
+			continue
+		}
+		if _, ok := pkgBySpec[tgt.ImpSpec]; !ok {
+			pkgBySpec[tgt.ImpSpec] = tgt.PkgName
+		}
+	}
+	if len(pkgBySpec) == 0 {
+		return nil
+	}
+
+	// Stable order for deterministic suffixes.
+	specs := make([]string, 0, len(pkgBySpec))
+	for spec := range pkgBySpec {
+		specs = append(specs, spec)
+	}
+	sort.Strings(specs)
+
+	// How many ImpSpecs claim each package name.
+	count := make(map[string]int, len(pkgBySpec))
+	for _, spec := range specs {
+		count[pkgBySpec[spec]]++
+	}
+
+	// alias -> ImpSpec already assigned.
+	taken := make(map[string]string, len(pkgBySpec))
+	out := make(map[string]string, len(pkgBySpec))
+	for _, spec := range specs {
+		base := pkgBySpec[spec]
+		alias := base
+		if count[base] > 1 {
+			// First keeps base; later get base2, base3, …
+			n := 1
+			for {
+				if n > 1 {
+					alias = fmt.Sprintf("%s%d", base, n)
+				}
+				if other, ok := taken[alias]; !ok || other == spec {
+					break
+				}
+				n++
+			}
+		}
+		taken[alias] = spec
+		out[spec] = alias
+	}
+	return out
+}
+
 // GoImports returns unique imports tagged with a `gomake:import` comment.
+// When two import paths declare the same package name, later imports get an
+// explicit alias (see importAliasMap).
 func (tgs *Targets) GoImports() string {
+	aliases := tgs.importAliasMap()
 	var lines []string
 	used := make(map[string]struct{}, 10)
 	for _, tgt := range tgs.List() {
@@ -336,7 +396,13 @@ func (tgs *Targets) GoImports() string {
 		if len(lines) == 0 {
 			lines = append(lines, "")
 		}
-		code := fmt.Sprintf("%q", tgt.ImpSpec)
+		alias := aliases[tgt.ImpSpec]
+		var code string
+		if alias != "" && alias != tgt.PkgName {
+			code = fmt.Sprintf("%s %q", alias, tgt.ImpSpec)
+		} else {
+			code = fmt.Sprintf("%q", tgt.ImpSpec)
+		}
 		lines = append(lines, code)
 		used[tgt.ImpSpec] = struct{}{}
 	}
@@ -348,14 +414,31 @@ func (tgs *Targets) GoImports() string {
 	return ""
 }
 
+// codePkgName returns the package identifier to use for tgt in generated
+// code, applying import aliases when package names collide.
+func (tgs *Targets) codePkgName(
+	tgt *mkf.Target,
+	aliases map[string]string,
+) string {
+
+	if tgt.PkgName == MainName || tgt.ImpSpec == "" {
+		return tgt.PkgName
+	}
+	if alias, ok := aliases[tgt.ImpSpec]; ok && alias != "" {
+		return alias
+	}
+	return tgt.PkgName
+}
+
 // GoCode returns Go source code defining the targets. If the qt is true the
 // package qualifier is added to the Target references ("mkf.Target" vs
-// "Target").
+// "Target"). Import package-name collisions use aliases from importAliasMap.
 func (tgs *Targets) GoCode(qt bool) string {
 	corePkg := ""
 	if qt {
 		corePkg = "mkf."
 	}
+	aliases := tgs.importAliasMap()
 	buf := &bytes.Buffer{}
 	var code string
 	if n := len(tgs.list); n > 0 {
@@ -374,6 +457,12 @@ func (tgs *Targets) GoCode(qt bool) string {
 			buf.WriteString("Target\n")
 			buf.WriteString("\n")
 		}
+		pkgID := tgs.codePkgName(tgt, aliases)
+		codeRef := tgt.CodeRef
+		if pkgID != tgt.PkgName && tgt.PkgName != MainName &&
+			strings.HasPrefix(codeRef, tgt.PkgName+".") {
+			codeRef = pkgID + codeRef[len(tgt.PkgName):]
+		}
 		if tgt.VarName != "" {
 			// Define variable if it's not defined.
 			if _, ok := vars[tgt.VarName]; !ok {
@@ -381,7 +470,7 @@ func (tgs *Targets) GoCode(qt bool) string {
 				// When target comes from imported package we
 				// need to add the package name qualifier.
 				if tgt.PkgName != MainName {
-					pkg = tgt.PkgName + "."
+					pkg = pkgID + "."
 				}
 				format := "var %s %s%s\n"
 				code = fmt.Sprintf(format, tgt.VarName, pkg, tgt.Receiver)
@@ -389,7 +478,13 @@ func (tgs *Targets) GoCode(qt bool) string {
 				vars[tgt.VarName] = struct{}{}
 			}
 		}
-		code = fmt.Sprintf("tgt = &%s\n", tgt.GoCode(qt))
+		// Rebuild Run body with the aliased CodeRef when needed.
+		runRef := codeRef
+		snippet := tgt.GoCode(qt)
+		if runRef != tgt.CodeRef {
+			snippet = strings.Replace(snippet, tgt.CodeRef, runRef, -1)
+		}
+		code = fmt.Sprintf("tgt = &%s\n", snippet)
 		code += "targets = append(targets, tgt)\n\n"
 		buf.WriteString(code)
 	}

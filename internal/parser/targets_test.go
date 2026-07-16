@@ -833,6 +833,32 @@ func Test_Targets_GoImports(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
+	t.Run("same package name gets aliases", func(t *testing.T) {
+		// --- Given ---
+		tgt0 := &mkf.Target{
+			Name:    "a",
+			PkgName: "git",
+			ImpSpec: "example.com/one/git",
+		}
+		tgt1 := &mkf.Target{
+			Name:    "b",
+			PkgName: "git",
+			ImpSpec: "example.com/two/git",
+		}
+		tgs := NewTargets()
+		assert.NoError(t, tgs.Add(tgt0, tgt1))
+
+		// --- When ---
+		have := tgs.GoImports()
+
+		// --- Then ---
+		// Sorted by import path; first keeps default name, second aliases.
+		want := "\n" +
+			"\"example.com/one/git\"\n" +
+			"git2 \"example.com/two/git\"\n"
+		assert.Equal(t, want, have)
+	})
+
 	t.Run("imports from showcase example", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
