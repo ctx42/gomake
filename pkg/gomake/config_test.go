@@ -326,6 +326,21 @@ func Test_GetCfg(t *testing.T) {
 		assert.ErrorIs(t, ErrType, err)
 	})
 
+	t.Run("composite any keeps large int precision", func(t *testing.T) {
+		// --- Given ---
+		// Nested any fields must not re-decode as float64.
+		cfg := configFrom(t, `{"obj":{"big":9007199254740993}}`)
+
+		// --- When ---
+		have, err := GetCfg[map[string]any](cfg, "obj")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		n, ok := have["big"].(json.Number)
+		assert.True(t, ok)
+		assert.Equal(t, "9007199254740993", string(n))
+	})
+
 	t.Run("any returns copy of map", func(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"version":"v1"}}`)

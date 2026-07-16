@@ -215,7 +215,10 @@ func GetCfg[T any](cfg *Config, path string) (T, error) {
 	if err != nil {
 		return out, fmt.Errorf("%w: %q: %w", ErrType, path, err)
 	}
-	if err = json.Unmarshal(data, &out); err != nil {
+	// UseNumber so nested integers stay exact (same as TargetConfig).
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err = dec.Decode(&out); err != nil {
 		return out, fmt.Errorf("%w: %q: %w", ErrType, path, err)
 	}
 	return out, nil
