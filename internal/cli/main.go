@@ -230,6 +230,10 @@ func Main(
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {
+			if _, ok := errors.AsType[*errCompile](err); ok {
+				fail(rng, err)
+				return mkf.ExitCodeCompile
+			}
 			return failCode(rng, err)
 		}
 		return 0

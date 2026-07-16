@@ -1963,7 +1963,7 @@ func BrokenCompile(ctx context.Context, rng *ring.Ring) error {
 		code := Main(context.Background(), rng, "1.0", builtin.Empty())
 
 		// --- Then ---
-		assert.Equal(t, 1, code)
+		assert.Equal(t, mkf.ExitCodeCompile, code)
 		assert.Contain(t, "undefinedSymbol", tst.Stderr())
 	})
 
