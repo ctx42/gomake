@@ -336,6 +336,40 @@ func toKebabCase(camel string) string {
 	return b.String()
 }
 
+// importLocalNames maps import local names to import paths for all imports in
+// the given files. Named imports use the name; unnamed imports use the last
+// path segment. Dot and blank imports are skipped.
+func importLocalNames(files map[string]*ast.File) map[string]string {
+	out := make(map[string]string)
+	for _, fil := range files {
+		if fil == nil {
+			continue
+		}
+		for _, imp := range fil.Imports {
+			path := unquote(imp.Path)
+			if path == "" {
+				continue
+			}
+			if imp.Name != nil {
+				switch imp.Name.Name {
+				case "_", ".":
+					continue
+				default:
+					out[imp.Name.Name] = path
+					continue
+				}
+			}
+			// Default local name is the last path element.
+			base := path
+			if i := strings.LastIndex(path, "/"); i >= 0 {
+				base = path[i+1:]
+			}
+			out[base] = path
+		}
+	}
+	return out
+}
+
 // gmImpSpec returns import namespace and import spec only for specs tagged
 // with `gomake:import`. Otherwise it returns two empty strings. The namespace
 // is always lowercase regardless of how it was written in the source.

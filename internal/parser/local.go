@@ -67,7 +67,8 @@ func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 		ctxt.GOARCH = goarch
 	}
 	if tag := GetBuildTag(rng); tag != "" {
-		ctxt.BuildTags = []string{tag}
+		// Append like `go list -tags` so GOFLAGS/default tags are kept.
+		ctxt.BuildTags = append(append([]string{}, ctxt.BuildTags...), tag)
 	}
 	return ctxt.ImportDir(dir, 0)
 }

@@ -716,7 +716,7 @@ func Test_Targets_MarkDefault(t *testing.T) {
 
 func Test_BuiltInCB(t *testing.T) {
 	// --- Given ---
-	tgt0 := &mkf.Target{Name: "tgt0"}
+	tgt0 := &mkf.Target{Name: "tgt0", Default: true}
 	tgt1 := &mkf.Target{Name: "tgt1"}
 	tgt2 := &mkf.Target{Name: "tgt2"}
 	tgs := must.Value(TargetsFromList(tgt0, tgt1, tgt2))
@@ -734,6 +734,7 @@ func Test_BuiltInCB(t *testing.T) {
 	assert.HasKey(t, ":tgt0", tgs.unique)
 	assert.HasKey(t, ":tgt1", tgs.unique)
 	assert.HasKey(t, ":tgt2", tgs.unique)
+	assert.False(t, tgs.Get(":tgt0").Default)
 }
 
 func Test_Targets_Map(t *testing.T) {
@@ -831,6 +832,25 @@ func Test_Targets_GoImports(t *testing.T) {
 			"\"git.com/prj/pkg1\"\n" +
 			"\"git.com/prj/pkg3\"\n"
 		assert.Equal(t, want, have)
+	})
+
+	t.Run("reserves context ring mkf names", func(t *testing.T) {
+		// --- Given ---
+		tgt0 := &mkf.Target{
+			Name: "a", PkgName: "context", ImpSpec: "example.com/ctx",
+		}
+		tgt1 := &mkf.Target{
+			Name: "b", PkgName: "ring", ImpSpec: "example.com/rng",
+		}
+		tgs := NewTargets()
+		assert.NoError(t, tgs.Add(tgt0, tgt1))
+
+		// --- When ---
+		have := tgs.GoImports()
+
+		// --- Then ---
+		assert.Contain(t, "context2 ", have)
+		assert.Contain(t, "ring2 ", have)
 	})
 
 	t.Run("same package name gets aliases", func(t *testing.T) {

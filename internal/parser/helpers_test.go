@@ -1015,3 +1015,24 @@ func Test_qIdent(t *testing.T) {
 		assert.Equal(t, "", have)
 	})
 }
+
+func Test_importLocalNames(t *testing.T) {
+	// --- Given ---
+	src := "" +
+		"package main\n" +
+		"import (\n" +
+		"\ta \"example.com/one/git\"\n" +
+		"\t\"example.com/pkg\"\n" +
+		")\n"
+	set := token.NewFileSet()
+	fil, err := goparser.ParseFile(set, "x.go", src, goparser.ImportsOnly)
+	assert.NoError(t, err)
+	files := map[string]*ast.File{"x.go": fil}
+
+	// --- When ---
+	have := importLocalNames(files)
+
+	// --- Then ---
+	assert.Equal(t, "example.com/one/git", have["a"])
+	assert.Equal(t, "example.com/pkg", have["pkg"])
+}

@@ -5,6 +5,7 @@ package parser
 
 import (
 	"errors"
+	"fmt"
 	"go/ast"
 	"go/doc"
 	"path/filepath"
@@ -95,17 +96,45 @@ func (pmf *Makefile) addTargets() (*doc.Package, error) {
 			}
 		}
 	}
-	pmf.markDefault(docPkg.Vars...)
+	if err = pmf.markDefault(astPkg, docPkg.Vars...); err != nil {
+		return nil, err
+	}
 	return docPkg, nil
 }
 
 // markDefault uses [findDefault] to locate the default target definition and,
-// when found, marks the matching target as default.
-func (pmf *Makefile) markDefault(vars ...*doc.Value) {
-	if ref := findDefault(vars...); ref != nil {
-		defRef := strings.Join(ref, ".")
-		pmf.Default = pmf.Targets.MarkDefault(defRef)
+// when found, marks the matching target as default. Import local names (named
+// imports) are resolved to the package name before matching DefRef. A declared
+// Default that matches no target is an error.
+func (pmf *Makefile) markDefault(
+	astPkg map[string]*ast.File,
+	vars ...*doc.Value,
+) error {
+
+	ref := findDefault(vars...)
+	if ref == nil {
+		return nil
 	}
+	defRef := strings.Join(ref, ".")
+	// Try exact DefRef first, then rewrite leading import alias → package name.
+	if name := pmf.Targets.MarkDefault(defRef); name != "" {
+		pmf.Default = name
+		return nil
+	}
+	if len(ref) >= 2 {
+		locals := importLocalNames(astPkg)
+		if path, ok := locals[ref[0]]; ok {
+			pkgName := pmf.Targets.pkgNameForImp(path)
+			if pkgName != "" {
+				rewritten := pkgName + "." + strings.Join(ref[1:], ".")
+				if name := pmf.Targets.MarkDefault(rewritten); name != "" {
+					pmf.Default = name
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("default target %q not found", defRef)
 }
 
 // adGmImports resolves the file's `gomake:import` imports with [gmImpPackages]

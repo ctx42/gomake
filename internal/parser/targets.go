@@ -133,6 +133,17 @@ func (tgs *Targets) Has(name string) bool {
 	return ok
 }
 
+// pkgNameForImp returns the package name of the first target from ImpSpec, or
+// empty when no such target is registered.
+func (tgs *Targets) pkgNameForImp(impSpec string) string {
+	for _, tgt := range tgs.list {
+		if tgt.ImpSpec == impSpec && tgt.PkgName != "" {
+			return tgt.PkgName
+		}
+	}
+	return ""
+}
+
 // addFunc adds function(s) (targets) belonging to given package to the
 // collection. If a function doesn't have compatible signature it will be
 // skipped without error. Method returns [ErrDupTarget] when duplicate target
@@ -303,10 +314,12 @@ func (tgs *Targets) MarkDefault(defRef string) string {
 }
 
 // BuiltInCB is callback function for [Targets.Map] method which marks given
-// target as built-in.
+// target as built-in. It clears Default so an external package's var Default
+// cannot become the no-arg default of the installed binary.
 func BuiltInCB(tgs *Targets, tgt *mkf.Target) {
 	delete(tgs.unique, tgt.Name)
 	tgt.Name = ":" + tgt.Name
+	tgt.Default = false
 	tgs.unique[tgt.Name] = struct{}{}
 }
 
@@ -347,8 +360,13 @@ func (tgs *Targets) importAliasMap() map[string]string {
 	}
 	sort.Strings(specs)
 
-	// alias -> ImpSpec already assigned; always resolve against taken.
-	taken := make(map[string]string, len(pkgBySpec))
+	// alias -> ImpSpec already assigned; seed reserved names used by gen
+	// templates so user packages named context/ring/mkf get a free alias.
+	taken := map[string]string{
+		"context": "reserved",
+		"ring":    "reserved",
+		"mkf":     "reserved",
+	}
 	out := make(map[string]string, len(pkgBySpec))
 	for _, spec := range specs {
 		alias := uniqueImportAlias(pkgBySpec[spec], taken, spec)
