@@ -614,23 +614,33 @@ func checkConfigProblems(
 		}
 	}
 
-	var malformed, unmatched []string
-	for imp, blk := range project.Targets {
-		if _, ok := blk.(map[string]any); !ok {
-			malformed = append(malformed, imp)
-			continue
+	for _, ent := range []struct {
+		label string
+		tree  map[string]any
+	}{
+		{"user", user.Targets},
+		{"project", project.Targets},
+	} {
+		var malformed, unmatched []string
+		for imp, blk := range ent.tree {
+			if _, ok := blk.(map[string]any); !ok {
+				malformed = append(malformed, imp)
+				continue
+			}
+			if validImps[imp] == nil {
+				unmatched = append(unmatched, imp)
+			}
 		}
-		if validImps[imp] == nil {
-			unmatched = append(unmatched, imp)
+		sort.Strings(malformed)
+		sort.Strings(unmatched)
+		for _, imp := range malformed {
+			format := "%s config is not a mapping: %s"
+			problems = append(problems, fmt.Sprintf(format, ent.label, imp))
 		}
-	}
-	sort.Strings(malformed)
-	sort.Strings(unmatched)
-	for _, imp := range malformed {
-		problems = append(problems, "project config is not a mapping: "+imp)
-	}
-	for _, imp := range unmatched {
-		problems = append(problems, "project import path has no target: "+imp)
+		for _, imp := range unmatched {
+			format := "%s import path has no target: %s"
+			problems = append(problems, fmt.Sprintf(format, ent.label, imp))
+		}
 	}
 	return problems
 }
