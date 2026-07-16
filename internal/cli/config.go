@@ -207,11 +207,23 @@ func (cfg *config) parse(env, args []string) error {
 		return mkf.ErrInvTimeout
 	}
 
-	// Load gomake.yaml files; this also resolves the temporary directory and
-	// the timeout from the settings section when not set by option or
-	// environment.
-	if err = cfg.applyFileConfig(env); err != nil {
-		return err
+	// --version does not need a project gomake.yaml; still run flag
+	// conflict checks below. --complete already returned earlier.
+	if cfg.showVersion {
+		if cfg.tmp == "" {
+			envMap := gomake.EnvSplit(env)
+			if envMap[envKeyTmpDir] != "" {
+				cfg.tmp = envMap[envKeyTmpDir]
+			} else {
+				cfg.tmp = filepath.Join(os.TempDir(), binName)
+			}
+		}
+	} else {
+		// Load gomake.yaml; resolves tmp and timeout from settings when
+		// not set by option or environment.
+		if err = cfg.applyFileConfig(env); err != nil {
+			return err
+		}
 	}
 
 	if cfg.timeout < 0 {
