@@ -388,7 +388,9 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		}
 	}
 
-	if err = editGoMod(rng, goModDst, mod.ImpSpec, mod.ImpPath); err != nil {
+	if err = editGoMod(
+		rng, goModDst, mod.ImpSpec, mod.ImpPath, modRoot,
+	); err != nil {
 		return nil, err
 	}
 
@@ -503,6 +505,16 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 		Use []struct {
 			DiskPath string `json:"DiskPath"`
 		} `json:"Use"`
+		Replace []struct {
+			Old struct {
+				Path    string `json:"Path"`
+				Version string `json:"Version"`
+			} `json:"Old"`
+			New struct {
+				Path    string `json:"Path"`
+				Version string `json:"Version"`
+			} `json:"New"`
+		} `json:"Replace"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
 		return goEditErr(errGoWorkEdit, srcWork, out.String(), err)
@@ -564,14 +576,48 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 			return goEditErr(errGoWorkEdit, dstWork, out.String(), err)
 		}
 	}
+
+	// Absolutize local replace targets against the original workDir.
+	for _, rpl := range result.Replace {
+		newPath := rpl.New.Path
+		if !isLocalDiskPath(newPath) {
+			continue
+		}
+		abs := newPath
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Clean(filepath.Join(workDir, abs))
+		}
+		oldSpec := rpl.Old.Path
+		if rpl.Old.Version != "" {
+			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
+		}
+		out.Reset()
+		cmd = exec.Command(
+			"go", "work", "edit",
+			"-dropreplace="+oldSpec,
+			"-replace="+oldSpec+"="+abs,
+		)
+		cmd.Env = dstEnv
+		cmd.Dir = dst
+		cmd.Stdout = out
+		cmd.Stderr = out
+		if err := cmd.Run(); err != nil {
+			return goEditErr(errGoWorkEdit, dstWork, out.String(), err)
+		}
+	}
 	return nil
 }
 
 // editGoMod edits "go.mod" pointed by absolute path pth. It sets the module
 // name to "makefile", requires pkgImpSpec and replaces it with pkgPath. It also
 // requires the xflag module and records its checksum, because the generated
-// makefile imports xflag while user projects do not.
-func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
+// makefile imports xflag while user projects do not. srcModDir is the original
+// module root used to absolutize local replace paths after the copy.
+func editGoMod(
+	env ring.Environ,
+	pth, pkgImpSpec, pkgPath, srcModDir string,
+) error {
+
 	dir := filepath.Dir(pth)
 	xflagReq := xflagModPath + "@" + xflagVersion()
 	// Pin GOWORK like compile so ambient workspace does not affect go mod.
@@ -593,6 +639,10 @@ func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
 		return goEditErr(errGoModEdit, pth, out.String(), err)
 	}
 
+	if err := absolutizeGoModReplaces(modEnv, dir, srcModDir); err != nil {
+		return err
+	}
+
 	// The copied "go.sum" lacks xflag, so populate it from the module cache
 	// (gomake was built with the same version) before the build runs.
 	out.Reset()
@@ -603,6 +653,67 @@ func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
 	cmd.Stderr = out
 	if err := cmd.Run(); err != nil {
 		return goEditErr(errGoModEdit, pth, out.String(), err)
+	}
+	return nil
+}
+
+// absolutizeGoModReplaces rewrites relative local replace targets in the
+// build-dir go.mod so they resolve against the original source module root.
+func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
+	out := &bytes.Buffer{}
+	cmd := exec.Command("go", "mod", "edit", "-json")
+	cmd.Env = env
+	cmd.Dir = buildDir
+	cmd.Stdout = out
+	cmd.Stderr = out
+	if err := cmd.Run(); err != nil {
+		return goEditErr(errGoModEdit, buildDir, out.String(), err)
+	}
+	var result struct {
+		Replace []struct {
+			Old struct {
+				Path    string `json:"Path"`
+				Version string `json:"Version"`
+			} `json:"Old"`
+			New struct {
+				Path    string `json:"Path"`
+				Version string `json:"Version"`
+			} `json:"New"`
+		} `json:"Replace"`
+	}
+	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+		return goEditErr(errGoModEdit, buildDir, out.String(), err)
+	}
+	srcModDir = filepath.Clean(srcModDir)
+	for _, rpl := range result.Replace {
+		newPath := rpl.New.Path
+		if !isLocalDiskPath(newPath) {
+			continue
+		}
+		abs := newPath
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Clean(filepath.Join(srcModDir, abs))
+		}
+		if abs == newPath {
+			continue
+		}
+		oldSpec := rpl.Old.Path
+		if rpl.Old.Version != "" {
+			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
+		}
+		out.Reset()
+		cmd = exec.Command(
+			"go", "mod", "edit",
+			"-dropreplace="+oldSpec,
+			"-replace="+oldSpec+"="+abs,
+		)
+		cmd.Env = env
+		cmd.Dir = buildDir
+		cmd.Stdout = out
+		cmd.Stderr = out
+		if err := cmd.Run(); err != nil {
+			return goEditErr(errGoModEdit, buildDir, out.String(), err)
+		}
 	}
 	return nil
 }
@@ -642,9 +753,9 @@ func xflagVersion() string {
 func goEditErr(sentinel error, where, out string, err error) error {
 	detail := strings.TrimSpace(out)
 	if detail == "" {
-		detail = err.Error()
+		return fmt.Errorf("%w at %s: %w", sentinel, where, err)
 	}
-	return fmt.Errorf("%w at %s: %s", sentinel, where, detail)
+	return fmt.Errorf("%w at %s: %s: %w", sentinel, where, detail, err)
 }
 
 // compile compiles binary from given files by calling "go build" with given

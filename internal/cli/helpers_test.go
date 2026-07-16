@@ -1010,7 +1010,7 @@ func Test_editGoMod(t *testing.T) {
 		wantData := oskit.ReadFileStr(t, "testdata/go.mod_want")
 
 		// --- When ---
-		err := editGoMod(env, pth, "example.com/user/repo", "/module/path")
+		err := editGoMod(env, pth, "example.com/user/repo", "/module/path", filepath.Dir(pth))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1024,7 +1024,7 @@ func Test_editGoMod(t *testing.T) {
 		pth := oskit.Write(t, "", t.TempDir(), "not-go.mod")
 
 		// --- When ---
-		err := editGoMod(env, pth, "example.com/user/repo", "/module/path")
+		err := editGoMod(env, pth, "example.com/user/repo", "/module/path", filepath.Dir(pth))
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoModEdit, err)
@@ -1052,7 +1052,8 @@ func Test_goEditErr(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoModEdit, err)
-		want := "editing \"go.mod\" file at /b: go: boom"
+		assert.ErrorIs(t, ErrTest, err)
+		want := "editing \"go.mod\" file at /b: go: boom: test error"
 		assert.ErrorEqual(t, want, err)
 	})
 
