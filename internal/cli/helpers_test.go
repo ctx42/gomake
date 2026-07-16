@@ -685,9 +685,10 @@ func Test_findGoWork(t *testing.T) {
 		env := ring.New()
 
 		// --- When ---
-		have := findGoWork(env, root)
+		have, err := findGoWork(env, root)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, filepath.Join(root, "go.work"), have)
 	})
 
@@ -699,9 +700,10 @@ func Test_findGoWork(t *testing.T) {
 		env := ring.New()
 
 		// --- When ---
-		have := findGoWork(env, mod)
+		have, err := findGoWork(env, mod)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, filepath.Join(base, "go.work"), have)
 	})
 
@@ -714,9 +716,10 @@ func Test_findGoWork(t *testing.T) {
 		env.EnvSet("GOWORK", work)
 
 		// --- When ---
-		have := findGoWork(env, mod)
+		have, err := findGoWork(env, mod)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, work, have)
 	})
 
@@ -733,9 +736,10 @@ func Test_findGoWork(t *testing.T) {
 		env.EnvSet("GOWORK", "go.work")
 
 		// --- When ---
-		have := findGoWork(env, mod)
+		have, err := findGoWork(env, mod)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, filepath.Join(base, "go.work"), have)
 	})
 
@@ -747,9 +751,25 @@ func Test_findGoWork(t *testing.T) {
 		env.EnvSet("GOWORK", "off")
 
 		// --- When ---
-		have := findGoWork(env, root)
+		have, err := findGoWork(env, root)
 
 		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - GOWORK path missing", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		env := ring.New()
+		env.EnvSet("GOWORK", filepath.Join(root, "nope.work"))
+
+		// --- When ---
+		have, err := findGoWork(env, root)
+
+		// --- Then ---
+		assert.Error(t, err)
+		assert.ErrorContain(t, "GOWORK", err)
 		assert.Equal(t, "", have)
 	})
 
@@ -759,9 +779,10 @@ func Test_findGoWork(t *testing.T) {
 		env := ring.New()
 
 		// --- When ---
-		have := findGoWork(env, root)
+		have, err := findGoWork(env, root)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "", have)
 	})
 }
@@ -805,6 +826,35 @@ func Test_editGoWork(t *testing.T) {
 		assert.NoError(t, err)
 		have := exekit.New(t).ExeStderr(outPrj.Compile())
 		assert.Equal(t, "project called other\n", have)
+	})
+
+	t.Run("parent workspace rewrites use dot", func(t *testing.T) {
+		// --- Given ---
+		// go.work at monorepo root: use . (parent) and use ./project.
+		// After copy into buildDir, "." must become the abs parent path.
+		wsPth := oskit.MkdirTemp(t, "", "workspace")
+		prjRoot := oskit.MkdirAll(t, wsPth, "project")
+		oskit.Write(t, "module example.com/parent\n\ngo 1.23\n", wsPth, "go.mod")
+		oskit.Write(t, "module example.com/project\n\ngo 1.23\n", prjRoot, "go.mod")
+		srcWork := filepath.Join(wsPth, "go.work")
+		oskit.Write(t, "go 1.23\n\nuse .\nuse ./project\n", srcWork)
+
+		outPth := oskit.MkdirTemp(t, "", "project")
+		oskit.Write(t, "module example.com/project\n\ngo 1.23\n", outPth, "go.mod")
+		// Destination starts with a copy of the parent workfile.
+		oskit.Write(t, "go 1.23\n\nuse .\nuse ./project\n", outPth, "go.work")
+		env := ring.New()
+
+		// --- When ---
+		err := editGoWork(env, srcWork, outPth, prjRoot)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		have := oskit.ReadFileStr(t, filepath.Join(outPth, "go.work"))
+		// go work edit may emit a use ( ... ) block; parent is abs, project is .
+		assert.Contain(t, wsPth, have)
+		assert.Contain(t, "\t.\n", have)
+		assert.NotContain(t, "./project", have)
 	})
 
 	t.Run("does not mutate source when GOWORK set", func(t *testing.T) {

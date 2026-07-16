@@ -345,7 +345,10 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 
 	// Copy "go.work" file (module root, parent walk, or GOWORK).
 	modRoot := filepath.Dir(mod.ModPath)
-	goWorkSrc := findGoWork(rng, modRoot)
+	goWorkSrc, err := findGoWork(rng, modRoot)
+	if err != nil {
+		return nil, err
+	}
 	if goWorkSrc != "" {
 		if content, err = os.ReadFile(goWorkSrc); err != nil {
 			return nil, err
@@ -427,8 +430,10 @@ func stripBuildTag(filData, tagLine []byte) []byte {
 
 // findGoWork returns the path to the go.work file that applies to modRoot.
 // It honors GOWORK when set (including "off"), otherwise walks from modRoot
-// toward the filesystem root like the Go toolchain. Empty means none.
-func findGoWork(env ring.Environ, modRoot string) string {
+// toward the filesystem root like the Go toolchain. Empty path means none.
+// A set, non-off GOWORK that does not exist returns an error (no silent
+// fallthrough to module-only mode).
+func findGoWork(env ring.Environ, modRoot string) (string, error) {
 	var gowork string
 	if env != nil {
 		gowork = env.EnvGet("GOWORK")
@@ -438,35 +443,36 @@ func findGoWork(env ring.Environ, modRoot string) string {
 
 // findGoWorkValue is the env-free core of findGoWork. Relative GOWORK paths
 // are resolved against the process working directory (like the Go toolchain),
-// not against modRoot.
-func findGoWorkValue(gowork, modRoot string) string {
+// not against modRoot. The second result is non-nil only when GOWORK is set
+// to a missing path.
+func findGoWorkValue(gowork, modRoot string) (string, error) {
 	if gowork != "" {
 		if gowork == "off" {
-			return ""
+			return "", nil
 		}
 		pth := gowork
 		if !filepath.IsAbs(pth) {
 			abs, err := filepath.Abs(pth)
 			if err != nil {
-				return ""
+				return "", fmt.Errorf("GOWORK %s: %w", gowork, err)
 			}
 			pth = abs
 		}
 		pth = filepath.Clean(pth)
 		if gomake.FileExists(pth) {
-			return pth
+			return pth, nil
 		}
-		return ""
+		return "", fmt.Errorf("GOWORK %s: no such file", pth)
 	}
 	dir := modRoot
 	for {
 		pth := filepath.Join(dir, "go.work")
 		if _, err := os.Stat(pth); err == nil {
-			return pth
+			return pth, nil
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return ""
+			return "", nil
 		}
 		dir = parent
 	}
@@ -503,18 +509,33 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	}
 
 	modRoot = filepath.Clean(modRoot)
+	workDir = filepath.Clean(workDir)
 	replace := make(map[string]string, len(result.Use))
 	for _, val := range result.Use {
 		dp := val.DiskPath
-		if filepath.IsAbs(dp) {
-			continue
+		var pth string
+		switch {
+		case filepath.IsAbs(dp):
+			pth = filepath.Clean(dp)
+		case filepath.Clean(dp) == ".":
+			// "." is the workspace root (workDir), not the build dir.
+			pth = workDir
+		default:
+			pth = filepath.Clean(filepath.Join(workDir, dp))
 		}
-		if filepath.Clean(dp) == "." {
-			continue
-		}
-		pth := filepath.Clean(filepath.Join(workDir, dp))
+		// Makefile module becomes the build-dir main module.
 		if modRoot != "" && pth == modRoot {
-			replace[dp] = "."
+			if filepath.Clean(dp) != "." {
+				replace[dp] = "."
+			}
+			continue
+		}
+		// Parent monorepo: keep an absolute path to the original workDir.
+		if filepath.Clean(dp) == "." {
+			replace[dp] = pth
+			continue
+		}
+		if filepath.IsAbs(dp) {
 			continue
 		}
 		replace[dp] = pth
@@ -553,6 +574,8 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
 	dir := filepath.Dir(pth)
 	xflagReq := xflagModPath + "@" + xflagVersion()
+	// Pin GOWORK like compile so ambient workspace does not affect go mod.
+	modEnv := pinBuildGOWORK(env.EnvAll(), dir)
 
 	cmd := exec.Command(
 		"go", "mod", "edit",
@@ -561,7 +584,7 @@ func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
 		"-replace="+pkgImpSpec+"@v0.0.0="+pkgPath,
 		"-require="+xflagReq,
 	)
-	cmd.Env = env.EnvAll()
+	cmd.Env = modEnv
 	cmd.Dir = dir
 	out := &bytes.Buffer{}
 	cmd.Stdout = out
@@ -574,7 +597,7 @@ func editGoMod(env ring.Environ, pth, pkgImpSpec, pkgPath string) error {
 	// (gomake was built with the same version) before the build runs.
 	out.Reset()
 	cmd = exec.Command("go", "mod", "download", xflagReq)
-	cmd.Env = env.EnvAll()
+	cmd.Env = modEnv
 	cmd.Dir = dir
 	cmd.Stdout = out
 	cmd.Stderr = out

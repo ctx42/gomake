@@ -154,6 +154,32 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, before, after)
 	})
 
+	t.Run("changes when go.work replace tree changes", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		proj := oskit.MkdirAll(t, base, "project")
+		lib := oskit.MkdirAll(t, base, "lib")
+		oskit.Write(t, "module example.com/m\n", proj, "go.mod")
+		oskit.Write(t, "package main\n", proj, "makefile.go")
+		work := "" +
+			"go 1.22\n" +
+			"use .\n" +
+			"replace example.com/lib => ../lib\n"
+		oskit.Write(t, work, proj, "go.work")
+		oskit.Write(t, "module example.com/lib\n", lib, "go.mod")
+		libPath := filepath.Join(lib, "lib.go")
+		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
+		mkf := []string{"makefile.go"}
+
+		// --- When ---
+		before := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64", ""))
+		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
+		after := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64", ""))
+
+		// --- Then ---
+		assert.NotEqual(t, before, after)
+	})
+
 	t.Run("error - missing makefile", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()

@@ -70,7 +70,9 @@ func binaryCacheKey(
 			}
 		}
 		// Effective workspace (parent walk / GOWORK / off).
-		goWorkPath := findGoWorkValue(gowork, modRoot)
+		// Missing GOWORK is not fatal for the cache key: hash the raw value
+		// and proceed without external trees so keys stay deterministic.
+		goWorkPath, _ := findGoWorkValue(gowork, modRoot)
 		_, _ = fmt.Fprintf(h, "gowork:%s\n", gowork)
 		if goWorkPath != "" {
 			if err := hashFile(h, "go.work", goWorkPath); err != nil {
@@ -106,18 +108,20 @@ func hashExternalModuleTrees(
 
 	var workRels []string
 	if goWorkPath != "" {
-		workRels = localPathsFromGoWork(goWorkPath)
-		// Resolve relative use paths against the workfile directory.
+		// use and replace from go.work; resolve relatives against workDir.
 		workDir := filepath.Dir(goWorkPath)
-		absRels := make([]string, 0, len(workRels))
-		for _, rel := range workRels {
+		raw := append(
+			localPathsFromGoWork(goWorkPath),
+			localPathsFromGoWorkReplace(goWorkPath)...,
+		)
+		workRels = make([]string, 0, len(raw))
+		for _, rel := range raw {
 			if filepath.IsAbs(rel) {
-				absRels = append(absRels, rel)
+				workRels = append(workRels, rel)
 				continue
 			}
-			absRels = append(absRels, filepath.Join(workDir, rel))
+			workRels = append(workRels, filepath.Join(workDir, rel))
 		}
-		workRels = absRels
 	}
 	rels := append(workRels, localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...)
 	if len(rels) == 0 {
@@ -180,6 +184,16 @@ func localPathsFromGoWork(path string) []string {
 		return nil
 	}
 	return scanLocalUseOrReplace(string(data), "use")
+}
+
+// localPathsFromGoWorkReplace returns local replace targets from a go.work
+// file (same grammar as go.mod replace).
+func localPathsFromGoWorkReplace(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return scanLocalUseOrReplace(string(data), "replace")
 }
 
 // localPathsFromGoMod returns local filesystem replace targets from a go.mod
