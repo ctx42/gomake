@@ -161,14 +161,17 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
   of main-package targets), per-invocation nearest-level resolution with
   project-first / user-fallback / in-module skip (`resolveDelivered`,
   `resolveTargetBlock`), delivery of the invoked target's block into `ring.Meta`
-  only (`deliverTargetConfig`), and `--check-config` (`runCheckConfig`).
-  Delivery: a
-  target's config originates solely from
-  `ring.Meta`, never the environment. In-process built-in/external targets read
-  it directly. For a local target compiled to a subprocess, `Execute` ferries
-  the block across as an internal `--gomake-config=<json>` argument; the
-  generated `main` (`gen_main.go` template) strips that arg and loads it into
-  `gomake.ConfigMetaKey` before the target runs.
+  only (`deliverTargetConfig`), and `--check-config` (`runCheckConfig` —
+  validates **user and project** `targets:` trees). Binary cache key
+  (`binaryCacheKey`) hashes compiled makefile sources, go.mod/go.sum, the
+  effective go.work tree, module Go files + local use/replace trees, version
+  / GOOS / GOARCH, `runtime.Version()`, and toolchain env (`GOFLAGS`,
+  `CGO_*`, `GOTOOLCHAIN`) when set. Delivery: a target's config originates
+  solely from `ring.Meta`, never the environment. In-process built-in/external
+  targets read it directly. For a local target compiled to a subprocess,
+  `Execute` ferries the block across as an internal `--gomake-config=<json>`
+  argument; the generated `main` (`gen_main.go` template) strips that arg and
+  loads it into `gomake.ConfigMetaKey` before the target runs.
 - **pkg/gomake**: The module's only public package — env/path helpers
   (`GetGOOS`, `LookupEnv`, `Root`, ...), process helpers (`ExitStatus`,
   `HasRun`), the target-name context key reused by downstream targets, and
@@ -244,7 +247,21 @@ in), see `dev/README.md`.
   so unpublished target edits compile in without touching `go.mod`. The devel
   in-source build snapshots and restores the regenerated `targets.go` /
   `targets.yaml`, so the tree stays clean and the install is re-runnable.
+  Snapshot restore runs on clean return (success or error) via `defer` only —
+  hard interrupt (SIGINT/SIGKILL) can skip it and leave generated files dirty;
+  recover with `git checkout -- targets.yaml internal/builtin/targets.go
+  internal/builtin/data/targets_main.go_`. Signal-handler restore is a
+  deliberate follow-up, not implemented.
 - Exit codes are documented in README (126=ErrPickTarget, 127=ErrUnkTarget,
   128+n=signal, etc.).
+
+## Open follow-ups (do not block releases)
+
+- `gomake.Root`: non-`fs.ErrNotExist` Stat failures return immediately
+  (correct); hard to unit-test without Stat injection — leave until a mock
+  hook exists.
+- Parser `go list` with empty `Files` plus a list `Error`: keep soft-skip for
+  "build constraints exclude all"; do not make empty+Error always fatal.
+- `cmd/install` hard-interrupt restore (see above).
 
 Update this file when you learn new conventions or gotchas during work.

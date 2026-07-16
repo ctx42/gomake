@@ -106,13 +106,16 @@ gomake --tmp /fast/tmp build
 Compiled binaries are cached under `~/.cache/gomake/bin/`. The cache key is a
 SHA-256 hash of:
 
-- All `makefile*.go` file contents (sorted by filename for determinism)
-- The project's `go.sum` file
-- The gomake version string
-- The target `GOOS` and `GOARCH`
+- The makefile sources actually compiled (validated `makefile*.go` names)
+- The module's `go.mod` and `go.sum`
+- The effective `go.work` / `go.work.sum` (parent walk or `GOWORK`)
+- Non-test `.go` files under the module and local `use`/`replace` trees
+- The gomake version, `GOOS`, and `GOARCH`
+- The Go runtime version and toolchain env (`GOFLAGS`, `CGO_*`,
+  `GOTOOLCHAIN`) when set
 
 The cache is invalidated automatically when any input changes. Errors reading
-the cache are silently ignored.
+or writing the cache are silently ignored.
 
 ---
 

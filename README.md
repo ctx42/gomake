@@ -1044,10 +1044,13 @@ gomake --bin ./dist/project-make
 GoMake caches compiled makefile binaries under `~/.cache/gomake/bin/`. The
 cache key is a SHA-256 hash of:
 
-- all `makefile*.go` file contents (sorted by name)
-- the project's `go.sum` file
-- the gomake version
-- `GOOS` and `GOARCH`
+- the makefile sources actually compiled (validated `makefile*.go` names)
+- the module's `go.mod` and `go.sum`
+- the effective `go.work` / `go.work.sum` (parent walk or `GOWORK`)
+- non-test `.go` files under the module and local `use`/`replace` trees
+- the gomake version, `GOOS`, and `GOARCH`
+- the Go runtime version and toolchain env (`GOFLAGS`, `CGO_*`,
+  `GOTOOLCHAIN`) when set
 
 When the cache key matches an existing binary, compilation is skipped entirely.
 The cache is invalidated automatically whenever any of the above inputs change.
@@ -1142,7 +1145,7 @@ compiled-and-cached binary:
 | Namespaces            | Methods on `//gomake:ns_root` structs, nestable |
 | Cross-package imports | `//gomake:import` comment tag                   |
 | Built-in targets      | `targets.yaml` — compiled into the binary       |
-| Binary cache          | SHA-256 of sources + `go.sum` + version + arch  |
+| Binary cache          | SHA-256 of sources, module graph, toolchain     |
 | Progress feedback     | Automatic, after 500 ms                         |
 | Cross-platform        | Go build tags + `GOOS`/`GOARCH`; `go.work` too  |
 | Standalone binary     | `gomake --bin ./make`                           |

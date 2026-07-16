@@ -39,7 +39,8 @@ $ gomake docker:push
 
 By convention the namespace type is an empty struct (`struct{}`), since it only
 serves to group targets. The `//gomake:ns_root` comment must appear on the same
-line as the type declaration.
+line as the type declaration. A space after `//` is tolerated
+(`// gomake:ns_root`), matching `//gomake:import`.
 
 ---
 
@@ -123,6 +124,7 @@ gomake release:publish  # runs Release.Publish
 
 - The namespace type must be a struct; use `struct{}` by convention.
 - The `//gomake:ns_root` comment must be on the same line as the type.
+  A space after `//` is fine (`// gomake:ns_root`).
 - A namespace can only be rooted once — you cannot have two
   `//gomake:ns_root` structs that alias each other.
 - Invalid chains (e.g. aliasing a built-in type or a non-struct type) are

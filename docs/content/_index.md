@@ -212,7 +212,7 @@ func TestGreet(t *testing.T) {
 | Namespaces            | Methods on `//gomake:ns_root` structs, nestable |
 | Cross-package imports | `//gomake:import` comment tag                   |
 | Built-in targets      | `targets.yaml` — compiled into the binary       |
-| Binary cache          | SHA-256 of sources + `go.sum` + version + arch  |
+| Binary cache          | SHA-256 of sources, module graph, toolchain     |
 | Progress feedback     | Automatic, after 500 ms                         |
 | Cross-platform        | Go build tags + `GOOS`/`GOARCH`; `go.work` too  |
 | Standalone binary     | `gomake --bin ./make`                           |

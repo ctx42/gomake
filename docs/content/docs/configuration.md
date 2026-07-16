@@ -105,9 +105,9 @@ path, so there is no need to guess the nesting:
 gomake --check-config
 ```
 
-The same command reports project-level import keys that match no discovered
-target, an import config that is not a mapping, and any `settings.tmp` value
-that is not absolute.
+The same command reports project- and user-level import keys that match no
+discovered target, an import config that is not a mapping, and any
+`settings.tmp` value that is not absolute.
 
 ## How configuration reaches a target
 
@@ -256,9 +256,11 @@ value as `T`:
   `GetCfg[time.Duration](cfg, "timeout")`. `GetCfg[any]` returns the raw decoded
   value.
 - **Strictness.** Conversion is strict: a number becomes an integer only when
-  it has no fractional part, and a value of the wrong JSON kind is rejected.
+  it has no fractional part, a value of the wrong JSON kind is rejected, and
+  JSON `null` yields `ErrType` for a concrete `T` (so `GetCfgDefault` does
+  not treat null as a typed zero value).
 - **Errors.** `ErrMiss` when the path is absent, out of range, or empty;
-  `ErrType` on a type mismatch or a failed duration parse. Use
+  `ErrType` on a type mismatch, a JSON null, or a failed duration parse. Use
   `errors.Is(err, gomake.ErrMiss)` to treat an optional key as a default, and
   `cfg.Has(path)` to test presence without an error.
 

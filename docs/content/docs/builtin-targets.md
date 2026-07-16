@@ -127,6 +127,13 @@ module from disk through a temporary Go workspace instead of fetching it with
 and `go.mod` is left untouched — no `replace` or `require` is added. Re-run the
 command after each edit to rebuild.
 
+A devel in-source install regenerates `targets.yaml` / `internal/builtin`
+glue for the build, then restores the prior contents on a normal exit
+(success or error). A hard interrupt (for example `SIGINT` / `SIGKILL`) can
+skip that restore and leave those files dirty — recover with
+`git checkout -- targets.yaml internal/builtin/targets.go
+internal/builtin/data/targets_main.go_`.
+
 The `-buildvcs=true` flag records the checked-out revision in the binary; see
 [Installing from a local clone]({{< relref "getting-started#installing-from-a-local-clone" >}})
 for why `go run` needs it.
