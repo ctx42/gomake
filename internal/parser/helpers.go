@@ -243,14 +243,16 @@ func isNS(spc *ast.TypeSpec, prev []string) []string {
 }
 
 // isNSRoot returns true when a type spec has a `gomake:ns_root` comment
-// marking the type as a namespace root.
+// marking the type as a namespace root. Accepts optional space after //
+// (//gomake:ns_root or // gomake:ns_root).
 func isNSRoot(spc *ast.TypeSpec) bool {
-	if spc != nil && spc.Comment != nil && len(spc.Comment.List) > 0 {
-		if spc.Comment.List[0].Text[2:] == nsTag {
-			return true
-		}
+	if spc == nil || spc.Comment == nil || len(spc.Comment.List) == 0 {
+		return false
 	}
-	return false
+	text := strings.TrimSpace(spc.Comment.List[0].Text)
+	text = strings.TrimPrefix(text, "//")
+	text = strings.TrimSpace(text)
+	return text == nsTag || strings.HasPrefix(text, nsTag+" ")
 }
 
 // builtinTypes represents a list of build in types.
