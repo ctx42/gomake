@@ -1571,6 +1571,52 @@ func mainPreRun(t *testing.T) {
 		assert.Equal(t, "gomake: test error: a\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
+
+	t.Run("pre runs fire for built-in target", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		tst := ringtest.New(t).WetStderr()
+		relPath := "testdata/projects/no_makefiles/project"
+		prj := gmt.NewProject(t)
+		prj.GoModInit()
+		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
+		prj.Close()
+		rng := tst.Ring(
+			"--src", prj.Root(),
+			"--tmp", prj.TempDir(),
+			":print",
+		)
+		bip := builtintest.NewTstProvider(preErr)
+
+		// --- When ---
+		code := Main(ctx, rng, "1.0", bip)
+
+		// --- Then ---
+		assert.Equal(t, 1, code)
+		assert.Contain(t, "test error", tst.Stderr())
+	})
+}
+
+func Test_Main_nestedTmp(t *testing.T) {
+	// --- Given ---
+	// Nested --tmp must create missing parents (MkdirAll). --list runs past
+	// tmp setup without requiring a makefile.
+	tst := ringtest.New(t).WetStderr()
+	tmp := filepath.Join(t.TempDir(), "a", "b", "c")
+	src := t.TempDir()
+	rng := tst.Ring("--list", "--tmp", tmp, "--src", src)
+
+	// --- When ---
+	code := Main(context.Background(), rng, "1.0", builtin.Empty())
+
+	// --- Then ---
+	assert.Equal(t, 0, code)
+	fi, err := os.Stat(tmp)
+	assert.NoError(t, err)
+	assert.True(t, fi.IsDir())
+	_ = tst.Stderr() // empty or target list; just drain WetStderr
 }
 
 func Test_complete_tabular(t *testing.T) {

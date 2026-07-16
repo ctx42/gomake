@@ -105,7 +105,7 @@ func Main(
 		if !errors.Is(err, fs.ErrNotExist) {
 			return failCode(rng, err)
 		}
-		if err = os.Mkdir(cfg.tmp, 0755); err != nil {
+		if err = os.MkdirAll(cfg.tmp, 0755); err != nil {
 			return failCode(rng, err)
 		}
 	} else if !fi.IsDir() {
@@ -150,12 +150,26 @@ func Main(
 		return 0
 	}
 
+	// runPreRuns fires provider pre-run hooks before any target execution.
+	runPreRuns := func() int {
+		for _, fn := range bip.PreRuns() {
+			if ctx, rng, err = fn(ctx, rng); err != nil {
+				fail(rng, err)
+				return 1
+			}
+		}
+		return 0
+	}
+
 	// When bin is provided, we create binary instead of running them.
 	if cfg.bin == "" && cfg.target != "" {
 		// If the target to execute is one of the built-in targets, we don't
 		// have to parse makefiles or compile anything... we can run it right
 		// away.
 		if tgt, _ := mkf.FindTarget(cfg.target, tgs); tgt != nil {
+			if code := runPreRuns(); code != 0 {
+				return code
+			}
 			applyExternalTargetMeta(rng, cfg.src)
 			if err = deliverTargetConfig(rng, cfg, tgt, tgs); err != nil {
 				fail(rng, err)
@@ -182,6 +196,9 @@ func Main(
 			return failCode(rng, err)
 		}
 
+		if code := runPreRuns(); code != 0 {
+			return code
+		}
 		return runWithoutCompile(ctx, rng, ver, tgs)
 
 	case err != nil:
@@ -213,12 +230,8 @@ func Main(
 		return 0
 	}
 
-	// Run all the pre-runs.
-	for _, fn := range bip.PreRuns() {
-		if ctx, rng, err = fn(ctx, rng); err != nil {
-			fail(rng, err)
-			return 1
-		}
+	if code := runPreRuns(); code != 0 {
+		return code
 	}
 
 	applyExternalTargetMeta(rng, cfg.src)
