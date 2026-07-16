@@ -33,6 +33,7 @@ func binaryCacheDir() (string, error) {
 // affect the compiled makefile binary: the makefile sources actually built,
 // the module's go.mod / go.sum / go.work / go.work.sum when present, every
 // non-test .go file under the module root (skipping vendor and VCS dirs),
+// local go.work use trees and go.mod replace targets outside the module,
 // and the gomake version plus GOOS/GOARCH. mkfNames are the validated
 // makefile base names actually compiled, so ignored makefile_* files do not
 // affect the key.
@@ -74,10 +75,194 @@ func binaryCacheKey(
 		if err := hashModuleGoFiles(h, modRoot); err != nil {
 			return "", err
 		}
+		if err := hashExternalModuleTrees(h, modRoot); err != nil {
+			return "", err
+		}
 	}
 
 	_, _ = fmt.Fprintf(h, "ver:%s\ngoos:%s\ngoarch:%s\n", version, goos, goarch)
 	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// hashExternalModuleTrees hashes non-test .go files (and go.mod when present)
+// under local go.work use directories and go.mod replace targets that lie
+// outside modRoot, so workspace siblings and out-of-tree replaces invalidate
+// the binary cache.
+func hashExternalModuleTrees(
+	h interface{ Write([]byte) (int, error) },
+	modRoot string,
+) error {
+
+	rels := append(
+		localPathsFromGoWork(filepath.Join(modRoot, "go.work")),
+		localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...,
+	)
+	if len(rels) == 0 {
+		return nil
+	}
+
+	seen := map[string]struct{}{filepath.Clean(modRoot): {}}
+	var roots []string
+	for _, rel := range rels {
+		abs := rel
+		if !filepath.IsAbs(abs) {
+			abs = filepath.Join(modRoot, rel)
+		}
+		abs = filepath.Clean(abs)
+		if _, ok := seen[abs]; ok {
+			continue
+		}
+		if isSubpath(modRoot, abs) {
+			continue
+		}
+		if fi, err := os.Stat(abs); err != nil || !fi.IsDir() {
+			continue
+		}
+		seen[abs] = struct{}{}
+		roots = append(roots, abs)
+	}
+	sort.Strings(roots)
+
+	for _, root := range roots {
+		modPath := filepath.Join(root, "go.mod")
+		if _, err := os.Stat(modPath); err == nil {
+			label := "extmod:" + filepath.ToSlash(root)
+			if err := hashFile(h, label, modPath); err != nil {
+				return err
+			}
+		}
+		if err := hashModuleGoFiles(h, root); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// isSubpath reports whether child is the same as parent or a path under it.
+func isSubpath(parent, child string) bool {
+	parent = filepath.Clean(parent)
+	child = filepath.Clean(child)
+	if parent == child {
+		return true
+	}
+	sep := string(filepath.Separator)
+	return strings.HasPrefix(child, parent+sep)
+}
+
+// localPathsFromGoWork returns relative or absolute use paths from a go.work
+// file. Missing or unreadable files yield a nil slice.
+func localPathsFromGoWork(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return scanLocalUseOrReplace(string(data), "use")
+}
+
+// localPathsFromGoMod returns local filesystem replace targets from a go.mod
+// file (paths that start with "." or are absolute). Versioned module replaces
+// are ignored.
+func localPathsFromGoMod(path string) []string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	return scanLocalUseOrReplace(string(data), "replace")
+}
+
+// scanLocalUseOrReplace extracts local disk paths from go.work "use" or
+// go.mod "replace" directives, including parenthesized multi-line forms.
+func scanLocalUseOrReplace(src, keyword string) []string {
+	var out []string
+	inBlock := false
+	for _, line := range strings.Split(src, "\n") {
+		line = strings.TrimSpace(line)
+		if i := strings.Index(line, "//"); i >= 0 {
+			line = strings.TrimSpace(line[:i])
+		}
+		if line == "" {
+			continue
+		}
+		if inBlock {
+			if line == ")" {
+				inBlock = false
+				continue
+			}
+			if pth := localPathFromDirective(line, keyword, true); pth != "" {
+				out = append(out, pth)
+			}
+			continue
+		}
+		if !strings.HasPrefix(line, keyword) {
+			continue
+		}
+		rest := strings.TrimSpace(strings.TrimPrefix(line, keyword))
+		if rest == "(" {
+			inBlock = true
+			continue
+		}
+		if pth := localPathFromDirective(rest, keyword, false); pth != "" {
+			out = append(out, pth)
+		}
+	}
+	return out
+}
+
+// localPathFromDirective returns a local path from a single use/replace line
+// body. inBlock is true when the line is inside a parenthesized block (no
+// leading keyword).
+func localPathFromDirective(line, keyword string, inBlock bool) string {
+	line = strings.TrimSpace(line)
+	if line == "" || line == ")" {
+		return ""
+	}
+	if keyword == "use" {
+		// use ./foo  or  use "../foo"
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			return ""
+		}
+		return unquotePath(fields[0])
+	}
+	// replace: "path [version] => local" (keyword already stripped when not
+	// in block? when not inBlock, line is full after "replace").
+	if !inBlock && strings.HasPrefix(line, "replace") {
+		line = strings.TrimSpace(strings.TrimPrefix(line, "replace"))
+	}
+	idx := strings.Index(line, "=>")
+	if idx < 0 {
+		return ""
+	}
+	rhs := strings.TrimSpace(line[idx+2:])
+	fields := strings.Fields(rhs)
+	if len(fields) == 0 {
+		return ""
+	}
+	pth := unquotePath(fields[0])
+	if !isLocalDiskPath(pth) {
+		return ""
+	}
+	return pth
+}
+
+// unquotePath strips optional surrounding double quotes from a path token.
+func unquotePath(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// isLocalDiskPath reports whether pth is a filesystem path rather than a
+// module path (relative with "."/".." or absolute).
+func isLocalDiskPath(pth string) bool {
+	if pth == "" {
+		return false
+	}
+	if filepath.IsAbs(pth) {
+		return true
+	}
+	return strings.HasPrefix(pth, ".") || strings.HasPrefix(pth, "..")
 }
 
 // hashFile writes a labeled file into h. Returns an error only when the file

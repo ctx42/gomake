@@ -108,6 +108,52 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, before, after)
 	})
 
+	t.Run("changes when workspace sibling go file changes", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		proj := oskit.MkdirAll(t, base, "project")
+		other := oskit.MkdirAll(t, base, "other")
+		oskit.Write(t, "module example.com/m\n", proj, "go.mod")
+		oskit.Write(t, "package main\n", proj, "makefile.go")
+		oskit.Write(t, "go 1.22\nuse .\nuse ../other\n", proj, "go.work")
+		oskit.Write(t, "module example.com/other\n", other, "go.mod")
+		libPath := filepath.Join(other, "lib.go")
+		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 1\n"), 0o600))
+		mkf := []string{"makefile.go"}
+
+		// --- When ---
+		before := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64"))
+		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 2\n"), 0o600))
+		after := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64"))
+
+		// --- Then ---
+		assert.NotEqual(t, before, after)
+	})
+
+	t.Run("changes when local replace go file changes", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		proj := oskit.MkdirAll(t, base, "project")
+		lib := oskit.MkdirAll(t, base, "lib")
+		mod := "" +
+			"module example.com/m\n" +
+			"replace example.com/lib => ../lib\n"
+		oskit.Write(t, mod, proj, "go.mod")
+		oskit.Write(t, "package main\n", proj, "makefile.go")
+		oskit.Write(t, "module example.com/lib\n", lib, "go.mod")
+		libPath := filepath.Join(lib, "lib.go")
+		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
+		mkf := []string{"makefile.go"}
+
+		// --- When ---
+		before := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64"))
+		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
+		after := must.Value(binaryCacheKey(proj, mkf, "1.0", "linux", "amd64"))
+
+		// --- Then ---
+		assert.NotEqual(t, before, after)
+	})
+
 	t.Run("error - missing makefile", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
@@ -120,6 +166,96 @@ func Test_binaryCacheKey(t *testing.T) {
 		// --- Then ---
 		assert.Error(t, err)
 	})
+}
+
+func Test_isSubpath_tabular(t *testing.T) {
+	tt := []struct {
+		test   string
+		parent string
+		child  string
+		want   bool
+	}{
+		{"same", "/a/b", "/a/b", true},
+		{"child", "/a/b", "/a/b/c", true},
+		{"sibling prefix", "/a/b", "/a/bc", false},
+		{"parent", "/a/b/c", "/a/b", false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.test, func(t *testing.T) {
+			// --- When ---
+			have := isSubpath(tc.parent, tc.child)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_isLocalDiskPath_tabular(t *testing.T) {
+	tt := []struct {
+		test string
+		path string
+		want bool
+	}{
+		{"dot", ".", true},
+		{"dot slash", "./", true},
+		{"parent", "../other", true},
+		{"absolute", "/abs", true},
+		{"module path", "example.com/lib", false},
+		{"empty", "", false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.test, func(t *testing.T) {
+			// --- When ---
+			have := isLocalDiskPath(tc.path)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_localPathsFromGoWork(t *testing.T) {
+	// --- Given ---
+	root := t.TempDir()
+	content := "" +
+		"go 1.22\n" +
+		"use .\n" +
+		"use ../other\n" +
+		"use (\n" +
+		"  ./a\n" +
+		"  ./b // comment\n" +
+		")\n"
+	path := oskit.Write(t, content, root, "go.work")
+
+	// --- When ---
+	have := localPathsFromGoWork(path)
+
+	// --- Then ---
+	want := []string{".", "../other", "./a", "./b"}
+	assert.Equal(t, want, have)
+}
+
+func Test_localPathsFromGoMod(t *testing.T) {
+	// --- Given ---
+	root := t.TempDir()
+	content := "" +
+		"module example.com/m\n" +
+		"replace example.com/lib => ../lib\n" +
+		"replace example.com/v => example.com/v v1.2.3\n" +
+		"replace (\n" +
+		"  example.com/a => ./a\n" +
+		")\n"
+	path := oskit.Write(t, content, root, "go.mod")
+
+	// --- When ---
+	have := localPathsFromGoMod(path)
+
+	// --- Then ---
+	want := []string{"../lib", "./a"}
+	assert.Equal(t, want, have)
 }
 
 func Test_shouldSkipCacheDir_tabular(t *testing.T) {
