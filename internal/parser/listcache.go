@@ -53,6 +53,10 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	if gowork := strings.TrimSpace(rng.EnvGet("GOWORK")); gowork != "" {
 		_, _ = fmt.Fprintf(h, "GOWORK:%s\n", gowork)
 	}
+	// GOFLAGS changes go list file selection (e.g. -tags=…).
+	if goflags := strings.TrimSpace(rng.EnvGet("GOFLAGS")); goflags != "" {
+		_, _ = fmt.Fprintf(h, "GOFLAGS:%s\n", goflags)
+	}
 	format := "spec:%s\ntag:%s\ngoos:%s\ngoarch:%s\ngo:%s\n"
 	_, _ = fmt.Fprintf(
 		h,
@@ -97,11 +101,21 @@ func storeListCache(key string, data []byte) {
 		return
 	}
 	dst := filepath.Join(dir, key)
-	tmp := dst + ".tmp"
-	if err = os.WriteFile(tmp, data, 0600); err != nil {
+	tmp, err := os.CreateTemp(dir, key+".*.tmp")
+	if err != nil {
 		return
 	}
-	if err = os.Rename(tmp, dst); err != nil {
-		_ = os.Remove(tmp)
+	tmpPath := tmp.Name()
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return
+	}
+	if err = tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return
+	}
+	if err = os.Rename(tmpPath, dst); err != nil {
+		_ = os.Remove(tmpPath)
 	}
 }
