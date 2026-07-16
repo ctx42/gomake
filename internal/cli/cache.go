@@ -430,12 +430,21 @@ func storeBinaryCache(
 		name += ".exe"
 	}
 	dst := filepath.Join(dir, name)
-	tmp := dst + ".tmp"
-	if err = copyFile(binPath, tmp); err != nil {
-		_ = os.Remove(tmp)
+	// Unique temp so concurrent same-key stores cannot clobber each other.
+	// CreateTemp only reserves a path; remove it so copyFile can create with
+	// executable mode (OpenFile ignores mode when the file already exists).
+	tmp, err := os.CreateTemp(dir, name+".*.tmp")
+	if err != nil {
 		return
 	}
-	if err = os.Rename(tmp, dst); err != nil {
-		_ = os.Remove(tmp)
+	tmpPath := tmp.Name()
+	_ = tmp.Close()
+	_ = os.Remove(tmpPath)
+	if err = copyFile(binPath, tmpPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return
+	}
+	if err = os.Rename(tmpPath, dst); err != nil {
+		_ = os.Remove(tmpPath)
 	}
 }
