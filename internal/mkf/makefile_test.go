@@ -138,6 +138,20 @@ func Test_NewMakefile(t *testing.T) {
 		assert.Equal(t, []string{"target"}, cmf.rng.Args())
 	})
 
+	t.Run("error - negative timeout", func(t *testing.T) {
+		// --- Given ---
+		tgs := make([]*Target, 0)
+		tst := ringtest.New(t)
+		rngOF := WithMakefileRing(tst.Ring("--timeout", "-1s", "target"))
+
+		// --- When ---
+		cmf, err := NewMakefile(tgs, rngOF)
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrInvTimeout, err)
+		assert.Nil(t, cmf)
+	})
+
 	t.Run("error - invalid timeout argument", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)

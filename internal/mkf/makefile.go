@@ -154,6 +154,9 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 		}
 		return nil, fmt.Errorf("parsing flags: %w", err)
 	}
+	if cmf.timeout < 0 {
+		return nil, ErrInvTimeout
+	}
 	cmf.rng = cmf.rng.SetArgs(cmf.fs.Args())
 
 	switch {
