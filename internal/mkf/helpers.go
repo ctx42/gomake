@@ -187,17 +187,24 @@ func runTarget(
 	// Wait for signal, context cancel, or the target result. Once the result
 	// arrives, drain until the goroutine exits (deferred cwd restore) without
 	// re-selecting on ctx/sig — a finished target must not be reported as a
-	// deadline/signal error during that restore window.
+	// deadline/signal error during that restore window. When cancel/signal
+	// races with completion, prefer a result already on done.
 	for {
 		select {
 		case itf := <-sig:
 			cxl() // Notify the running target the context has been canceled.
+			if err, ok := recvDone(done); ok {
+				return err
+			}
 			if i, ok := itf.(syscall.Signal); ok {
 				return interruptedError(exitCodeSignal + int(i))
 			}
 			return interruptedError(1)
 
 		case <-ctx.Done():
+			if err, ok := recvDone(done); ok {
+				return err
+			}
 			return ctx.Err()
 
 		case err, open := <-done:
@@ -205,11 +212,32 @@ func runTarget(
 				// Closed without a prior result (should not happen).
 				return nil
 			}
-			for {
-				if _, open = <-done; !open {
-					return err
-				}
-			}
+			return drainDone(done, err)
+		}
+	}
+}
+
+// recvDone non-blocking-reads a finished target result from done. When a
+// value is present it drains the channel (cwd restore) and returns the
+// result with ok true. When the channel is empty, ok is false.
+func recvDone(done <-chan error) (err error, ok bool) {
+	select {
+	case err, open := <-done:
+		if !open {
+			return nil, true
+		}
+		return drainDone(done, err), true
+	default:
+		return nil, false
+	}
+}
+
+// drainDone waits until done is closed after the first result err, so the
+// target goroutine can finish its deferred cwd restore.
+func drainDone(done <-chan error, err error) error {
+	for {
+		if _, open := <-done; !open {
+			return err
 		}
 	}
 }

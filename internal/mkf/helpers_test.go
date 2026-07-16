@@ -187,6 +187,49 @@ func Test_pickTarget(t *testing.T) {
 	})
 }
 
+func Test_recvDone(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 1)
+
+		// --- When ---
+		err, ok := recvDone(done)
+
+		// --- Then ---
+		assert.False(t, ok)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ready result", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 2)
+		done <- nil
+		close(done)
+
+		// --- When ---
+		err, ok := recvDone(done)
+
+		// --- Then ---
+		assert.True(t, ok)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ready error", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 2)
+		want := errors.New("target failed")
+		done <- want
+		close(done)
+
+		// --- When ---
+		have, ok := recvDone(done)
+
+		// --- Then ---
+		assert.True(t, ok)
+		assert.ErrorIs(t, want, have)
+	})
+}
+
 func Test_runTarget(t *testing.T) {
 	t.Run("execute target", func(t *testing.T) {
 		// --- Given ---
