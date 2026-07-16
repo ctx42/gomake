@@ -19,6 +19,7 @@ import (
 
 	"github.com/ctx42/gomake/internal/cli"
 	"github.com/ctx42/gomake/internal/version"
+	"github.com/ctx42/gomake/pkg/gomake"
 )
 
 // Main builds and installs the gomake binary into GOBIN, returning a non-nil
@@ -72,11 +73,16 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 	}
 	version.PopulateVersion(rng, info)
 
-	// Resolve the read-only source: the live working tree for a devel build,
+	// Resolve the read-only source: module root for a devel build (not CWD),
 	// the module-cache directory for a published one.
-	src := wd
 	devel := info.Main.Version == "(devel)"
-	if !devel {
+	var src string
+	if devel {
+		src, err = gomake.Root(wd)
+		if err != nil {
+			return fmt.Errorf("gomake: %w", err)
+		}
+	} else {
 		module := info.Main.Path + "@" + info.Main.Version
 		if src, err = moduleCacheDir(rng, module); err != nil {
 			return err

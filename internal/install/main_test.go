@@ -86,10 +86,11 @@ func Test_installTo(t *testing.T) {
 
 	t.Run("error - nonexistent targets file", func(t *testing.T) {
 		// --- Given ---
-		// The devel install path builds from the current working directory
-		// and writes artifacts (targets.yaml, regenerated builtins) into it.
-		// Run inside a temp dir so nothing lands in the real project tree.
-		t.Chdir(t.TempDir())
+		// Devel install resolves the module root via go.mod (not CWD alone).
+		// Use a temp module so nothing lands in the real project tree.
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+		t.Chdir(src)
 		rng := ringtest.New(t)
 		pth := filepath.Join(t.TempDir(), "missing.yaml")
 		info, _ := debug.ReadBuildInfo()
@@ -105,10 +106,11 @@ func Test_installTo(t *testing.T) {
 		// --- Given ---
 		// A --targets file with an import must take the full path: the
 		// effective targets.yaml is written (inline os.WriteFile) and
-		// PrepareTargets (go get + regen) runs before the build. No go.mod in
-		// the tree makes go get fail before touching the network, proving the
-		// fast path was not taken (it would skip PrepareTargets entirely).
+		// PrepareTargets (go get + regen) runs before the build. No require
+		// path in go.mod makes go get fail before touching the network,
+		// proving the fast path was not taken.
 		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
 		t.Chdir(src)
 		rng := ringtest.New(t)
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
@@ -126,9 +128,10 @@ func Test_installTo(t *testing.T) {
 
 	t.Run("error - targets file cannot be written", func(t *testing.T) {
 		// --- Given ---
-		// A read-only working directory causes os.WriteFile to fail when
-		// installTo writes the effective targets.yaml into the build tree.
+		// A read-only module root causes os.WriteFile to fail when installTo
+		// writes the effective targets.yaml into the build tree.
 		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
 		if err := os.Chmod(src, 0o555); err != nil {
 			t.Skip("cannot make dir read-only:", err)
 		}
