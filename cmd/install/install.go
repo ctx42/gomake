@@ -37,22 +37,27 @@ func main() {
 
 	rng := ring.New()
 
+	// Trim so whitespace-only --targets= is treated as empty, matching the
+	// note and the value passed to install.Main.
+	tgs := strings.TrimSpace(*targets)
+
 	// An explicitly empty --targets= is not an error: report that no external
 	// targets were provided and continue installing.
-	if note := emptyTargetsNote(fs, *targets); note != "" {
+	if note := emptyTargetsNote(fs, tgs); note != "" {
 		_, _ = fmt.Fprintln(rng.Stderr(), note)
 	}
 
 	info, _ := debug.ReadBuildInfo()
-	if err := install.Main(rng, info, *targets); err != nil {
+	if err := install.Main(rng, info, tgs); err != nil {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
 		os.Exit(1)
 	}
 }
 
 // emptyTargetsNote returns the note to print when --targets was set on fs with
-// an empty value tgs. It returns "" when the flag was absent or non-empty, so
-// that an explicit --targets= is reported rather than treated as an error.
+// an empty value tgs. Whitespace-only values count as empty. It returns "" when
+// the flag was absent or non-empty, so that an explicit --targets= is reported
+// rather than treated as an error.
 func emptyTargetsNote(fs *xflag.FlagSet, tgs string) string {
 	if strings.TrimSpace(tgs) != "" {
 		return ""
