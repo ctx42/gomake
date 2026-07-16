@@ -429,21 +429,34 @@ func stripBuildTag(filData, tagLine []byte) []byte {
 // It honors GOWORK when set (including "off"), otherwise walks from modRoot
 // toward the filesystem root like the Go toolchain. Empty means none.
 func findGoWork(env ring.Environ, modRoot string) string {
+	var gowork string
 	if env != nil {
-		if v := env.EnvGet("GOWORK"); v != "" {
-			if v == "off" {
-				return ""
-			}
-			pth := v
-			if !filepath.IsAbs(pth) {
-				pth = filepath.Join(modRoot, pth)
-			}
-			pth = filepath.Clean(pth)
-			if gomake.FileExists(pth) {
-				return pth
-			}
+		gowork = env.EnvGet("GOWORK")
+	}
+	return findGoWorkValue(gowork, modRoot)
+}
+
+// findGoWorkValue is the env-free core of findGoWork. Relative GOWORK paths
+// are resolved against the process working directory (like the Go toolchain),
+// not against modRoot.
+func findGoWorkValue(gowork, modRoot string) string {
+	if gowork != "" {
+		if gowork == "off" {
 			return ""
 		}
+		pth := gowork
+		if !filepath.IsAbs(pth) {
+			abs, err := filepath.Abs(pth)
+			if err != nil {
+				return ""
+			}
+			pth = abs
+		}
+		pth = filepath.Clean(pth)
+		if gomake.FileExists(pth) {
+			return pth
+		}
+		return ""
 	}
 	dir := modRoot
 	for {
@@ -614,7 +627,8 @@ func goEditErr(sentinel error, where, out string, err error) error {
 // compile compiles binary from given files by calling "go build" with given
 // environment and in given working directory. The compiled makefile will be
 // put in path defined by out. The returned error will always be of ErrCompile
-// type.
+// type. GOWORK is pinned to wd/go.work when present, otherwise "off", so the
+// build never follows the caller's ambient workspace.
 func compile(
 	ctx context.Context,
 	env []string,
@@ -630,6 +644,8 @@ func compile(
 		out,
 	}
 	args = append(args, files...)
+
+	env = pinBuildGOWORK(env, wd)
 
 	sout := &bytes.Buffer{}
 	eout := &bytes.Buffer{}
@@ -647,6 +663,16 @@ func compile(
 		return err
 	}
 	return nil
+}
+
+// pinBuildGOWORK sets GOWORK to buildDir/go.work when that file exists,
+// otherwise to "off", so go tool invocations use only the prepared workspace.
+func pinBuildGOWORK(env []string, buildDir string) []string {
+	work := filepath.Join(buildDir, "go.work")
+	if _, err := os.Stat(work); err == nil {
+		return ring.EnvSet(env, "GOWORK", work)
+	}
+	return ring.EnvSet(env, "GOWORK", "off")
 }
 
 // gmFiles returns the list of files which have buildTag ("go:build") for the

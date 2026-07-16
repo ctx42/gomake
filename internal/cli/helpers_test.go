@@ -720,6 +720,25 @@ func Test_findGoWork(t *testing.T) {
 		assert.Equal(t, work, have)
 	})
 
+	t.Run("GOWORK relative uses process cwd", func(t *testing.T) {
+		// --- Given ---
+		base := t.TempDir()
+		oskit.Write(t, "go 1.22\nuse .\n", base, "go.work")
+		mod := oskit.MkdirAll(t, base, "mod")
+		// Relative GOWORK is resolved against cwd, not modRoot.
+		cwd := must.Value(os.Getwd())
+		t.Cleanup(func() { _ = os.Chdir(cwd) })
+		must.Nil(os.Chdir(base))
+		env := ring.New()
+		env.EnvSet("GOWORK", "go.work")
+
+		// --- When ---
+		have := findGoWork(env, mod)
+
+		// --- Then ---
+		assert.Equal(t, filepath.Join(base, "go.work"), have)
+	})
+
 	t.Run("GOWORK off", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()

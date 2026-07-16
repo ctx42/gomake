@@ -31,16 +31,16 @@ func binaryCacheDir() (string, error) {
 
 // binaryCacheKey returns a hex-encoded SHA-256 hash over the inputs that
 // affect the compiled makefile binary: the makefile sources actually built,
-// the module's go.mod / go.sum / go.work / go.work.sum when present, every
-// non-test .go file under the module root (skipping vendor and VCS dirs),
-// local go.work use trees and go.mod replace targets outside the module,
-// and the gomake version plus GOOS/GOARCH. mkfNames are the validated
-// makefile base names actually compiled, so ignored makefile_* files do not
-// affect the key.
+// the module's go.mod / go.sum, the effective go.work (same resolution as
+// findGoWorkValue, including GOWORK=off), every non-test .go file under the
+// module root (skipping vendor and VCS dirs), local use/replace trees outside
+// the module, and the gomake version plus GOOS/GOARCH. mkfNames are the
+// validated makefile base names actually compiled, so ignored makefile_*
+// files do not affect the key. gowork is the raw GOWORK env value.
 func binaryCacheKey(
 	srcDir string,
 	mkfNames []string,
-	version, goos, goarch string,
+	version, goos, goarch, gowork string,
 ) (string, error) {
 
 	h := sha256.New()
@@ -62,20 +62,31 @@ func binaryCacheKey(
 		if err := hashFile(h, "go.mod", filepath.Join(modRoot, "go.mod")); err != nil {
 			return "", err
 		}
-		// Optional files: missing is fine; read errors are not.
-		for _, name := range []string{"go.sum", "go.work", "go.work.sum"} {
-			pth := filepath.Join(modRoot, name)
-			if _, err := os.Stat(pth); err != nil {
-				continue
-			}
-			if err := hashFile(h, name, pth); err != nil {
+		// Optional go.sum at module root.
+		sumPath := filepath.Join(modRoot, "go.sum")
+		if _, err := os.Stat(sumPath); err == nil {
+			if err := hashFile(h, "go.sum", sumPath); err != nil {
 				return "", err
+			}
+		}
+		// Effective workspace (parent walk / GOWORK / off).
+		goWorkPath := findGoWorkValue(gowork, modRoot)
+		_, _ = fmt.Fprintf(h, "gowork:%s\n", gowork)
+		if goWorkPath != "" {
+			if err := hashFile(h, "go.work", goWorkPath); err != nil {
+				return "", err
+			}
+			sumBeside := goWorkPath + ".sum"
+			if _, err := os.Stat(sumBeside); err == nil {
+				if err := hashFile(h, "go.work.sum", sumBeside); err != nil {
+					return "", err
+				}
 			}
 		}
 		if err := hashModuleGoFiles(h, modRoot); err != nil {
 			return "", err
 		}
-		if err := hashExternalModuleTrees(h, modRoot); err != nil {
+		if err := hashExternalModuleTrees(h, modRoot, goWorkPath); err != nil {
 			return "", err
 		}
 	}
@@ -87,16 +98,28 @@ func binaryCacheKey(
 // hashExternalModuleTrees hashes non-test .go files (and go.mod when present)
 // under local go.work use directories and go.mod replace targets that lie
 // outside modRoot, so workspace siblings and out-of-tree replaces invalidate
-// the binary cache.
+// the binary cache. goWorkPath is the effective workspace file (may be empty).
 func hashExternalModuleTrees(
 	h interface{ Write([]byte) (int, error) },
-	modRoot string,
+	modRoot, goWorkPath string,
 ) error {
 
-	rels := append(
-		localPathsFromGoWork(filepath.Join(modRoot, "go.work")),
-		localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...,
-	)
+	var workRels []string
+	if goWorkPath != "" {
+		workRels = localPathsFromGoWork(goWorkPath)
+		// Resolve relative use paths against the workfile directory.
+		workDir := filepath.Dir(goWorkPath)
+		absRels := make([]string, 0, len(workRels))
+		for _, rel := range workRels {
+			if filepath.IsAbs(rel) {
+				absRels = append(absRels, rel)
+				continue
+			}
+			absRels = append(absRels, filepath.Join(workDir, rel))
+		}
+		workRels = absRels
+	}
+	rels := append(workRels, localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...)
 	if len(rels) == 0 {
 		return nil
 	}
@@ -262,7 +285,8 @@ func isLocalDiskPath(pth string) bool {
 	if filepath.IsAbs(pth) {
 		return true
 	}
-	return strings.HasPrefix(pth, ".") || strings.HasPrefix(pth, "..")
+	// Relative disk paths start with "." (covers "./", "../", ".").
+	return strings.HasPrefix(pth, ".")
 }
 
 // hashFile writes a labeled file into h. Returns an error only when the file
@@ -344,13 +368,14 @@ func findModuleRoot(srcDir string) string {
 
 // lookupBinaryCache returns the path to a cached binary and true when a valid
 // cached binary exists for the given source directory, version, and platform.
+// gowork is the raw GOWORK env value (same as findGoWorkValue).
 func lookupBinaryCache(
 	srcDir string,
 	mkfNames []string,
-	version, goos, goarch string,
+	version, goos, goarch, gowork string,
 ) (string, bool) {
 
-	key, err := binaryCacheKey(srcDir, mkfNames, version, goos, goarch)
+	key, err := binaryCacheKey(srcDir, mkfNames, version, goos, goarch, gowork)
 	if err != nil {
 		return "", false
 	}
@@ -370,14 +395,15 @@ func lookupBinaryCache(
 }
 
 // storeBinaryCache copies the compiled binary at binPath into the cache.
-// Errors are silently ignored because the cache is advisory.
+// Errors are silently ignored because the cache is advisory. The write is
+// rename-atomic so concurrent lookups never see a partial binary.
 func storeBinaryCache(
 	binPath, srcDir string,
 	mkfNames []string,
-	version, goos, goarch string,
+	version, goos, goarch, gowork string,
 ) {
 
-	key, err := binaryCacheKey(srcDir, mkfNames, version, goos, goarch)
+	key, err := binaryCacheKey(srcDir, mkfNames, version, goos, goarch, gowork)
 	if err != nil {
 		return
 	}
@@ -389,5 +415,13 @@ func storeBinaryCache(
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-	_ = copyFile(binPath, filepath.Join(dir, name))
+	dst := filepath.Join(dir, name)
+	tmp := dst + ".tmp"
+	if err = copyFile(binPath, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return
+	}
+	if err = os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
+	}
 }

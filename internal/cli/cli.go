@@ -118,9 +118,10 @@ func (gmk *goMake) Compile(
 func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 	env := rng.EnvAll()
 
+	gowork := rng.EnvGet("GOWORK")
 	binPath, cached := lookupBinaryCache(
 		gmk.cfg.src, gmk.cu.MkfNames,
-		gmk.cfg.version, gmk.cfg.goos, gmk.cfg.goarch,
+		gmk.cfg.version, gmk.cfg.goos, gmk.cfg.goarch, gowork,
 	)
 	if !cached {
 		var err error
@@ -135,7 +136,7 @@ func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 		storeBinaryCache(
 			gmk.cu.MainBin,
 			gmk.cfg.src, gmk.cu.MkfNames, gmk.cfg.version,
-			gmk.cfg.goos, gmk.cfg.goarch,
+			gmk.cfg.goos, gmk.cfg.goarch, gowork,
 		)
 		binPath = gmk.cu.MainBin
 	}
