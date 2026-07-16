@@ -17,10 +17,11 @@ func Test_installPath_envOverride(t *testing.T) {
 	// --- Given ---
 	want := filepath.Join(t.TempDir(), "gomake")
 	oskit.Write(t, "x", want)
-	t.Setenv(envKeyInstallPath, want)
+	rng := ring.New()
+	rng.EnvSet(envKeyInstallPath, want)
 
 	// --- When ---
-	have, err := installPath(ring.New())
+	have, err := installPath(rng)
 
 	// --- Then ---
 	assert.NoError(t, err)
@@ -29,10 +30,12 @@ func Test_installPath_envOverride(t *testing.T) {
 
 func Test_installPath_executableLookup(t *testing.T) {
 	// --- Given ---
-	t.Setenv(envKeyInstallPath, "")
+	rng := ring.New()
+	// Ensure the override key is absent so Executable() path is used.
+	rng.EnvSet(envKeyInstallPath, "")
 
 	// --- When ---
-	have, err := installPath(ring.New())
+	have, err := installPath(rng)
 
 	// --- Then ---
 	assert.NoError(t, err)

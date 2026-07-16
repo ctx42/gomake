@@ -19,8 +19,10 @@ const envKeyInstallPath = "GOMAKE_INSTALL_PATH"
 // installPath returns the absolute path to the running gomake binary. The env
 // supplies the environment for the [GoBinPath] fallback.
 func installPath(env ring.Environ) (string, error) {
-	if p := strings.TrimSpace(os.Getenv(envKeyInstallPath)); p != "" {
-		return filepath.Abs(p)
+	if p, ok := env.EnvLookup(envKeyInstallPath); ok {
+		if p = strings.TrimSpace(p); p != "" {
+			return filepath.Abs(p)
+		}
 	}
 	execPath, err := os.Executable()
 	if err != nil {
