@@ -170,14 +170,14 @@ func runTarget(
 		done <- fn(ctx, rng)
 	}()
 
-	// Handle signals.
-	signal.Notify(sig, syscall.SIGINT)
+	// Handle interrupt and termination (containers send SIGTERM).
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	// Wait for signal, done context or done channel.
-	var tgtErr error
-	var finished bool
-
-	for !finished {
+	// Wait for signal, context cancel, or the target result. Once the result
+	// arrives, drain until the goroutine exits (deferred cwd restore) without
+	// re-selecting on ctx/sig — a finished target must not be reported as a
+	// deadline/signal error during that restore window.
+	for {
 		select {
 		case itf := <-sig:
 			cxl() // Notify the running target the context has been canceled.
@@ -185,17 +185,22 @@ func runTarget(
 				return interruptedError(exitCodeSignal + int(i))
 			}
 			return interruptedError(1)
+
 		case <-ctx.Done():
 			return ctx.Err()
+
 		case err, open := <-done:
-			if open {
-				tgtErr = err // Target finished executing.
-			} else {
-				finished = true // Goroutine running target exited.
+			if !open {
+				// Closed without a prior result (should not happen).
+				return nil
+			}
+			for {
+				if _, open = <-done; !open {
+					return err
+				}
 			}
 		}
 	}
-	return tgtErr
 }
 
 // HelpTargets returns formatted help with the list of targets and their
