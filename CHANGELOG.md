@@ -1,3 +1,6 @@
+## v0.26.1 (Sun, 19 Jul 2026 19:57:33 UTC)
+- fix(cli): expand leading ~ in --targets path.
+
 ## v0.26.0 (Thu, 16 Jul 2026 11:54:31 UTC)
 - fix(cli): pass target name to HelpUsage.
 - fix(cli): widen makefile binary cache key.
