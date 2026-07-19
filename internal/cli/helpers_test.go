@@ -46,6 +46,30 @@ func Test_isCoreCmd_tabular(t *testing.T) {
 	}
 }
 
+func Test_expandHome_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		pth  string
+		home string
+		want string
+	}{
+		{"bare tilde", "~", "/home/u", "/home/u"},
+		{"tilde slash", "~/a/b", "/home/u", "/home/u/a/b"},
+		{"tilde only prefix not slash", "~foo", "/home/u", "~foo"},
+		{"no tilde", "a/b", "/home/u", "a/b"},
+		{"absolute path", "/etc/x", "/home/u", "/etc/x"},
+		{"empty", "", "/home/u", ""},
+		{"tilde mid path", "a/~/b", "/home/u", "a/~/b"},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			assert.Equal(t, tc.want, expandHome(tc.pth, tc.home))
+		})
+	}
+}
+
 func Test_errCompile_Unwrap(t *testing.T) {
 	// --- When ---
 	err := &errCompile{error: ErrTest}

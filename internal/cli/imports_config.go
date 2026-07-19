@@ -118,9 +118,10 @@ func (cfg *ImportsConfig) importLines() []string {
 
 // LoadExternalTargets loads a targets.yaml from pathOrURL. If pathOrURL begins
 // with "http://" or "https://" the file is fetched over HTTP; otherwise it is
-// read from the local filesystem. A missing local file returns an empty config
-// without error. The context cancels in-flight HTTP fetches; local reads ignore
-// it except for a pre-check of ctx.Err().
+// read from the local filesystem, with a leading "~" or "~/" expanded to the
+// user's home directory. A missing local file returns an empty config without
+// error. The context cancels in-flight HTTP fetches; local reads ignore it
+// except for a pre-check of ctx.Err().
 func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -130,6 +131,13 @@ func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error
 		strings.HasPrefix(lower, "https://")
 	if isURL {
 		return fetchExternalTargets(ctx, tgs)
+	}
+	if strings.HasPrefix(tgs, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		tgs = expandHome(tgs, home)
 	}
 	cfg, err := readExternalTargets(tgs)
 	if errors.Is(err, os.ErrNotExist) {

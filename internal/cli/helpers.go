@@ -31,6 +31,19 @@ import (
 // mirroring [mkf.Target.IsCore].
 func isCoreCmd(tgtName string) bool { return strings.HasPrefix(tgtName, ":") }
 
+// expandHome replaces a leading "~" or "~/" in pth with home. A bare "~"
+// becomes home; "~/rest" becomes home joined with rest. Any other path,
+// including a "~user" form or a tilde not at the start, is returned unchanged.
+func expandHome(pth, home string) string {
+	if pth == "~" {
+		return home
+	}
+	if rest, ok := strings.CutPrefix(pth, "~/"); ok {
+		return filepath.Join(home, rest)
+	}
+	return pth
+}
+
 // fail writes err to stderr decorated for the user. It is the single place
 // controlling how command errors are presented.
 func fail(rng *ring.Ring, err error) {
