@@ -1,3 +1,7 @@
+## v0.27.0 (Mon, 21 Sep 2026 14:30:33 UTC)
+- refactor(version)!: adopt xdef v0.9.0 names, drop CCID.
+- refactor(version)!: report the toolchain's version.
+
 ## v0.26.1 (Sun, 19 Jul 2026 19:57:33 UTC)
 - fix(cli): expand leading ~ in --targets path.
 
