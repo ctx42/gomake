@@ -23,7 +23,6 @@ import (
 	"github.com/ctx42/gomake/internal/mkf"
 	"github.com/ctx42/gomake/internal/osarch"
 	"github.com/ctx42/gomake/internal/parser"
-	"github.com/ctx42/gomake/internal/version"
 	"github.com/ctx42/gomake/pkg/gomake"
 )
 
@@ -813,13 +812,10 @@ func compile(
 	files ...string,
 ) error {
 
-	args := []string{
-		"build",
-		"-ldflags",
-		version.LDFlags(),
-		"-o",
-		out,
-	}
+	// No -ldflags: the generated main is self-contained and links none of
+	// gomake's packages, so a -X definition naming one would go nowhere. The
+	// makefile learns the gomake version from the generated source instead.
+	args := []string{"build", "-o", out}
 	args = append(args, files...)
 
 	env = pinBuildGOWORK(env, wd)

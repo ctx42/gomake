@@ -112,8 +112,12 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
 - **Build isolation**: gomake uses out-of-source builds under a temp dir
   (GOMAKE_TMP_DIR or system tmp + random subdir). The dir is cleaned on
   success or error paths in most cases.
-- **Versioning**: ldflags + Go build info during install (no git). See
-  internal/version and internal/install.
+- **Versioning**: the Go toolchain's, not gomake's. `internal/version` reads
+  `debug.ReadBuildInfo()` at run time — a module version for a published
+  install, a pseudo-version with commit and `+dirty` for a build made in the
+  repository. The installer stamps `xdef.VarScmRev` with `-ldflags -X` only
+  for a published install, which compiles from the module cache and so has no
+  repository for the toolchain to read.
 
 ## Common Gotchas
 
@@ -133,8 +137,11 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
   and both must use the same value.
 - Temp dir leaks are possible on certain error paths in `prepare`; review any
   changes to build-dir creation/defer logic.
-- `internal/install` assumes `go` is in PATH and behaves reasonably (install no
-  longer shells out to `git`; version metadata comes from Go build info).
+- `internal/install` assumes `go` is in PATH and behaves reasonably. It never
+  shells out to `git`: version metadata comes from Go build info.
+- The generated makefile main links none of gomake's packages (its sources are
+  inlined after the CODE MARK), so a `-ldflags -X` naming one would go
+  nowhere. The makefile learns the gomake version from the generated source.
 - Exported `Target` zero value has `Run: nil` (will panic if called). Use
   `NewTarget()` or the parser.
 - No `Example*` functions yet; README and godoc examples are limited.
@@ -181,8 +188,7 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
   their code generation (`GenMain`) and embedded templates. The generated
   `targets.go` is empty by default. Note: `--help`/`--list`/`--version` are CLI
   flags handled in pkg/gomake, not built-in targets.
-- **internal/install**: Self-install + version stamping from Go build info
-  during install.
+- **internal/install**: Self-install + version stamping during install.
 - **internal/osarch**: Generated, version-independent list of supported
   GOOS/GOARCH values (from `go tool dist list`, latest Go as a superset) used
   to validate makefile filename suffixes. Regenerate via

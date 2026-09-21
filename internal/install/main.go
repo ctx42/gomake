@@ -65,13 +65,12 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 	// setupWorkspace may override with a private workfile when needed.
 	rng.EnvSet("GOWORK", "off")
 
-	// Build metadata embedded by the Go toolchain gives both the version to
-	// record and the installation mode: "(devel)" for `go run ./cmd/install`,
-	// an actual version for `go run ...@version`.
+	// Build metadata embedded by the Go toolchain gives the installation
+	// mode: "(devel)" for `go run ./cmd/install`, an actual version for
+	// `go run ...@version`.
 	if info == nil {
 		return errors.New("gomake: build info unavailable")
 	}
-	version.PopulateVersion(rng, info)
 
 	// Resolve the read-only source: module root for a devel build (not CWD),
 	// the module-cache directory for a published one.
@@ -96,7 +95,11 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 		return fmt.Errorf("gomake: %w", err)
 	}
 
-	ldflags := version.LDFlags()
+	// A devel build compiles from the repository, so the Go toolchain works
+	// the version out on its own and LDFlags stamps nothing. A published one
+	// compiles from the module cache, which carries no repository to read,
+	// and there the version info holds is the one to stamp.
+	ldflags := version.LDFlags(info.Main.Version)
 
 	// Fast path: no external targets. Build directly from the read-only source
 	// without copying, fetching, or regenerating builtins.

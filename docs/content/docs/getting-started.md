@@ -22,7 +22,7 @@ After installation, verify it works:
 
 ```shell
 gomake --version
-# gomake v0.12.1, hash: abc1234, ...
+# gomake v0.26.1
 ```
 
 ### With custom built-in targets
@@ -50,22 +50,42 @@ installer from the clone. It builds whatever is in your working tree; no tag,
 release, or module proxy is involved:
 
 ```shell
-go run -buildvcs=true ./cmd/install
+go run ./cmd/install
 ```
 
 `--targets` works the same way:
 
 ```shell
-go run -buildvcs=true ./cmd/install --targets=./targets.yaml
+go run ./cmd/install --targets=./targets.yaml
 ```
 
-Pass `-buildvcs=true`: under the default `-buildvcs=auto`, `go run` skips
-version-control stamping, so the binary reports `<not set>` for its revision,
-hash, and clean/dirty state; forcing it on records them from the checked-out
-commit. Use the package path `./cmd/install`, not a file path like
+Use the package path `./cmd/install`, not a file path like
 `cmd/install/install.go` — building from an explicit file leaves the build
 metadata empty, and the installer then mistakes the run for a published
 install and fails.
+
+---
+
+## Versioning
+
+`gomake --version` reports the version the Go toolchain recorded for the
+binary, so the string says where the build came from:
+
+| Build                             | Version                                       |
+|-----------------------------------|-----------------------------------------------|
+| Published release (`…@latest`)    | `v0.26.1`                                     |
+| From a clone                      | `v0.26.2-0.20260921121020-5bde820e3c1c+dirty` |
+| From a source copy, no repository | `(devel)`                                     |
+
+The middle form is a Go pseudo-version: the last tag with its patch raised, a
+pre-release stamp holding the commit time and hash, and `+dirty` when the
+work tree carried uncommitted changes. It sorts after `v0.26.1` and before
+`v0.26.2`, so a build from a clone never claims to be the release it was
+built on top of.
+
+A published install is the one build the toolchain cannot version by itself:
+it compiles from the module cache, which carries no repository to read. The
+installer stamps the version there with `-ldflags -X`.
 
 ---
 

@@ -52,6 +52,7 @@ test      runs the test suite
 
 - [Why GoMake?](#why-gomake)
 - [Installation](#installation)
+- [Versioning](#versioning)
 - [Quick start](#quick-start)
 - [Writing targets](#writing-targets)
   - [Target signature](#target-signature)
@@ -124,7 +125,7 @@ After installation, verify:
 
 ```shell
 gomake --version
-# gomake v0.12.1, hash: abc1234, build date: 2026-05-09T12:00:00Z, scm state: clean
+# gomake v0.26.1
 ```
 
 ### With custom built-in targets
@@ -161,31 +162,53 @@ installer from the clone with `go run ./cmd/install`. It builds whatever is in
 your working tree; no tag, release, or module proxy is involved.
 
 ```shell
-go run -buildvcs=true ./cmd/install
+go run ./cmd/install
 ```
 
 `--targets` and the other options work exactly as above:
 
 ```shell
-go run -buildvcs=true ./cmd/install --targets=./targets.yaml
+go run ./cmd/install --targets=./targets.yaml
 ```
 
-> [!IMPORTANT]
-> Pass `-buildvcs=true`. Under the default `-buildvcs=auto`, `go run` skips
-> version-control stamping, so the binary reports `<not set>` for its revision,
-> hash, and clean/dirty state. Forcing it on records them from the checked-out
-> commit:
->
-> ```shell
-> gomake --version
-> # gomake v0.24.0, hash: ec7c8f1, build date: 2026-07-15T...Z, scm state: clean
-> ```
+The binary reports where the work tree stood when it was built:
+
+```shell
+gomake --version
+# gomake v0.24.1-0.20260715T101500-ec7c8f1a2b3c+dirty
+```
+
+See [Versioning](#versioning) for how to read that string.
 
 > [!NOTE]
 > Use the package path `./cmd/install`, not a file path like
 > `cmd/install/install.go`. Building from an explicit file leaves the build
 > metadata empty, and the installer then mistakes the run for a published
 > install and fails.
+
+---
+
+## Versioning
+
+`gomake --version` reports the version the Go toolchain recorded for the
+binary, so the string says where the build came from:
+
+| Build                             | Version                                       |
+|-----------------------------------|-----------------------------------------------|
+| Published release (`…@latest`)    | `v0.26.1`                                     |
+| From a clone                      | `v0.26.2-0.20260921121020-5bde820e3c1c+dirty` |
+| From a source copy, no repository | `(devel)`                                     |
+
+The middle form is a Go pseudo-version: the last tag with its patch raised, a
+pre-release stamp holding the commit time and hash, and `+dirty` when the
+work tree carried uncommitted changes. It sorts after `v0.26.1` and before
+`v0.26.2`, so a build from a clone never claims to be the release it was
+built on top of.
+
+A published install is the one build the toolchain cannot version by itself:
+it compiles from the module cache, which carries no repository to read. The
+installer stamps the version there with `-ldflags -X`, and a stamp always
+wins over the toolchain's own value.
 
 ---
 
@@ -1130,7 +1153,7 @@ compiled-and-cached binary:
 | Capability            | How GoMake does it                              |
 |-----------------------|-------------------------------------------------|
 | Target signature      | `func(ctx, *ring.Ring) error` — one form        |
-| I/O access            | `rng.Stdout()` / `rng.Stderr()` — injectable     |
+| I/O access            | `rng.Stdout()` / `rng.Stderr()` — injectable    |
 | Arguments             | `rng.Args()` — the full `[]string`              |
 | Environment           | `rng.EnvGet` — isolated and seedable in tests   |
 | Testing               | Call the target directly with a controlled Ring |
