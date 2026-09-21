@@ -14,8 +14,8 @@ import (
 
 func Test_SaveVersion(t *testing.T) {
 	// --- Given ---
-	wD, wR, wH, wS, wC := version.Get()
-	t.Cleanup(func() { version.Set(wD, wR, wH, wS, wC) })
+	wD, wR, wH, wS := version.Get()
+	t.Cleanup(func() { version.Set(wD, wR, wH, wS) })
 
 	tspy := tester.New(t)
 	tspy.ExpectCleanups(1)
@@ -25,21 +25,19 @@ func Test_SaveVersion(t *testing.T) {
 	SaveVersion(tspy)
 
 	// --- Then ---
-	version.Set("d0", "r0", "h0", "s0", "c0")
+	version.Set("d0", "r0", "h0", "s0")
 
-	hD, hR, hH, hS, hC := version.Get()
+	hD, hR, hH, hS := version.Get()
 	assert.Equal(t, "d0", hD)
 	assert.Equal(t, "r0", hR)
 	assert.Equal(t, "h0", hH)
 	assert.Equal(t, "s0", hS)
-	assert.Equal(t, "c0", hC)
 
 	tspy.Finish()
 
-	hD, hR, hH, hS, hC = version.Get()
+	hD, hR, hH, hS = version.Get()
 	assert.Equal(t, wD, hD)
 	assert.Equal(t, wR, hR)
 	assert.Equal(t, wH, hH)
 	assert.Equal(t, wS, hS)
-	assert.Equal(t, wC, hC)
 }

@@ -45,7 +45,7 @@ helpers operate on those values.
 | Environment         | `Getenv`, `LookupEnv`, `GetGOOS`, `GetGOARCH`, `EnvSplit`, `EnvJoin`, `EnvSplitOrdered`, `Expander`, `PrettyPrintEnv` |
 | Interactive input   | `ReadLine`, `ReadChar`                                                                                                |
 | Errors & exit codes | `ExitStatus`, `HasRun`, `ErrNoGoMod`                                                                                  |
-| Constants           | `CCIDEnvKey`, `ProjectDirEnvKey`, `VersionEnvKey`                                                                     |
+| Constants           | `ProjectDirEnvKey`, `VersionEnvKey`                                                                                   |
 
 ## Using the helpers in a target
 

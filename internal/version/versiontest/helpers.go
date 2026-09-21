@@ -13,7 +13,7 @@ import (
 // SaveVersion saves [version] package vars and restores them after the test.
 func SaveVersion(t tester.T) {
 	t.Helper()
-	date, rev, hash, state, cc := version.Get()
-	fn := func() { version.Set(date, rev, hash, state, cc) }
+	date, rev, hash, state := version.Get()
+	fn := func() { version.Set(date, rev, hash, state) }
 	t.Cleanup(fn)
 }

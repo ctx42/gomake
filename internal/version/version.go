@@ -11,8 +11,6 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/xdef/pkg/xdef"
-
-	"github.com/ctx42/gomake/pkg/gomake"
 )
 
 // importPath is the package path used in -X linker definitions.
@@ -20,59 +18,48 @@ const importPath = "github.com/ctx42/gomake/internal/version"
 
 // Variables set by ldflags representing the build version.
 var (
-	// buildDate holds the UTC RFC-3339 timestamp of the build.
-	buildDate = xdef.NotSet
+	// bldDate holds the UTC RFC-3339 timestamp of the build.
+	bldDate = xdef.PhNotSet
 
 	// scmRev holds the source control revision tag, e.g. "v1.2.3".
-	scmRev = xdef.NotSet
+	scmRev = xdef.PhNotSet
 
 	// scmHash holds the short commit hash, e.g. "12ab23c".
-	scmHash = xdef.NotSet
+	scmHash = xdef.PhNotSet
 
 	// scmState represents the working directory state: clean, dirty.
-	scmState = xdef.NotSet
-
-	// ccid represents CI/CD job identifier.
-	ccid = xdef.NotSet
+	scmState = xdef.PhNotSet
 )
 
-// Get returns the current build-metadata values: date, rev, hash, state, cc.
-func Get() (string, string, string, string, string) {
-	return buildDate, scmRev, scmHash, scmState, ccid
+// Get returns the current build-metadata values: date, rev, hash, state.
+func Get() (string, string, string, string) {
+	return bldDate, scmRev, scmHash, scmState
 }
 
-// Set assigns all five build-metadata variables at once.
-func Set(date, rev, hash, state, cc string) {
-	buildDate = date
+// Set assigns all four build-metadata variables at once.
+func Set(date, rev, hash, state string) {
+	bldDate = date
 	scmRev = rev
 	scmHash = hash
 	scmState = state
-	ccid = cc
 }
 
 // PopulateVersion reads version metadata embedded by the Go toolchain in info
 // and stores the results in the package variables. The module version and the
 // vcs.revision/vcs.modified build settings are used when present and
-// meaningful; any field info does not carry is recorded as [xdef.NotSet]. It
+// meaningful; any field info does not carry is recorded as [xdef.PhNotSet]. It
 // relies only on the Go toolchain and never shells out to a VCS such as git,
-// so installation works on machines that have only Go installed. The CI/CD job
-// identifier is read from the [gomake.CCIDEnvKey] environment variable.
+// so installation works on machines that have only Go installed.
 func PopulateVersion(rng *ring.Ring, info *debug.BuildInfo) {
 	rev, hash, state := buildInfoFields(info)
 	date := rng.Clock()().UTC().Format(time.RFC3339)
-	Set(
-		date,
-		orNotSet(rev),
-		orNotSet(hash),
-		orNotSet(state),
-		orNotSet(rng.EnvGet(gomake.CCIDEnvKey)),
-	)
+	Set(date, orNotSet(rev), orNotSet(hash), orNotSet(state))
 }
 
-// orNotSet returns s when it is non-empty, otherwise [xdef.NotSet].
+// orNotSet returns s when it is non-empty, otherwise [xdef.PhNotSet].
 func orNotSet(s string) string {
 	if s == "" {
-		return xdef.NotSet
+		return xdef.PhNotSet
 	}
 	return s
 }
@@ -84,9 +71,8 @@ func Version(cmd string) string {
 	b.WriteByte(' ')
 	b.WriteString(scmRev)
 	writeField(&b, "hash", scmHash)
-	writeField(&b, "build date", buildDate)
+	writeField(&b, "build date", bldDate)
 	writeField(&b, "scm state", scmState)
-	writeField(&b, "cc tag", ccid)
 	return b.String()
 }
 
@@ -96,11 +82,10 @@ func Version(cmd string) string {
 // `go build -ldflags`.
 func LDFlags() string {
 	flags := []string{
-		ldflag(xdef.VarBuildDate, buildDate),
+		ldflag(xdef.VarBldDate, bldDate),
 		ldflag(xdef.VarScmRev, scmRev),
 		ldflag(xdef.VarScmHash, scmHash),
 		ldflag(xdef.VarScmState, scmState),
-		ldflag(xdef.VarCCID, ccid),
 	}
 	return strings.Join(flags, " ")
 }

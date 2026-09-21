@@ -25,14 +25,6 @@ gomake --version
 # gomake v0.12.1, hash: abc1234, ...
 ```
 
-### Embedding a CI/CD tag
-
-Set `GOMAKE_CCID` to embed a build identifier in the version string:
-
-```shell
-GOMAKE_CCID=build-42 go run github.com/ctx42/gomake/cmd/install@latest
-```
-
 ### With custom built-in targets
 
 Pass a `targets.yaml` to compile external target packages permanently into the

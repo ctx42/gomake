@@ -144,14 +144,6 @@ curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh
 curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh -s -- --targets=https://example.com/targets.yaml
 ```
 
-### Embedding a CI/CD tag
-
-```shell
-GOMAKE_CCID=build-42 go run github.com/ctx42/gomake/cmd/install@latest
-gomake --version
-# gomake v0.12.1, hash: abc1234, build date: 2026-05-09T12:00:00Z, scm state: clean, cc tag: build-42
-```
-
 ### Installing to a custom directory
 
 The binary is installed to GOBIN (or `$GOPATH/bin` when GOBIN is unset). Point

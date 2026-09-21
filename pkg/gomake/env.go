@@ -12,11 +12,6 @@ import (
 
 // Public gomake environment contract keys.
 const (
-	// CCIDEnvKey is the environment variable carrying the CI/CD job identifier
-	// gomake records as build metadata. A CI/CD pipeline sets it before
-	// installing so the value is embedded in the built binary.
-	CCIDEnvKey = "GOMAKE_CCID"
-
 	// VersionEnvKey is the environment variable carrying the gomake version
 	// string. The runtime sets it on the process environment (and ring meta)
 	// so a target can read the version of the gomake tool that invoked it.
