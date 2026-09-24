@@ -1,3 +1,6 @@
+## v0.27.1 (Thu, 24 Sep 2026 11:46:05 UTC)
+- build(deps): bump testkit to v0.15.0.
+
 ## v0.27.0 (Mon, 21 Sep 2026 14:30:33 UTC)
 - refactor(version)!: adopt xdef v0.9.0 names, drop CCID.
 - refactor(version)!: report the toolchain's version.
