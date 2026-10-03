@@ -89,6 +89,19 @@ func Test_FindTarget(t *testing.T) {
 		assert.Same(t, want, have)
 	})
 
+	t.Run("nil entry", func(t *testing.T) {
+		// --- Given ---
+		want := TgtB()
+		tgs := []*Target{nil, want}
+
+		// --- When ---
+		have, err := FindTarget("tgt-b", tgs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Same(t, want, have)
+	})
+
 	t.Run("error - not found", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA(), TgtB(), TgtC()}
@@ -98,6 +111,7 @@ func Test_FindTarget(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
+		assert.ErrorContain(t, "unknown target: unknown", err)
 		assert.Nil(t, have)
 	})
 }
@@ -597,6 +611,17 @@ func Test_runTarget(t *testing.T) {
 }
 
 func Test_HelpTargets(t *testing.T) {
+	t.Run("negative padding", func(t *testing.T) {
+		// --- Given ---
+		tgs := []*Target{TgtA()}
+
+		// --- When ---
+		have := HelpTargets(tgs, -1)
+
+		// --- Then ---
+		assert.Equal(t, "tgt-a    syn tgt-a\n", have)
+	})
+
 	t.Run("one target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
@@ -842,6 +867,7 @@ func Test_Indent_tabular(t *testing.T) {
 		{"3", 1, "a\nb", "\ta\n\tb"},
 		{"4", 1, "a\nb\n", "\ta\n\tb\n"},
 		{"5", 1, "a\n\n", "\ta\n\n"},
+		{"negative", -1, "a", "a"},
 	}
 
 	for _, tc := range tt {

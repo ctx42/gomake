@@ -82,14 +82,17 @@ func RecoverError(v any) error {
 }
 
 // FindTarget finds target by given name in the slice, returns [ErrUnkTarget]
-// when there is no target by that name.
+// when there is no target by that name. The error text includes the name.
 func FindTarget(name string, tgs []*Target) (*Target, error) {
 	for _, tgt := range tgs {
+		if tgt == nil {
+			continue
+		}
 		if tgt.Name == name {
 			return tgt, nil
 		}
 	}
-	return nil, ErrUnkTarget
+	return nil, fmt.Errorf("%w: %s", ErrUnkTarget, name)
 }
 
 // defaultTarget returns the default target or [ErrPickTarget] error when the
@@ -248,8 +251,11 @@ func drainDone(done <-chan error, err error) error {
 // HelpTargets returns formatted help with the list of targets and their
 // synopses. The default target is marked with an asterisk. An empty slice
 // yields "no targets\n"; a non-empty slice whose targets are all hidden
-// yields an empty string.
+// yields an empty string. A negative padding is treated as zero.
 func HelpTargets(tgs []*Target, padding int) string {
+	if padding < 0 {
+		padding = 0
+	}
 	buf := &bytes.Buffer{}
 	pad := strings.Repeat(" ", padding)
 	if len(tgs) == 0 {
@@ -338,8 +344,12 @@ func helpTarget(tgt *Target) string {
 	return fmt.Sprintf("%s\t%s\n", tgt.Name, tgt.Doc)
 }
 
-// Indent indents all lines in v with n tab characters.
+// Indent indents all lines in v with n tab characters. A negative n is
+// treated as zero.
 func Indent(n int, v string) string {
+	if n < 0 {
+		n = 0
+	}
 	pad := strings.Repeat("\t", n)
 	lines := strings.Split(v, "\n")
 	for i, line := range lines {

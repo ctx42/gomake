@@ -44,6 +44,10 @@ var (
 	ErrPickTarget = errors.New("pick a target to execute")
 )
 
+// errNilRing is returned when a makefile has no ring to read arguments and
+// write output through.
+var errNilRing = errors.New("nil ring")
+
 // interruptedError wraps signal code and is returned when target execution has
 // been interrupted by an OS signal.
 type interruptedError int
@@ -121,7 +125,13 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 		version: "unknown version",
 	}
 	for _, opt := range opts {
+		if opt == nil {
+			continue
+		}
 		opt(cmf)
+	}
+	if cmf.rng == nil {
+		return nil, errNilRing
 	}
 	cmf.fs = xflag.NewFlagSet("makefile", flag.ContinueOnError)
 	cmf.fs.SetOutput(io.Discard)
@@ -150,7 +160,7 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 		// parse failure propagates unchanged.
 		pe, ok := errors.AsType[*xflag.ParseError](err)
 		if ok && pe.Flag == "timeout" {
-			return nil, ErrInvTimeout
+			return nil, fmt.Errorf("%w: %w", ErrInvTimeout, pe)
 		}
 		return nil, fmt.Errorf("parsing flags: %w", err)
 	}
@@ -177,7 +187,14 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 // the original working directory before returning. On timeout or signal
 // cancellation it returns immediately while the target goroutine restores the
 // directory asynchronously, so the restore may not be visible on return.
+//
+// Execute is single-flight. It changes the process working directory and
+// installs process-wide signal handlers, so two calls must not run at once.
 func (cmf *Makefile) Execute(ctx context.Context) error {
+	if cmf == nil || cmf.rng == nil {
+		return errNilRing
+	}
+
 	// Help was requested.
 	if cmf.showHelp {
 		help, err := HelpUsage(

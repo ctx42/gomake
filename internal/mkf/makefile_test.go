@@ -82,6 +82,32 @@ func Test_WithMakefileRing(t *testing.T) {
 }
 
 func Test_NewMakefile(t *testing.T) {
+	t.Run("nil option", func(t *testing.T) {
+		// --- Given ---
+		tgs := []*Target{}
+		tst := ringtest.New(t)
+		rngOF := WithMakefileRing(tst.Ring())
+
+		// --- When ---
+		cmf, err := NewMakefile(tgs, nil, rngOF, WithMakefileVersion("v"))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "v", cmf.version)
+	})
+
+	t.Run("error - nil ring", func(t *testing.T) {
+		// --- Given ---
+		tgs := []*Target{}
+
+		// --- When ---
+		cmf, err := NewMakefile(tgs, WithMakefileRing(nil))
+
+		// --- Then ---
+		assert.ErrorIs(t, errNilRing, err)
+		assert.Nil(t, cmf)
+	})
+
 	t.Run("no arguments", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
@@ -163,6 +189,7 @@ func Test_NewMakefile(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrInvTimeout, err)
+		assert.ErrorContain(t, "abc", err)
 		assert.Nil(t, cmf)
 	})
 
@@ -298,6 +325,30 @@ func Test_NewMakefile(t *testing.T) {
 }
 
 func Test_Makefile_Execute(t *testing.T) {
+	t.Run("error - zero value", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		var cmf Makefile
+
+		// --- When ---
+		err := cmf.Execute(ctx)
+
+		// --- Then ---
+		assert.ErrorIs(t, errNilRing, err)
+	})
+
+	t.Run("error - nil makefile", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		var cmf *Makefile
+
+		// --- When ---
+		err := cmf.Execute(ctx)
+
+		// --- Then ---
+		assert.ErrorIs(t, errNilRing, err)
+	})
+
 	t.Run("show target help", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}

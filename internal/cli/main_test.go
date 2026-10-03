@@ -353,7 +353,7 @@ func mainMakefileWithNoTargets(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeUnkTarget, code)
-		assert.Equal(t, mkf.ErrUnkTarget.Error()+"\n", tst.Stderr())
+		assert.Equal(t, "unknown target: target\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -415,7 +415,7 @@ func mainMakefileWithNoTargets(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeUnkTarget, code)
-		assert.Equal(t, "unknown target\n", tst.Stderr())
+		assert.Equal(t, "unknown target: :tgt-x\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -571,7 +571,7 @@ func mainMakefileNoDefaultTarget(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeUnkTarget, code)
-		assert.Equal(t, "unknown target\n", tst.Stderr())
+		assert.Equal(t, "unknown target: :tgt-x\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -644,7 +644,7 @@ func Test_main(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 127, code)
-		assert.Equal(t, "unknown target\n", tst.Stderr())
+		assert.Equal(t, "unknown target: unknown\n", tst.Stderr())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
