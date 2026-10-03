@@ -245,10 +245,7 @@ func Main(
 
 	buildDir := gmk.cu.BuildDir
 	defer func() { _ = os.RemoveAll(buildDir) }()
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	defer signal.Stop(sig)
-	defer watchBuildDir(buildDir, sig)()
+	defer watchBuildDir(buildDir)()
 
 	for _, name := range gmk.cu.Ignored {
 		_, _ = fmt.Fprint(rng.Stderr(), ignoreWarning(name))
@@ -301,19 +298,33 @@ func Main(
 	return 0
 }
 
-// watchBuildDir removes dir when a signal arrives on sig. The returned
-// stop ends the watch and does not remove dir. Callers still remove dir
-// when the run returns; this covers a signal that skips that cleanup.
-func watchBuildDir(dir string, sig <-chan os.Signal) (stop func()) {
+// watchBuildDir removes dir when SIGINT or SIGTERM arrives, then re-raises
+// the signal so the process terminates as it would without the watch. The
+// returned stop ends the watch and does not remove dir. Callers still remove
+// dir when the run returns; this covers a signal that skips that cleanup.
+func watchBuildDir(dir string) (stop func()) {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	done := make(chan struct{})
 	go func() {
 		select {
-		case <-sig:
+		case s := <-sig:
 			_ = os.RemoveAll(dir)
+			signal.Stop(sig)
+			prc, err := os.FindProcess(os.Getpid())
+			if err == nil {
+				err = prc.Signal(s)
+			}
+			if err != nil {
+				os.Exit(1) // The signal cannot be re-raised on this OS.
+			}
 		case <-done:
 		}
 	}()
-	return func() { close(done) }
+	return func() {
+		signal.Stop(sig)
+		close(done)
+	}
 }
 
 // compileExit is the exit code for a compile failure. Context
@@ -333,7 +344,7 @@ func compileExit(err error) int {
 // applyExternalTargetMeta loads [gomake.TargetsFile] from srcDir and sets
 // Ring.meta for each entry that has a "config" field. The meta-key is the
 // entry's namespace or the last path segment of the import path. Two configs
-// that resolve to the same key return errDupMetaKey and set nothing.
+// that resolve to the same key return errDupMetaKey.
 //
 // A load error is intentionally ignored: applying external-target metadata is
 // best-effort, and a missing or malformed targets file must not abort the run.
@@ -349,7 +360,6 @@ func applyExternalTargetMeta(
 		// A missing or malformed targets file must not abort the run.
 		return nil //nolint:nilerr
 	}
-	pending := make([]ImportEntry, 0, len(cfg.imports))
 	seen := make(map[string]string, len(cfg.imports))
 	for _, ent := range cfg.imports {
 		if len(ent.Config) == 0 {
@@ -357,14 +367,11 @@ func applyExternalTargetMeta(
 		}
 		key := ent.MetaKey()
 		if prev, ok := seen[key]; ok {
-			return fmt.Errorf("%w %q: %s and %s",
-				errDupMetaKey, key, prev, ent.Path)
+			format := "%w %q: %s and %s"
+			return fmt.Errorf(format, errDupMetaKey, key, prev, ent.Path)
 		}
 		seen[key] = ent.Path
-		pending = append(pending, ent)
-	}
-	for _, ent := range pending {
-		rng.MetaSet(ent.MetaKey(), string(ent.Config))
+		rng.MetaSet(key, string(ent.Config))
 	}
 	return nil
 }

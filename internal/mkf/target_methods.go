@@ -28,7 +28,6 @@ func (tgt *Target) GoCode(qualify bool) string {
 		"\tSynopsis:    %q,\n" +
 		"\tDoc:         %q,\n" +
 		"\tHidden:      %t,\n" +
-		"\t//nolint:gocritic\n" +
 		"\tRun: func(ctx context.Context, rng *ring.Ring) error {\n" +
 		"\t%s\n" +
 		"\t},\n"

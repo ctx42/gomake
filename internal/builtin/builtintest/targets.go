@@ -35,7 +35,6 @@ func targetsBuiltIn() []*mkf.Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
-		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg2.PanicString(ctx, rng)
 		},
@@ -58,7 +57,6 @@ func targetsBuiltIn() []*mkf.Target {
 		Synopsis:    "is a test target with help message",
 		Doc:         "is a test target with help message.",
 		Hidden:      false,
-		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg2.Print(ctx, rng)
 		},

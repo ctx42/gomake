@@ -44,7 +44,10 @@ func Test_newTarget_generic(t *testing.T) {
 
 func Test_Targets_addFunc_alias(t *testing.T) {
 	// --- Given ---
-	pkg := &Package{Name: "main"}
+	pkg := &Package{
+		Name:    "main",
+		imports: map[string]string{"context": "context", "r": ringPath},
+	}
 	fn := &doc.Func{
 		Name: "Aliased",
 		Decl: &ast.FuncDecl{

@@ -12,6 +12,9 @@ import (
 	"github.com/ctx42/gomake/internal/mkf"
 )
 
+// ringPath is the import path of the ring package a target takes.
+const ringPath = "github.com/ctx42/ring/pkg/ring"
+
 // Target related errors.
 var (
 	// errNotExported is error returned when target is not exported.
@@ -65,7 +68,7 @@ func newTarget(
 		return nil, errGeneric
 	}
 
-	if err := checkParams(ft.Params); err != nil {
+	if err := checkParams(ft.Params, pkg.imports); err != nil {
 		return nil, err
 	}
 
@@ -82,16 +85,21 @@ func newTarget(
 	return tgt, nil
 }
 
-// selName returns the identifier at the end of a type expression.
-func selName(expr ast.Expr) string {
-	switch v := expr.(type) {
-	case *ast.Ident:
-		return v.Name
-	case *ast.SelectorExpr:
-		return v.Sel.Name
-	default:
-		return ""
+// importedAs reports whether expr is the selector sel qualified by a local
+// import name that imports maps to path.
+func importedAs(
+	expr ast.Expr,
+	imports map[string]string,
+	path string,
+	sel string,
+) bool {
+
+	se, ok := expr.(*ast.SelectorExpr)
+	if !ok || se.Sel.Name != sel {
+		return false
 	}
+	x, ok := se.X.(*ast.Ident)
+	return ok && imports[x.Name] == path
 }
 
 // setDerivedFields sets target's calculated fields.
@@ -144,7 +152,9 @@ func targetName(pkgNS string, crumbs []string, funcName string) string {
 
 // checkParams checks target parameters. For invalid parameters returns
 // [errInvArg] error. The second parameter must be `*ring.Ring` (pointer).
-func checkParams(params *ast.FieldList) error {
+// imports maps import local names to paths; a parameter that names context
+// or the ring package through an alias returns errAliased.
+func checkParams(params *ast.FieldList, imports map[string]string) error {
 	if params == nil || len(params.List) != 2 {
 		return errInvArg
 	}
@@ -154,7 +164,7 @@ func checkParams(params *ast.FieldList) error {
 
 	typ := qIdent(params.List[0].Type)
 	if typ != "context.Context" {
-		if selName(params.List[0].Type) == "Context" {
+		if importedAs(params.List[0].Type, imports, "context", "Context") {
 			return errAliased
 		}
 		return errInvArg
@@ -165,7 +175,7 @@ func checkParams(params *ast.FieldList) error {
 	// An import alias (r "…/ring", *r.Ring) is rejected and reported.
 	star, ok := params.List[1].Type.(*ast.StarExpr)
 	if !ok || qIdent(star.X) != "ring.Ring" {
-		if ok && selName(star.X) == "Ring" {
+		if ok && importedAs(star.X, imports, ringPath, "Ring") {
 			return errAliased
 		}
 		return errInvArg

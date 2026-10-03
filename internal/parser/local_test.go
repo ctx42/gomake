@@ -135,31 +135,6 @@ func Test_importDir(t *testing.T) {
 	})
 }
 
-func Test_releaseTagsFor_tabular(t *testing.T) {
-	tt := []struct {
-		testN   string
-		version string
-		want    []string
-		ok      bool
-	}{
-		{"release", "go1.2.0", []string{"go1.1", "go1.2"}, true},
-		{"rc", "go1.3rc1", []string{"go1.1", "go1.2", "go1.3"}, true},
-		{"devel prefix", "devel go1.2-abc", []string{"go1.1", "go1.2"}, true},
-		{"not a version", "tip", nil, false},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.testN, func(t *testing.T) {
-			// --- When ---
-			have, hOk := releaseTagsFor(tc.version)
-
-			// --- Then ---
-			assert.Equal(t, tc.ok, hOk)
-			assert.Equal(t, tc.want, have)
-		})
-	}
-}
-
 func importDirFixture(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()

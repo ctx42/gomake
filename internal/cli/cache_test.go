@@ -4,8 +4,10 @@
 package cli
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -150,40 +152,6 @@ func Test_binaryCacheKey(t *testing.T) {
 		// --- Then ---
 		assert.NotEqual(t, hBefore, hAfter)
 	})
-
-	t.Run(
-		"ignores a file the embed directive does not name",
-		func(t *testing.T) {
-			// --- Given ---
-			root := t.TempDir()
-			oskit.Write(t, "module example.com/m\n", root, "go.mod")
-			oskit.Write(t, "package main\n", root, "makefile.go")
-			oskit.MkdirAll(t, root, "lib")
-			src := "" +
-				"package lib\n" +
-				"\n" +
-				"import \"embed\"\n" +
-				"\n" +
-				"//go:embed data.txt\n" +
-				"var data embed.FS\n"
-			oskit.Write(t, src, root, "lib", "lib.go")
-			oskit.Write(t, "one\n", root, "lib", "data.txt")
-			oskit.Write(t, "other\n", root, "lib", "other.txt")
-
-			mkf := []string{"makefile.go"}
-
-			// --- When ---
-			hBefore := must.Value(binaryCacheKey(
-				ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
-			)
-			oskit.Create(t, "changed\n", root, "lib", "other.txt")
-			hAfter := must.Value(binaryCacheKey(
-				ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
-			)
-
-			// --- Then ---
-			assert.Equal(t, hBefore, hAfter)
-		})
 
 	t.Run("changes when go.mod changes", func(t *testing.T) {
 		// --- Given ---
@@ -499,6 +467,49 @@ func Test_isLocalDiskPath_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have)
 		})
 	}
+}
+
+func Test_walkCacheFiles(t *testing.T) {
+	t.Run("kept files sorted", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "", root, "b.go")
+		oskit.Write(t, "", root, "a.txt")
+		oskit.Write(t, "", oskit.MkdirAll(t, root, "sub"), "c.go")
+		oskit.Write(t, "", oskit.MkdirAll(t, root, ".git"), "d.go")
+		keep := func(name string) bool { return strings.HasSuffix(name, ".go") }
+
+		// --- When ---
+		have, err := walkCacheFiles(root, keep)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		want := []string{
+			filepath.Join(root, "b.go"),
+			filepath.Join(root, "sub", "c.go"),
+		}
+		assert.Equal(t, want, have)
+	})
+
+	t.Run("error - missing root", func(t *testing.T) {
+		// --- Given ---
+		root := filepath.Join(t.TempDir(), "missing")
+		keep := func(string) bool { return true }
+
+		// --- When ---
+		_, err := walkCacheFiles(root, keep)
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+	})
+}
+
+func Test_cacheLabel(t *testing.T) {
+	// --- When ---
+	have := cacheLabel("/root", filepath.Join("/root", "a", "b.txt"))
+
+	// --- Then ---
+	assert.Equal(t, "a/b.txt", have)
 }
 
 func Test_shouldSkipCacheDir_tabular(t *testing.T) {

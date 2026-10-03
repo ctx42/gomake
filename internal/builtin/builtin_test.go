@@ -4,14 +4,12 @@
 package builtin
 
 import (
-	"os"
 	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/goldy"
-	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 
@@ -193,6 +191,17 @@ func Test_WithGenDst(t *testing.T) {
 	assert.Equal(t, "/path/to", opts.dst)
 }
 
+func Test_WithGenImpPathRoot(t *testing.T) {
+	// --- Given ---
+	opts := &genOpts{}
+
+	// --- When ---
+	WithGenImpPathRoot("/path/to")(opts)
+
+	// --- Then ---
+	assert.Equal(t, "/path/to", opts.root)
+}
+
 func Test_WithoutGenEmptySrc(t *testing.T) {
 	// --- Given ---
 	opts := &genOpts{
@@ -347,6 +356,53 @@ func Test_GenImports(t *testing.T) {
 		assert.Contain(t, `Name:        ":myns:pkg0",`, text)
 	})
 
+	t.Run("ImpPath relative to the root", func(t *testing.T) {
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+
+		imports := []parser.Import{
+			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
+		}
+		opts := []GenOption{
+			WithoutGenEmptySrc,
+			WithGenDst(prj.Root()),
+			WithGenImpPathRoot(modkit.Root()),
+		}
+
+		// --- When ---
+		err := GenImports(imports, opts...)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
+		assert.Contain(t, `ImpPath:     "testdata/imports/pkg0",`, text)
+	})
+
+	t.Run("ImpPath outside the root stays absolute", func(t *testing.T) {
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+
+		imports := []parser.Import{
+			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
+		}
+		opts := []GenOption{
+			WithoutGenEmptySrc,
+			WithGenDst(prj.Root()),
+			WithGenImpPathRoot(t.TempDir()),
+		}
+
+		// --- When ---
+		err := GenImports(imports, opts...)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
+		want := `ImpPath:     "` + modkit.Path("testdata/imports/pkg0") + `",`
+		assert.Contain(t, want, text)
+	})
+
 	t.Run("error - package name is not an identifier", func(t *testing.T) {
 		// --- Given ---
 		prj := clitest.NewProject(t)
@@ -360,28 +416,5 @@ func Test_GenImports(t *testing.T) {
 		// --- Then ---
 		assert.ErrorContain(t, name, err)
 		assert.NoFileExist(t, prj.Path(targetsFN))
-	})
-
-	t.Run("write failure leaves existing files", func(t *testing.T) {
-		// --- Given ---
-		prj := clitest.NewProject(t)
-		prj.Close()
-		original := "package original\n"
-		oskit.Write(t, original, prj.Root(), targetsFN)
-
-		data := oskit.MkdirAll(t, prj.Root(), "data")
-		must.Nil(os.Chmod(data, 0o555))
-		t.Cleanup(func() { _ = os.Chmod(data, 0o755) })
-
-		imports := []parser.Import{
-			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
-		}
-
-		// --- When ---
-		err := GenImports(imports, WithGenDst(prj.Root()))
-
-		// --- Then ---
-		assert.ErrorContain(t, mainFN, err)
-		assert.Equal(t, original, oskit.ReadFileStr(t, prj.Path(targetsFN)))
 	})
 }

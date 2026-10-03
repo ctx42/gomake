@@ -19,7 +19,6 @@ tgt = &Target{
 	Synopsis:    "is a method in namespace NS",
 	Doc:         "is a method in namespace NS. The rest of the doc string.",
 	Hidden:      false,
-	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return _vpkg4NS.M0(ctx, rng)
 	},
@@ -42,7 +41,6 @@ tgt = &Target{
 	Synopsis:    "is a method in namespace NS",
 	Doc:         "is a method in namespace NS. The rest of the doc string.",
 	Hidden:      false,
-	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return _vpkg4NS.M1(ctx, rng)
 	},

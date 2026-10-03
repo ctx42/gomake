@@ -16,7 +16,6 @@ Target{
 	Synopsis:    "Synopsis",
 	Doc:         "Doc",
 	Hidden:      true,
-	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return CodeRef(ctx, rng)
 	},

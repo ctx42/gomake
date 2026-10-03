@@ -196,21 +196,21 @@ func namePath(name string) []string {
 }
 
 // localImportPath returns the import path of the makefile package in the
-// source-scan directory srcDir. It returns an empty string and a nil error
-// when srcDir is not inside a Go module. An unreadable go.mod is an error.
-func localImportPath(srcDir string) (string, error) {
-	modPath, err := moduleImportPath(srcDir)
-	if err != nil || modPath == "" {
-		return "", err
+// source-scan directory srcDir of the module modPath, as returned by
+// moduleImportPath. It returns an empty string when modPath is empty.
+func localImportPath(srcDir, modPath string) string {
+	if modPath == "" {
+		return ""
 	}
 	root, err := gomake.Root(srcDir)
-	if err == nil {
-		rel, relErr := filepath.Rel(root, srcDir)
-		if relErr == nil && rel != "." && rel != "" {
-			return modPath + "/" + filepath.ToSlash(rel), nil
-		}
+	if err != nil {
+		return modPath
 	}
-	return modPath, nil
+	rel, err := filepath.Rel(root, srcDir)
+	if err != nil || rel == "." || rel == "" {
+		return modPath
+	}
+	return modPath + "/" + filepath.ToSlash(rel)
 }
 
 // moduleImportPath returns the module path declared in the go.mod file found
@@ -481,17 +481,13 @@ func deliverTargetConfig(
 		return nil
 	}
 
-	localImp, err := localImportPath(cfg.src)
-	if err != nil {
-		return err
-	}
 	modImp, err := moduleImportPath(cfg.src)
 	if err != nil {
 		return err
 	}
 	blk, ok := resolveDelivered(
 		tgt,
-		localImp,
+		localImportPath(cfg.src, modImp),
 		modImp,
 		cfg.userTargets,
 		cfg.projectTargets,
@@ -548,10 +544,11 @@ func runCheckConfig(
 		return "", err
 	}
 
-	localImp, err := localImportPath(cfg.src)
+	modImp, err := moduleImportPath(cfg.src)
 	if err != nil {
 		return "", err
 	}
+	localImp := localImportPath(cfg.src, modImp)
 	return checkConfigReport(tgts, localImp, user, project), nil
 }
 

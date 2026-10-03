@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testkit/pkg/modkit"
+	"github.com/ctx42/testkit/pkg/oskit"
 
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 )
@@ -72,6 +74,44 @@ func Test_NewMakefile(t *testing.T) {
 		assert.Equal(t, "", have.Doc)
 		assert.Equal(t, 0, have.Targets.Len())
 		assert.Equal(t, "", have.Default)
+	})
+	t.Run("warns only about aliased context and ring", func(t *testing.T) {
+		// --- Given ---
+		tst := ringtest.New(t).WetStderr()
+		rng := SetBuildTag(tst.Ring())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\tr \"github.com/ctx42/ring/pkg/ring\"\n" +
+			"\t\"example.com/other\"\n" +
+			")\n" +
+			"\n" +
+			"func Aliased(ctx context.Context, rng *r.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n" +
+			"\n" +
+			"func Other(ctx context.Context, rng *other.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 0, have.Targets.Len())
+		want := "gomake: skipping Aliased: " +
+			"aliased context or ring parameter\n"
+		assert.Equal(t, want, tst.Stderr())
 	})
 }
 

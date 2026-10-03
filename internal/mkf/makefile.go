@@ -44,10 +44,6 @@ var (
 	ErrPickTarget = errors.New("pick a target to execute")
 )
 
-// errNilRing is returned when a makefile has no ring to read arguments and
-// write output through.
-var errNilRing = errors.New("nil ring")
-
 // interruptedError wraps signal code and is returned when target execution has
 // been interrupted by an OS signal.
 type interruptedError int
@@ -127,13 +123,7 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 		version: "unknown version",
 	}
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
 		opt(cmf)
-	}
-	if cmf.rng == nil {
-		return nil, errNilRing
 	}
 	cmf.fs = xflag.NewFlagSet("makefile", flag.ContinueOnError)
 	cmf.fs.SetOutput(io.Discard)
@@ -193,10 +183,6 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 // Execute is single-flight. It changes the process working directory and
 // installs process-wide signal handlers, so two calls must not run at once.
 func (cmf *Makefile) Execute(ctx context.Context) error {
-	if cmf == nil || cmf.rng == nil {
-		return errNilRing
-	}
-
 	// Help was requested.
 	if cmf.showHelp {
 		help, err := HelpUsage(

@@ -81,6 +81,7 @@ func (pmf *Makefile) addTargets() (*doc.Package, error) {
 	if err != nil {
 		return nil, err
 	}
+	pkg.imports = importLocalNames(astPkg)
 	if err = pmf.Targets.addFunc(pkg, docPkg.Funcs...); err != nil {
 		return nil, err
 	}
@@ -146,11 +147,12 @@ func (pmf *Makefile) adGmImports(fil *ast.File) error {
 		return err
 	}
 	for _, pkg := range pks {
+		var astPkg map[string]*ast.File
 		var docPkg *doc.Package
 		// Non-nil even when empty: empty import packages must not re-scan.
 		impFiles := make([]string, len(pkg.Files))
 		copy(impFiles, pkg.Files)
-		_, docPkg, err = astAndDocPkg(pkg.ImpPath, impFiles)
+		astPkg, docPkg, err = astAndDocPkg(pkg.ImpPath, impFiles)
 		if errors.Is(err, ErrAstEmpty) {
 			// Soft-skip: same as main package when go list selected no files.
 			continue
@@ -158,6 +160,7 @@ func (pmf *Makefile) adGmImports(fil *ast.File) error {
 		if err != nil {
 			return err
 		}
+		pkg.imports = importLocalNames(astPkg)
 		err = pmf.Targets.addFunc(pkg, docPkg.Funcs...)
 		if err != nil {
 			return err

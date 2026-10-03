@@ -80,14 +80,6 @@ func Test_homeDir(t *testing.T) {
 		// --- Then ---
 		assert.ErrorContain(t, "is not defined", err)
 	})
-
-	t.Run("error - nil ring", func(t *testing.T) {
-		// --- When ---
-		_, err := homeDir(nil)
-
-		// --- Then ---
-		assert.ErrorContain(t, "is not defined", err)
-	})
 }
 
 func Test_errCompile_Unwrap(t *testing.T) {

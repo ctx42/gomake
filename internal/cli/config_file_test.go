@@ -283,10 +283,9 @@ func Test_localImportPath(t *testing.T) {
 		oskit.Write(t, "module github.com/foo/bar\n", dir, "go.mod")
 
 		// --- When ---
-		have, err := localImportPath(dir)
+		have := localImportPath(dir, "github.com/foo/bar")
 
 		// --- Then ---
-		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar", have)
 	})
 
@@ -297,19 +296,17 @@ func Test_localImportPath(t *testing.T) {
 		sub := oskit.MkdirAll(t, dir, "build", "mk")
 
 		// --- When ---
-		have, err := localImportPath(sub)
+		have := localImportPath(sub, "github.com/foo/bar")
 
 		// --- Then ---
-		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar/build/mk", have)
 	})
 
 	t.Run("not in a module", func(t *testing.T) {
 		// --- When ---
-		have, err := localImportPath(t.TempDir())
+		have := localImportPath(t.TempDir(), "")
 
 		// --- Then ---
-		assert.NoError(t, err)
 		assert.Equal(t, "", have)
 	})
 }

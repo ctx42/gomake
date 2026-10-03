@@ -15,6 +15,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
 
@@ -128,6 +129,10 @@ type genOpts struct {
 
 	// Generate mainEmptyFN file. Default: true.
 	empty bool
+
+	// Root the generated ImpPath values are made relative to. Default: empty,
+	// keeping absolute paths.
+	root string
 }
 
 // WithGenName is option for [GenMain] setting package name to use for
@@ -161,6 +166,13 @@ func WithGenDst(dst string) GenOption {
 // working directory.
 func WithGenWorkDir(dir string) GenOption {
 	return func(opts *genOpts) { opts.dir = dir }
+}
+
+// WithGenImpPathRoot is option for [GenMain] making each target's ImpPath
+// relative to root when it lies under root, so generated files carry no
+// machine-specific directory. By default, ImpPath stays absolute.
+func WithGenImpPathRoot(root string) GenOption {
+	return func(opts *genOpts) { opts.root = root }
 }
 
 // WithoutGenEmptySrc is option for [GenMain] turning off generating
@@ -210,8 +222,8 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 		opts.rng = ring.New()
 	}
 
-	// Generate every file before writing any of them, so a later failure
-	// does not replace an earlier file.
+	// Generate every file before writing any of them, so a generation
+	// failure writes nothing.
 	tgs, err := parser.TargetsFromImports(
 		opts.rng,
 		opts.dir,
@@ -220,6 +232,14 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	)
 	if err != nil {
 		return fmt.Errorf("parsing target specs: %w", err)
+	}
+	if opts.root != "" {
+		tgs.Map(func(_ *parser.Targets, tgt *mkf.Target) {
+			rel, err := filepath.Rel(opts.root, tgt.ImpPath)
+			if err == nil && !strings.HasPrefix(rel, "..") {
+				tgt.ImpPath = filepath.ToSlash(rel)
+			}
+		})
 	}
 	files := make([]genFile, 0, 3)
 	code, err := parser.NewGenerator(tgs).
@@ -257,57 +277,16 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	if err = os.MkdirAll(filepath.Join(opts.dst, "data"), 0o750); err != nil {
 		return fmt.Errorf("creating destination tree: %w", err)
 	}
-	return writeGenerated(files)
+	for _, fil := range files {
+		if err = parser.CreateFile(fil.dst, fil.code); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // genFile is one generated file waiting to be written.
 type genFile struct {
 	dst  string
 	code []byte
-}
-
-// writeGenerated writes every file to a temporary sibling and renames them
-// into place only after every temporary file is complete. A failure leaves
-// the destination files unchanged.
-func writeGenerated(files []genFile) error {
-	type staged struct {
-		dst string
-		tmp string
-	}
-	stagedFiles := make([]staged, 0, len(files))
-	ok := false
-	defer func() {
-		if ok {
-			return
-		}
-		for _, st := range stagedFiles {
-			_ = os.Remove(st.tmp)
-		}
-	}()
-	for _, fil := range files {
-		dir := filepath.Dir(fil.dst)
-		pattern := filepath.Base(fil.dst) + ".*.tmp"
-		tf, err := os.CreateTemp(dir, pattern)
-		if err != nil {
-			return fmt.Errorf("writing %s: %w", fil.dst, err)
-		}
-		tmp := tf.Name()
-		if _, err = tf.Write(fil.code); err != nil {
-			_ = tf.Close()
-			_ = os.Remove(tmp)
-			return fmt.Errorf("writing %s: %w", fil.dst, err)
-		}
-		if err = tf.Close(); err != nil {
-			_ = os.Remove(tmp)
-			return fmt.Errorf("writing %s: %w", fil.dst, err)
-		}
-		stagedFiles = append(stagedFiles, staged{dst: fil.dst, tmp: tmp})
-	}
-	for _, st := range stagedFiles {
-		if err := os.Rename(st.tmp, st.dst); err != nil {
-			return fmt.Errorf("writing %s: %w", st.dst, err)
-		}
-	}
-	ok = true
-	return nil
 }

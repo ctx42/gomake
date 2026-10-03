@@ -96,6 +96,9 @@ type Package struct {
 
 	// Arguments for the "go list" command.
 	args []string
+
+	// Import local names mapped to import paths across the parsed files.
+	imports map[string]string
 }
 
 // NewPackage runs "go list" to get information about a package identified by

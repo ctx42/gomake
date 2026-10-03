@@ -115,16 +115,12 @@ func (tgs *Targets) Len() int {
 }
 
 // Add adds new target(s) to the collection. Returns [ErrDupTarget] when target
-// is already in the collection. A nil target is ignored. The zero value is
-// safe to add to.
+// is already in the collection. The zero value is safe to add to.
 func (tgs *Targets) Add(ts ...*mkf.Target) error {
 	if tgs.unique == nil {
 		tgs.unique = make(map[string]struct{})
 	}
 	for _, tgt := range ts {
-		if tgt == nil {
-			continue
-		}
 		if got := tgs.Get(tgt.Name); got != nil {
 			format := "%w: %s, %s"
 			return fmt.Errorf(format, ErrDupTarget, got.DefRef, tgt.DefRef)
@@ -355,14 +351,8 @@ func (tgs *Targets) MarkDefault(defRef string) string {
 
 // BuiltInCB is callback function for [Targets.Map] method which marks given
 // target as built-in. It clears Default so an external package's var Default
-// cannot become the no-arg default of the installed binary. A name that
-// already starts with ":" is left as-is, so a second pass does not stack
-// prefixes.
+// cannot become the no-arg default of the installed binary.
 func BuiltInCB(tgs *Targets, tgt *mkf.Target) {
-	if strings.HasPrefix(tgt.Name, ":") {
-		tgt.Default = false
-		return
-	}
 	delete(tgs.unique, tgt.Name)
 	tgt.Name = ":" + tgt.Name
 	tgt.Default = false

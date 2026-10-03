@@ -51,10 +51,8 @@ func homeDir(rng *ring.Ring) (string, error) {
 	case "plan9":
 		key, unset = "home", "$home"
 	}
-	if rng != nil {
-		if v := rng.EnvGet(key); v != "" {
-			return v, nil
-		}
+	if v := rng.EnvGet(key); v != "" {
+		return v, nil
 	}
 	switch runtime.GOOS {
 	case "android":

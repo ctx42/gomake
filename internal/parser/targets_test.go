@@ -43,15 +43,6 @@ func Test_TargetsFromList(t *testing.T) {
 		assert.Equal(t, 2, have.Len())
 	})
 
-	t.Run("nil target", func(t *testing.T) {
-		// --- When ---
-		have, err := TargetsFromList(nil)
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, 0, have.Len())
-	})
-
 	t.Run("error - duplicate", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
@@ -320,17 +311,6 @@ func Test_Targets_Add(t *testing.T) {
 		assert.Same(t, tgt, tgs.Get("build"))
 	})
 
-	t.Run("nil target", func(t *testing.T) {
-		// --- Given ---
-		tgs := NewTargets()
-
-		// --- When ---
-		err := tgs.Add(nil)
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, 0, tgs.Len())
-	})
 }
 
 func Test_Targets_Has(t *testing.T) {
@@ -752,20 +732,6 @@ func Test_BuiltInCB(t *testing.T) {
 	assert.HasKey(t, ":tgt1", tgs.unique)
 	assert.HasKey(t, ":tgt2", tgs.unique)
 	assert.False(t, tgs.Get(":tgt0").Default)
-}
-
-func Test_BuiltInCB_second_call(t *testing.T) {
-	// --- Given ---
-	tgt := &mkf.Target{Name: "build", Default: true}
-	tgs := must.Value(TargetsFromList(tgt))
-	tgs.Map(BuiltInCB)
-
-	// --- When ---
-	tgs.Map(BuiltInCB)
-
-	// --- Then ---
-	assert.Equal(t, []string{":build"}, tgs.Names())
-	assert.False(t, tgs.Get(":build").Default)
 }
 
 func Test_Targets_Map(t *testing.T) {

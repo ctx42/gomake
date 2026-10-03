@@ -9,7 +9,9 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -17,7 +19,6 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
-	"github.com/ctx42/testing/pkg/check"
 	"github.com/ctx42/testing/pkg/goldy"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/exekit"
@@ -1840,35 +1841,48 @@ func Test_Main_setsContractEnv(t *testing.T) {
 	assert.Equal(t, src, rng.MetaGet(gomake.ProjectDirEnvKey))
 }
 
+// watchDirEnv names the build directory a Test_watchBuildDir helper process
+// watches before it signals itself.
+const watchDirEnv = "GOMAKE_TEST_WATCH_DIR"
+
 func Test_watchBuildDir(t *testing.T) {
-	t.Run("signal removes the directory", func(t *testing.T) {
+	if dir := os.Getenv(watchDirEnv); dir != "" {
+		watchBuildDir(dir)
+		prc := must.Value(os.FindProcess(os.Getpid()))
+		_ = prc.Signal(syscall.SIGTERM)
+		time.Sleep(10 * time.Second)
+		os.Exit(0)
+	}
+
+	t.Run("signal removes the directory and terminates", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("signals cannot be sent to a process on windows")
+		}
+
 		// --- Given ---
 		dir := t.TempDir()
 		marker := oskit.Write(t, "x", dir, "marker")
-		sig := make(chan os.Signal, 1)
-		stop := watchBuildDir(dir, sig)
-		defer stop()
+
+		args := []string{"-test.run=^Test_watchBuildDir$"}
+		cmd := exec.CommandContext(t.Context(), os.Args[0], args...)
+		cmd.Env = append(os.Environ(), watchDirEnv+"="+dir)
 
 		// --- When ---
-		sig <- syscall.SIGINT
+		err := cmd.Run()
 
 		// --- Then ---
-		gone := func() bool {
-			_, err := os.Stat(marker)
-			return errors.Is(err, fs.ErrNotExist)
-		}
-		err := check.Wait(
-			"1s", gone, check.WithWaitThrottle(10*time.Millisecond),
-		)
-		assert.NoError(t, err)
+		assert.Error(t, err)
+		assert.Equal(t, -1, cmd.ProcessState.ExitCode())
+
+		_, err = os.Stat(marker)
+		assert.ErrorIs(t, fs.ErrNotExist, err)
 	})
 
 	t.Run("stop leaves the directory", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		marker := oskit.Write(t, "x", dir, "marker")
-		sig := make(chan os.Signal, 1)
-		stop := watchBuildDir(dir, sig)
+		stop := watchBuildDir(dir)
 
 		// --- When ---
 		stop()
@@ -1991,8 +2005,6 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, errDupMetaKey, err)
-		_, ok := rng.MetaLookup("db")
-		assert.False(t, ok)
 	})
 }
 
