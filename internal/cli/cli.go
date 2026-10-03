@@ -29,6 +29,9 @@ var (
 	// makefiles.
 	errNoMakefile = errors.New("no makefile found")
 
+	// errNoTargets indicates a makefile was found and it defines no targets.
+	errNoTargets = errors.New("makefile has no targets")
+
 	// errGoModEdit is an error returned when go.mod file editing fails.
 	errGoModEdit = errors.New("editing \"go.mod\" file")
 
@@ -48,14 +51,22 @@ type goMake struct {
 }
 
 // newGoMake returns new instance of [goMake].
-func newGoMake(rng *ring.Ring, cfg *config) (gmk *goMake, err error) {
+func newGoMake(
+	ctx context.Context,
+	rng *ring.Ring,
+	cfg *config,
+) (gmk *goMake, err error) {
+
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
 	gmk = &goMake{cfg: cfg}
 	rng.EnvSet("GOOS", cfg.goos)
 	rng.EnvSet("GOARCH", cfg.goarch)
 	rng = parser.SetBuildTag(rng)
 
 	// Bring to build directory user defined targets and empty built-in targets.
-	gmk.cu, err = prepare(rng, cfg.tmp, cfg.src)
+	gmk.cu, err = prepare(ctx, rng, cfg.tmp, cfg.src)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +131,7 @@ func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 
 	gowork := rng.EnvGet("GOWORK")
 	binPath, cached := lookupBinaryCache(
+		rng,
 		gmk.cfg.src, gmk.cu.MkfNames,
 		gmk.cfg.version, gmk.cfg.goos, gmk.cfg.goarch, gowork,
 	)
@@ -134,6 +146,7 @@ func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 			return err
 		}
 		storeBinaryCache(
+			rng,
 			gmk.cu.MainBin,
 			gmk.cfg.src, gmk.cu.MkfNames, gmk.cfg.version,
 			gmk.cfg.goos, gmk.cfg.goarch, gowork,

@@ -33,18 +33,42 @@ func Test_runComplete(t *testing.T) {
 	t.Run("bash shell installs completion and returns a message",
 		func(t *testing.T) {
 			// --- Given ---
+			// Process HOME is a different directory, so a read of the
+			// process environment cannot satisfy the assertion.
+			procHome := t.TempDir()
+			t.Setenv("HOME", procHome)
+			t.Setenv("USERPROFILE", procHome)
 			home := t.TempDir()
-			t.Setenv("HOME", home)
 			rng := ring.New()
 			rng.EnvSet("SHELL", "/bin/bash")
+			rng.EnvSet("HOME", home)
+			rng.EnvSet("USERPROFILE", home)
+			rng.EnvSet("home", home)
 
 			// --- When ---
 			msg, err := runComplete(rng)
 
 			// --- Then ---
 			assert.NoError(t, err)
+			script := filepath.Join(home, ".bash_completion.d", "gomake")
+			assert.FileExist(t, script)
 			assert.Contain(t, "Gomake bash completion installed.", msg)
 		})
+
+	t.Run("error - home unset", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("SHELL", "/bin/bash")
+		rng.EnvSet("HOME", "")
+		rng.EnvSet("USERPROFILE", "")
+		rng.EnvSet("home", "")
+
+		// --- When ---
+		_, err := runComplete(rng)
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
+	})
 }
 
 func Test_setupBashCompletion(t *testing.T) {

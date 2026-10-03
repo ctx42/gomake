@@ -196,35 +196,39 @@ func namePath(name string) []string {
 }
 
 // localImportPath returns the import path of the makefile package in the
-// source-scan directory srcDir. It returns an empty string when srcDir is not
-// inside a Go module.
-func localImportPath(srcDir string) string {
-	modPath := moduleImportPath(srcDir)
-	if modPath == "" {
-		return ""
+// source-scan directory srcDir. It returns an empty string and a nil error
+// when srcDir is not inside a Go module. An unreadable go.mod is an error.
+func localImportPath(srcDir string) (string, error) {
+	modPath, err := moduleImportPath(srcDir)
+	if err != nil || modPath == "" {
+		return "", err
 	}
 	root, err := gomake.Root(srcDir)
 	if err != nil {
-		return modPath
+		return modPath, nil
 	}
 	rel, err := filepath.Rel(root, srcDir)
 	if err != nil || rel == "." || rel == "" {
-		return modPath
+		return modPath, nil
 	}
-	return modPath + "/" + filepath.ToSlash(rel)
+	return modPath + "/" + filepath.ToSlash(rel), nil
 }
 
-// moduleImportPath returns the module path declared in the go.mod file found by
-// walking up from dir. It returns an empty string when dir is not inside a Go
-// module or the module directive cannot be read.
-func moduleImportPath(dir string) string {
+// moduleImportPath returns the module path declared in the go.mod file found
+// by walking up from dir. It returns an empty string and a nil error when dir
+// is not inside a Go module. A go.mod that exists but cannot be read is an
+// error.
+func moduleImportPath(dir string) (string, error) {
 	modFile, err := gomake.Root(dir, "go.mod")
 	if err != nil {
-		return ""
+		if errors.Is(err, gomake.ErrNoGoMod) {
+			return "", nil
+		}
+		return "", err
 	}
 	data, err := os.ReadFile(modFile)
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("read module path: %w", err)
 	}
 
 	scn := bufio.NewScanner(bytes.NewReader(data))
@@ -239,10 +243,13 @@ func moduleImportPath(dir string) string {
 			rest = strings.TrimSpace(rest[:i])
 		}
 		if rest = strings.Trim(rest, "\"`"); rest != "" {
-			return rest
+			return rest, nil
 		}
 	}
-	return ""
+	if err = scn.Err(); err != nil {
+		return "", fmt.Errorf("read module path: %w", err)
+	}
+	return "", nil
 }
 
 // mergeConfigs merges the settings sections of the user-level and
@@ -475,10 +482,18 @@ func deliverTargetConfig(
 		return nil
 	}
 
+	localImp, err := localImportPath(cfg.src)
+	if err != nil {
+		return err
+	}
+	modImp, err := moduleImportPath(cfg.src)
+	if err != nil {
+		return err
+	}
 	blk, ok := resolveDelivered(
 		tgt,
-		localImportPath(cfg.src),
-		moduleImportPath(cfg.src),
+		localImp,
+		modImp,
 		cfg.userTargets,
 		cfg.projectTargets,
 		tgts,
@@ -529,7 +544,11 @@ func runCheckConfig(rng *ring.Ring, cfg *config, stock []*mkf.Target) error {
 		return err
 	}
 
-	report := checkConfigReport(tgts, localImportPath(cfg.src), user, project)
+	localImp, err := localImportPath(cfg.src)
+	if err != nil {
+		return err
+	}
+	report := checkConfigReport(tgts, localImp, user, project)
 	_, _ = fmt.Fprint(rng.Stderr(), report)
 	return nil
 }

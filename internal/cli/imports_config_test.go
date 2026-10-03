@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testkit/pkg/httpkit"
 	"github.com/ctx42/testkit/pkg/oskit"
@@ -303,6 +304,7 @@ func Test_LoadExternalTargets_tabular(t *testing.T) {
 			// --- When ---
 			cfg, err := LoadExternalTargets(
 				context.Background(),
+				ring.New(),
 				filepath.Join(dir, TargetsFile),
 			)
 
@@ -332,12 +334,48 @@ func Test_LoadExternalTargets(t *testing.T) {
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		cfg, err := LoadExternalTargets(context.Background(), srv.URL)
+		cfg, err := LoadExternalTargets(
+			context.Background(),
+			ring.New(),
+			srv.URL,
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
 		assert.Equal(t, []byte(body), cfg.Raw())
+	})
+
+	t.Run("expands a tilde from the ring", func(t *testing.T) {
+		// --- Given ---
+		home := t.TempDir()
+		body := "imports:\n  - import: a.com/x\n"
+		oskit.Write(t, body, home, "targets.yaml")
+		rng := ring.New()
+		rng.EnvSet("HOME", home)
+		rng.EnvSet("USERPROFILE", home)
+		rng.EnvSet("home", home)
+
+		// --- When ---
+		cfg, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
+	})
+
+	t.Run("error - home unset", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "")
+		rng.EnvSet("USERPROFILE", "")
+		rng.EnvSet("home", "")
+
+		// --- When ---
+		_, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
 	})
 }
 

@@ -23,7 +23,7 @@ func runComplete(rng *ring.Ring) (string, error) {
 	shell := rng.EnvGet("SHELL")
 	switch {
 	case strings.Contains(shell, "bash"):
-		home, err := os.UserHomeDir()
+		home, err := homeDir(rng)
 		if err != nil {
 			return "", err
 		}

@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ctx42/ring/pkg/ring"
+
 	"github.com/ctx42/gomake/internal/builtin"
 	"github.com/ctx42/gomake/internal/cli"
 	"github.com/ctx42/gomake/internal/parser"
@@ -30,6 +32,7 @@ func main() {
 	}
 	cfg, err := cli.LoadExternalTargets(
 		context.Background(),
+		ring.New(),
 		filepath.Join(modRoot, cli.TargetsFile),
 	)
 	if err != nil {

@@ -14,6 +14,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"slices"
 	"strings"
@@ -41,6 +42,31 @@ func expandHome(pth, home string) string {
 		return filepath.Join(home, rest)
 	}
 	return pth
+}
+
+// homeDir returns the user's home directory from rng. It reads USERPROFILE
+// on Windows, home on Plan 9, and HOME otherwise. Android and iOS use the
+// platform default when that variable is unset.
+func homeDir(rng *ring.Ring) (string, error) {
+	key, unset := "HOME", "$HOME"
+	switch runtime.GOOS {
+	case "windows":
+		key, unset = "USERPROFILE", "%userprofile%"
+	case "plan9":
+		key, unset = "home", "$home"
+	}
+	if rng != nil {
+		if v := rng.EnvGet(key); v != "" {
+			return v, nil
+		}
+	}
+	switch runtime.GOOS {
+	case "android":
+		return "/sdcard", nil
+	case "ios":
+		return "/", nil
+	}
+	return "", errors.New(unset + " is not defined")
 }
 
 // fail writes err to stderr decorated for the user. It is the single place
@@ -251,7 +277,16 @@ const srcDirMustContain = "source directory must not contain %q file"
 // [parser.BuildTag]; do not mix tagged and untagged makefile sources in src.
 //
 //nolint:cyclop,gocognit
-func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
+func prepare(
+	ctx context.Context,
+	rng *ring.Ring,
+	tmp, src string,
+) (cu *compUnit, err error) {
+
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	// Before we do anything we must be in a Go project (the go.mod file
 	// exists).
 	if _, err = gomake.Root(src); err != nil {
@@ -369,7 +404,9 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
 			return nil, err
 		}
-		if err = editGoWork(rng, goWorkSrc, buildDir, modRoot); err != nil {
+		if err = editGoWork(
+			ctx, rng, goWorkSrc, buildDir, modRoot,
+		); err != nil {
 			return nil, err
 		}
 
@@ -401,7 +438,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	}
 
 	if err = editGoMod(
-		rng, goModDst, mod.ImpSpec, mod.ImpPath, modRoot,
+		ctx, rng, goModDst, mod.ImpSpec, mod.ImpPath, modRoot,
 	); err != nil {
 		return nil, err
 	}
@@ -524,13 +561,21 @@ func findGoWorkValue(gowork, modRoot string) (string, error) {
 // "." so the build directory remains the workspace's main module; other
 // relative paths become absolute. GOWORK is pinned per command so ambient
 // GOWORK never mutates the caller's workfile.
-func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
+func editGoWork(
+	ctx context.Context,
+	env ring.Environ,
+	srcWork, dst, modRoot string,
+) error {
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	workDir := filepath.Dir(srcWork)
 	base := env.EnvAll()
 	srcEnv := ring.EnvSet(base, "GOWORK", srcWork)
 
 	out := &bytes.Buffer{}
-	cmd := exec.Command("go", "work", "edit", "-json")
+	cmd := exec.CommandContext(ctx, "go", "work", "edit", "-json")
 	cmd.Env = srcEnv
 	cmd.Dir = workDir
 	cmd.Stdout = out
@@ -598,7 +643,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	// adding use "." for the makefile module would remove that entry.
 	for from := range replace {
 		out.Reset()
-		cmd = exec.Command("go", "work", "edit", "-dropuse", from)
+		cmd = exec.CommandContext(ctx, "go", "work", "edit", "-dropuse", from)
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -609,7 +654,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	}
 	for _, to := range replace {
 		out.Reset()
-		cmd = exec.Command("go", "work", "edit", "-use", to)
+		cmd = exec.CommandContext(ctx, "go", "work", "edit", "-use", to)
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -634,7 +679,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.Command(
+		cmd = exec.CommandContext(ctx,
 			"go", "work", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,
@@ -656,16 +701,20 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 // makefile imports xflag while user projects do not. srcModDir is the original
 // module root used to absolutize local replace paths after the copy.
 func editGoMod(
+	ctx context.Context,
 	env ring.Environ,
 	pth, pkgImpSpec, pkgPath, srcModDir string,
 ) error {
 
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	dir := filepath.Dir(pth)
 	xflagReq := xflagModPath + "@" + xflagVersion()
 	// Pin GOWORK like compile so ambient workspace does not affect go mod.
 	modEnv := pinBuildGOWORK(env.EnvAll(), dir)
 
-	cmd := exec.Command(
+	cmd := exec.CommandContext(ctx,
 		"go", "mod", "edit",
 		"-module", "makefile",
 		"-require="+pkgImpSpec+"@v0.0.0",
@@ -681,14 +730,14 @@ func editGoMod(
 		return goEditErr(errGoModEdit, pth, out.String(), err)
 	}
 
-	if err := absolutizeGoModReplaces(modEnv, dir, srcModDir); err != nil {
+	if err := absolutizeGoModReplaces(ctx, modEnv, dir, srcModDir); err != nil {
 		return err
 	}
 
 	// The copied "go.sum" lacks xflag, so populate it from the module cache
 	// (gomake was built with the same version) before the build runs.
 	out.Reset()
-	cmd = exec.Command("go", "mod", "download", xflagReq)
+	cmd = exec.CommandContext(ctx, "go", "mod", "download", xflagReq)
 	cmd.Env = modEnv
 	cmd.Dir = dir
 	cmd.Stdout = out
@@ -701,9 +750,17 @@ func editGoMod(
 
 // absolutizeGoModReplaces rewrites relative local replace targets in the
 // build-dir go.mod so they resolve against the original source module root.
-func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
+func absolutizeGoModReplaces(
+	ctx context.Context,
+	env []string,
+	buildDir, srcModDir string,
+) error {
+
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	out := &bytes.Buffer{}
-	cmd := exec.Command("go", "mod", "edit", "-json")
+	cmd := exec.CommandContext(ctx, "go", "mod", "edit", "-json")
 	cmd.Env = env
 	cmd.Dir = buildDir
 	cmd.Stdout = out
@@ -744,7 +801,7 @@ func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.Command(
+		cmd = exec.CommandContext(ctx,
 			"go", "mod", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,

@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ctx42/ring/pkg/ring"
+
 	"github.com/goccy/go-yaml"
 )
 
@@ -30,6 +32,9 @@ const fetchTimeout = 10 * time.Second
 var (
 	// errDupImportPath indicates a duplicate import path in config.
 	errDupImportPath = errors.New("duplicate import path")
+
+	// errDupMetaKey indicates two configs resolve to the same ring meta key.
+	errDupMetaKey = errors.New("duplicate target config key")
 
 	// errInvConfig indicates invalid YAML or schema in the config file.
 	errInvConfig = errors.New("invalid external targets config")
@@ -118,11 +123,16 @@ func (cfg *ImportsConfig) importLines() []string {
 
 // LoadExternalTargets loads a targets.yaml from pathOrURL. If pathOrURL begins
 // with "http://" or "https://" the file is fetched over HTTP; otherwise it is
-// read from the local filesystem, with a leading "~" or "~/" expanded to the
-// user's home directory. A missing local file returns an empty config without
-// error. The context cancels in-flight HTTP fetches; local reads ignore it
-// except for a pre-check of ctx.Err().
-func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error) {
+// read from the local filesystem, with a leading "~" or "~/" expanded using
+// the home directory from rng. A missing local file returns an empty config
+// without error. The context cancels in-flight HTTP fetches; local reads
+// ignore it except for a pre-check of ctx.Err().
+func LoadExternalTargets(
+	ctx context.Context,
+	rng *ring.Ring,
+	tgs string,
+) (*ImportsConfig, error) {
+
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -133,7 +143,7 @@ func LoadExternalTargets(ctx context.Context, tgs string) (*ImportsConfig, error
 		return fetchExternalTargets(ctx, tgs)
 	}
 	if strings.HasPrefix(tgs, "~") {
-		home, err := os.UserHomeDir()
+		home, err := homeDir(rng)
 		if err != nil {
 			return nil, err
 		}

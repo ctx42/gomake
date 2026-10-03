@@ -4,10 +4,12 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
 
+	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
@@ -21,6 +23,19 @@ import (
 )
 
 func Test_newGoMake(t *testing.T) {
+	t.Run("error - context canceled", func(t *testing.T) {
+		// --- Given ---
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		rng := ring.New()
+
+		// --- When ---
+		_, err := newGoMake(ctx, rng, &config{})
+
+		// --- Then ---
+		assert.ErrorIs(t, context.Canceled, err)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
@@ -43,7 +58,7 @@ func Test_newGoMake(t *testing.T) {
 		rng = rng.SetArgs(cfg.args)
 
 		// --- When ---
-		gmk, err := newGoMake(rng, cfg)
+		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -85,7 +100,7 @@ func Test_newGoMake(t *testing.T) {
 		rng = rng.SetArgs(cfg.args)
 
 		// --- When ---
-		gmk, err := newGoMake(rng, cfg)
+		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -113,7 +128,7 @@ func Test_newGoMake(t *testing.T) {
 		rng = rng.SetArgs(cfg.args)
 
 		// --- When ---
-		gmk, err := newGoMake(rng, cfg)
+		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrDupTarget, err)
@@ -141,7 +156,7 @@ func Test_newGoMake(t *testing.T) {
 		rng = rng.SetArgs(cfg.args)
 
 		// --- When ---
-		gmk, err := newGoMake(rng, cfg)
+		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -172,7 +187,7 @@ func Test_newGoMake(t *testing.T) {
 		rng = rng.SetArgs(cfg.args)
 
 		// --- When ---
-		gmk, err := newGoMake(rng, cfg)
+		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -210,7 +225,7 @@ func Test_newGoMake(t *testing.T) {
 			rng = rng.SetArgs(cfg.args)
 
 			// --- When ---
-			gmk, err := newGoMake(rng, cfg)
+			gmk, err := newGoMake(t.Context(), rng, cfg)
 
 			// --- Then ---
 			assert.NoError(t, err)
@@ -236,7 +251,7 @@ func Test_goMake_Compile(t *testing.T) {
 	rng := tst.Ring("--tmp", prj.TempDir(), "--src", prj.Root())
 	cfg := must.Value(newConfig("1.2.3", rng))
 	rng = rng.SetArgs(cfg.args)
-	gmk := must.Value(newGoMake(rng, cfg))
+	gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 	// --- When ---
 	have, err := gmk.Compile(ctx, rng.EnvAll(), bin)
@@ -269,7 +284,7 @@ func Test_goMake_Execute(t *testing.T) {
 		)
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-		gmk := must.Value(newGoMake(rng, cfg))
+		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
 		err := gmk.Execute(ctx, rng)
@@ -302,7 +317,7 @@ func Test_goMake_Execute(t *testing.T) {
 		rng.EnvSet(kv, kv)
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-		gmk := must.Value(newGoMake(rng, cfg))
+		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
 		err := gmk.Execute(ctx, rng)
@@ -333,7 +348,7 @@ func Test_goMake_Execute(t *testing.T) {
 		)
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-		gmk := must.Value(newGoMake(rng, cfg))
+		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
 		err := gmk.Execute(ctx, rng)

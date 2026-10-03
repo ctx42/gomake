@@ -62,7 +62,9 @@ func Test_PrepareExternalTargets(t *testing.T) {
 		err := prepareExternalTargets(rng.Ring(), dir, "")
 
 		// --- Then ---
-		assert.ErrorContain(t, "go get example.com/pkg@v1.0.0", err)
+		assert.ErrorRegexp(t,
+			"(?s)go get example.com/pkg@v1.0.0.*go mod tidy", err,
+		)
 	})
 }
 

@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/ctx42/ring/pkg/ring"
 
@@ -169,7 +171,10 @@ func Main(
 			if code := runPreRuns(); code != 0 {
 				return code
 			}
-			applyExternalTargetMeta(rng, cfg.src)
+			if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
+				fail(rng, err)
+				return 1
+			}
 			if err = deliverTargetConfig(rng, cfg, tgt, tgs); err != nil {
 				fail(rng, err)
 				return 1
@@ -180,7 +185,7 @@ func Main(
 
 	var gmk *goMake
 	analyzeAct := func() error {
-		gmk, err = newGoMake(rng, cfg)
+		gmk, err = newGoMake(ctx, rng, cfg)
 		return err
 	}
 	err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)
@@ -211,6 +216,10 @@ func Main(
 
 	buildDir := gmk.cu.BuildDir
 	defer func() { _ = os.RemoveAll(buildDir) }()
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sig)
+	defer watchBuildDir(buildDir, sig)()
 
 	for _, name := range gmk.cu.Ignored {
 		_, _ = fmt.Fprint(rng.Stderr(), ignoreWarning(name))
@@ -220,7 +229,7 @@ func Main(
 		// If there are no custom targets, there is no point compiling custom
 		// binary which would have "the same content" as gomake binary.
 		if gmk.targets.Len() == 0 {
-			return failCode(rng, errNoMakefile)
+			return failCode(rng, errNoTargets)
 		}
 
 		compileAct := func() error {
@@ -238,7 +247,10 @@ func Main(
 		return code
 	}
 
-	applyExternalTargetMeta(rng, cfg.src)
+	if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
+		fail(rng, err)
+		return 1
+	}
 	tgt := invokedTarget(cfg, gmk.targets)
 	err = deliverTargetConfig(rng, cfg, tgt, gmk.targets.List())
 	if err != nil {
@@ -257,6 +269,21 @@ func Main(
 	return 0
 }
 
+// watchBuildDir removes dir when a signal arrives on sig. The returned
+// stop ends the watch and does not remove dir. Callers still remove dir
+// when the run returns; this covers a signal that skips that cleanup.
+func watchBuildDir(dir string, sig <-chan os.Signal) (stop func()) {
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-sig:
+			_ = os.RemoveAll(dir)
+		case <-done:
+		}
+	}()
+	return func() { close(done) }
+}
+
 // compileFailCode reports a compile failure. Context cancel/deadline wrapped
 // in *errCompile use the context exit codes, not ExitCodeCompile.
 func compileFailCode(rng *ring.Ring, err error) int {
@@ -273,21 +300,35 @@ func compileFailCode(rng *ring.Ring, err error) int {
 
 // applyExternalTargetMeta loads [gomake.TargetsFile] from srcDir and sets
 // Ring.meta for each entry that has a "config" field. The meta-key is the
-// entry's namespace or the last path segment of the import path.
+// entry's namespace or the last path segment of the import path. Two configs
+// that resolve to the same key return errDupMetaKey and set nothing.
 //
 // A load error is intentionally ignored: applying external-target metadata is
 // best-effort, and a missing or malformed targets file must not abort the run.
-func applyExternalTargetMeta(rng *ring.Ring, srcDir string) {
+func applyExternalTargetMeta(rng *ring.Ring, srcDir string) error {
 	pth := filepath.Join(srcDir, TargetsFile)
-	cfg, err := LoadExternalTargets(context.Background(), pth)
+	cfg, err := LoadExternalTargets(context.Background(), rng, pth)
 	if err != nil {
-		return
+		return nil
 	}
+	pending := make([]ImportEntry, 0, len(cfg.imports))
+	seen := make(map[string]string, len(cfg.imports))
 	for _, ent := range cfg.imports {
-		if len(ent.Config) > 0 {
-			rng.MetaSet(ent.MetaKey(), string(ent.Config))
+		if len(ent.Config) == 0 {
+			continue
 		}
+		key := ent.MetaKey()
+		if prev, ok := seen[key]; ok {
+			return fmt.Errorf("%w %q: %s and %s",
+				errDupMetaKey, key, prev, ent.Path)
+		}
+		seen[key] = ent.Path
+		pending = append(pending, ent)
 	}
+	for _, ent := range pending {
+		rng.MetaSet(ent.MetaKey(), string(ent.Config))
+	}
+	return nil
 }
 
 // runWithoutCompile runs a target without compiling a makefile. It is an

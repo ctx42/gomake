@@ -90,7 +90,7 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 
 	// Resolve the effective imports: a --targets file (path or URL) overrides
 	// the source targets.yaml.
-	cfg, err := effectiveImports(src, tgs)
+	cfg, err := effectiveImports(rng, src, tgs)
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
@@ -167,12 +167,17 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 // names a --targets file (a local path or an HTTP/HTTPS URL) it is loaded
 // directly; otherwise the source targets.yaml in srcDir is used. A missing
 // source file returns an empty config. A missing --targets file is an error.
-func effectiveImports(srcDir, tgs string) (*cli.ImportsConfig, error) {
+func effectiveImports(
+	rng *ring.Ring,
+	srcDir string,
+	tgs string,
+) (*cli.ImportsConfig, error) {
+
 	pth := filepath.Join(srcDir, cli.TargetsFile)
 	if tgs != "" {
 		pth = tgs
 	}
-	cfg, err := cli.LoadExternalTargets(context.Background(), pth)
+	cfg, err := cli.LoadExternalTargets(context.Background(), rng, pth)
 	if err != nil {
 		return nil, err
 	}

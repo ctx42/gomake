@@ -26,7 +26,11 @@ func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
 	if err := prepareExternalTargets(rng, wd, skipMod); err != nil {
 		return err
 	}
-	cfg, err := LoadExternalTargets(context.Background(), filepath.Join(wd, TargetsFile))
+	cfg, err := LoadExternalTargets(
+		context.Background(),
+		rng,
+		filepath.Join(wd, TargetsFile),
+	)
 	if err != nil {
 		return err
 	}
@@ -41,7 +45,11 @@ func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
 // install and build scripts before compiling the binary. Imports under skipMod
 // are provided by a Go workspace and their `go get` is skipped.
 func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
-	cfg, err := LoadExternalTargets(context.Background(), filepath.Join(wd, TargetsFile))
+	cfg, err := LoadExternalTargets(
+		context.Background(),
+		rng,
+		filepath.Join(wd, TargetsFile),
+	)
 	if err != nil {
 		return err
 	}
@@ -50,8 +58,11 @@ func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
 			continue
 		}
 		if err = runGoInDir(rng, wd, "get", ent.Path); err != nil {
-			_ = runGoInDir(rng, wd, "mod", "tidy")
-			return fmt.Errorf("go get %s: %w", ent.Path, err)
+			getErr := fmt.Errorf("go get %s: %w", ent.Path, err)
+			if terr := runGoInDir(rng, wd, "mod", "tidy"); terr != nil {
+				return fmt.Errorf("%w; go mod tidy: %w", getErr, terr)
+			}
+			return getErr
 		}
 	}
 	return regenBuiltins(rng, wd, cfg)

@@ -70,6 +70,45 @@ func Test_expandHome_tabular(t *testing.T) {
 	}
 }
 
+func Test_homeDir(t *testing.T) {
+	t.Run("ring value", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "/ring/home")
+		rng.EnvSet("USERPROFILE", "/ring/home")
+		rng.EnvSet("home", "/ring/home")
+
+		// --- When ---
+		have, err := homeDir(rng)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "/ring/home", have)
+	})
+
+	t.Run("error - unset", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "")
+		rng.EnvSet("USERPROFILE", "")
+		rng.EnvSet("home", "")
+
+		// --- When ---
+		_, err := homeDir(rng)
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
+	})
+
+	t.Run("error - nil ring", func(t *testing.T) {
+		// --- When ---
+		_, err := homeDir(nil)
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
+	})
+}
+
 func Test_errCompile_Unwrap(t *testing.T) {
 	// --- When ---
 	err := &errCompile{error: ErrTest}
@@ -347,6 +386,21 @@ func Test_selectMakefiles(t *testing.T) {
 }
 
 func Test_prepare(t *testing.T) {
+	t.Run("error - context canceled", func(t *testing.T) {
+		// --- Given ---
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		rng := ring.New()
+		tmp := t.TempDir()
+		src := t.TempDir()
+
+		// --- When ---
+		_, err := prepare(ctx, rng, tmp, src)
+
+		// --- Then ---
+		assert.ErrorIs(t, context.Canceled, err)
+	})
+
 	t.Run("cleans build dir on error after mkdir", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
@@ -367,7 +421,7 @@ func Test_prepare(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chmod(unreadable, 0644) })
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -395,7 +449,7 @@ func Test_prepare(t *testing.T) {
 		rng = parser.SetBuildTag(rng)
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -444,7 +498,7 @@ func Test_prepare(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -467,7 +521,7 @@ func Test_prepare(t *testing.T) {
 		rng = parser.SetBuildTag(rng)
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -489,7 +543,7 @@ func Test_prepare(t *testing.T) {
 		rng := parser.SetBuildTag(ring.New())
 
 		// --- When ---
-		cu, err := prepare(rng, dstPath, srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPath, srcPrj.Root())
 
 		// --- Then ---
 		var e *fs.PathError
@@ -516,7 +570,7 @@ func Test_prepare(t *testing.T) {
 		rng := parser.SetBuildTag(ring.New())
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile_gen.go\" file"
@@ -540,7 +594,7 @@ func Test_prepare(t *testing.T) {
 		rng := parser.SetBuildTag(ring.New())
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile\" file"
@@ -564,7 +618,7 @@ func Test_prepare(t *testing.T) {
 		rng := parser.SetBuildTag(ring.New())
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile_user.go\" file"
@@ -583,7 +637,7 @@ func Test_prepare(t *testing.T) {
 		rng := parser.SetBuildTag(ring.New())
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPth)
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPth)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrAbsPath, err)
@@ -608,7 +662,7 @@ func Test_prepare(t *testing.T) {
 		rng = parser.SetBuildTag(rng)
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, gomake.ErrNoGoMod, err)
@@ -635,7 +689,7 @@ func Test_prepare(t *testing.T) {
 		rng = parser.SetBuildTag(rng)
 
 		// --- When ---
-		cu, err := prepare(rng, dstPrj.Root(), srcPrj.Root())
+		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -812,6 +866,19 @@ func Test_findGoWork(t *testing.T) {
 }
 
 func Test_editGoWork(t *testing.T) {
+	t.Run("error - context canceled", func(t *testing.T) {
+		// --- Given ---
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		env := ring.New()
+
+		// --- When ---
+		err := editGoWork(ctx, env, "go.work", t.TempDir(), t.TempDir())
+
+		// --- Then ---
+		assert.ErrorIs(t, context.Canceled, err)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
@@ -844,7 +911,13 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), outPth, prjRoot)
+		err := editGoWork(
+			t.Context(),
+			env,
+			filepath.Join(prjRoot, "go.work"),
+			outPth,
+			prjRoot,
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -870,7 +943,7 @@ func Test_editGoWork(t *testing.T) {
 		env := ring.New()
 
 		// --- When ---
-		err := editGoWork(env, srcWork, outPth, prjRoot)
+		err := editGoWork(t.Context(), env, srcWork, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -915,7 +988,7 @@ func Test_editGoWork(t *testing.T) {
 		env.EnvSet("GOWORK", srcWork)
 
 		// --- When ---
-		err := editGoWork(env, srcWork, outPth, prjRoot)
+		err := editGoWork(t.Context(), env, srcWork, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -933,7 +1006,13 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, filepath.Join(srcPth, "go.work"), dstPth, srcPth)
+		err := editGoWork(
+			t.Context(),
+			env,
+			filepath.Join(srcPth, "go.work"),
+			dstPth,
+			srcPth,
+		)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
@@ -952,7 +1031,13 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, filepath.Join(srcPth, "go.work"), dstPth, srcPth)
+		err := editGoWork(
+			t.Context(),
+			env,
+			filepath.Join(srcPth, "go.work"),
+			dstPth,
+			srcPth,
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -984,7 +1069,13 @@ func Test_editGoWork(t *testing.T) {
 		outPrj.Close()
 
 		// --- When ---
-		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), outPth, prjRoot)
+		err := editGoWork(
+			t.Context(),
+			env,
+			filepath.Join(prjRoot, "go.work"),
+			outPth,
+			prjRoot,
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1016,7 +1107,13 @@ func Test_editGoWork(t *testing.T) {
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
 		// --- When ---
-		err := editGoWork(env, filepath.Join(prjRoot, "go.work"), dstPth, prjRoot)
+		err := editGoWork(
+			t.Context(),
+			env,
+			filepath.Join(prjRoot, "go.work"),
+			dstPth,
+			prjRoot,
+		)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
@@ -1026,6 +1123,19 @@ func Test_editGoWork(t *testing.T) {
 }
 
 func Test_editGoMod(t *testing.T) {
+	t.Run("error - context canceled", func(t *testing.T) {
+		// --- Given ---
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		env := ring.New()
+
+		// --- When ---
+		err := editGoMod(ctx, env, "go.mod", "example.com/m", ".", ".")
+
+		// --- Then ---
+		assert.ErrorIs(t, context.Canceled, err)
+	})
+
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
@@ -1034,7 +1144,14 @@ func Test_editGoMod(t *testing.T) {
 		wantData := oskit.ReadFileStr(t, "testdata/go.mod_want")
 
 		// --- When ---
-		err := editGoMod(env, pth, "example.com/user/repo", "/module/path", filepath.Dir(pth))
+		err := editGoMod(
+			t.Context(),
+			env,
+			pth,
+			"example.com/user/repo",
+			"/module/path",
+			filepath.Dir(pth),
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1048,7 +1165,14 @@ func Test_editGoMod(t *testing.T) {
 		pth := oskit.Write(t, "", t.TempDir(), "not-go.mod")
 
 		// --- When ---
-		err := editGoMod(env, pth, "example.com/user/repo", "/module/path", filepath.Dir(pth))
+		err := editGoMod(
+			t.Context(),
+			env,
+			pth,
+			"example.com/user/repo",
+			"/module/path",
+			filepath.Dir(pth),
+		)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoModEdit, err)

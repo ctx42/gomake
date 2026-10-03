@@ -406,7 +406,7 @@ func Test_effectiveImports(t *testing.T) {
 		oskit.Write(t, content, srcDir, "targets.yaml")
 
 		// --- When ---
-		cfg, err := effectiveImports(srcDir, "")
+		cfg, err := effectiveImports(ring.New(), srcDir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -415,7 +415,7 @@ func Test_effectiveImports(t *testing.T) {
 
 	t.Run("no flag, an absent source yields empty config", func(t *testing.T) {
 		// --- When ---
-		cfg, err := effectiveImports(t.TempDir(), "")
+		cfg, err := effectiveImports(ring.New(), t.TempDir(), "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -431,7 +431,7 @@ func Test_effectiveImports(t *testing.T) {
 		oskit.Write(t, "imports:\n  - import: flag.com/y\n", flagFile)
 
 		// --- When ---
-		cfg, err := effectiveImports(srcDir, flagFile)
+		cfg, err := effectiveImports(ring.New(), srcDir, flagFile)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -444,7 +444,7 @@ func Test_effectiveImports(t *testing.T) {
 		flagFile := filepath.Join(t.TempDir(), "missing.yaml")
 
 		// --- When ---
-		_, err := effectiveImports(t.TempDir(), flagFile)
+		_, err := effectiveImports(ring.New(), t.TempDir(), flagFile)
 
 		// --- Then ---
 		assert.ErrorContain(t, "read targets", err)
@@ -456,7 +456,7 @@ func Test_effectiveImports(t *testing.T) {
 		oskit.Write(t, "{", flagFile)
 
 		// --- When ---
-		_, err := effectiveImports(t.TempDir(), flagFile)
+		_, err := effectiveImports(ring.New(), t.TempDir(), flagFile)
 
 		// --- Then ---
 		assert.ErrorContain(t, "invalid external targets config", err)

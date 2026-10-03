@@ -5,14 +5,19 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
+	"time"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/check"
 	"github.com/ctx42/testing/pkg/goldy"
 	"github.com/ctx42/testkit/pkg/exekit"
 	"github.com/ctx42/testkit/pkg/modkit"
@@ -446,7 +451,7 @@ func mainMakefileWithNoTargets(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeErr, code)
-		assert.Equal(t, "gomake: no makefile found\n", tst.Stderr())
+		assert.Equal(t, "gomake: makefile has no targets\n", tst.Stderr())
 		assert.NoFileExist(t, bin)
 	})
 
@@ -1269,9 +1274,11 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+
 		have, ok := rng.MetaLookup("db")
 		assert.True(t, ok)
 		assert.Equal(t, `{"host":"db.internal"}`, have)
@@ -1289,9 +1296,11 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+
 		have, ok := rng.MetaLookup("pkg")
 		assert.True(t, ok)
 		assert.Equal(t, `{"host":"db.internal"}`, have)
@@ -1306,9 +1315,11 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+
 		_, ok := rng.MetaLookup("db")
 		assert.False(t, ok)
 	})
@@ -1320,9 +1331,11 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		dir := t.TempDir()
 
 		// --- When ---
-		applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+
 		_, ok := rng.MetaLookup("pkg")
 		assert.False(t, ok)
 	})
@@ -1335,10 +1348,37 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, "{bad yaml}", dir, TargetsFile)
 
 		// --- When ---
-		applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+
 		_, ok := rng.MetaLookup("pkg")
+		assert.False(t, ok)
+	})
+
+	t.Run("error - two configs share a meta key", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		dir := t.TempDir()
+		content := "" +
+			"imports:\n" +
+			"  - import: a.com/db\n" +
+			"    config:\n" +
+			"      host: a\n" +
+			"  - import: b.com/db\n" +
+			"    config:\n" +
+			"      host: b\n"
+		oskit.Write(t, content, dir, TargetsFile)
+
+		// --- When ---
+		err := applyExternalTargetMeta(rng, dir)
+
+		// --- Then ---
+		assert.ErrorIs(t, errDupMetaKey, err)
+
+		_, ok := rng.MetaLookup("db")
 		assert.False(t, ok)
 	})
 }
@@ -2068,6 +2108,45 @@ func Test_Main_setsContractEnv(t *testing.T) {
 	assert.Equal(t, src, rng.EnvGet(gomake.ProjectDirEnvKey))
 	assert.Equal(t, ver, rng.MetaGet(gomake.VersionEnvKey))
 	assert.Equal(t, src, rng.MetaGet(gomake.ProjectDirEnvKey))
+}
+
+func Test_watchBuildDir(t *testing.T) {
+	t.Run("signal removes the directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		marker := oskit.Write(t, "x", dir, "marker")
+		sig := make(chan os.Signal, 1)
+		stop := watchBuildDir(dir, sig)
+		defer stop()
+
+		// --- When ---
+		sig <- syscall.SIGINT
+
+		// --- Then ---
+		gone := func() bool {
+			_, err := os.Stat(marker)
+			return errors.Is(err, fs.ErrNotExist)
+		}
+		err := check.Wait(
+			"1s", gone, check.WithWaitThrottle(10*time.Millisecond),
+		)
+		assert.NoError(t, err)
+	})
+
+	t.Run("stop leaves the directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		marker := oskit.Write(t, "x", dir, "marker")
+		sig := make(chan os.Signal, 1)
+		stop := watchBuildDir(dir, sig)
+
+		// --- When ---
+		stop()
+
+		// --- Then ---
+		_, err := os.Stat(marker)
+		assert.NoError(t, err)
+	})
 }
 
 // prePanic is a pre-run hook that panics (exercises main's recover path).

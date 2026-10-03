@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"bufio"
 	"flag"
 	"path/filepath"
 	"strings"
@@ -282,9 +283,10 @@ func Test_localImportPath(t *testing.T) {
 		oskit.Write(t, "module github.com/foo/bar\n", dir, "go.mod")
 
 		// --- When ---
-		have := localImportPath(dir)
+		have, err := localImportPath(dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar", have)
 	})
 
@@ -295,9 +297,10 @@ func Test_localImportPath(t *testing.T) {
 		sub := oskit.MkdirAll(t, dir, "build", "mk")
 
 		// --- When ---
-		have := localImportPath(sub)
+		have, err := localImportPath(sub)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar/build/mk", have)
 	})
 
@@ -306,9 +309,10 @@ func Test_localImportPath(t *testing.T) {
 		dir := t.TempDir()
 
 		// --- When ---
-		have := localImportPath(dir)
+		have, err := localImportPath(dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "", have)
 	})
 }
@@ -320,9 +324,10 @@ func Test_moduleImportPath(t *testing.T) {
 		oskit.Write(t, "module github.com/foo/bar\n\ngo 1.21\n", dir, "go.mod")
 
 		// --- When ---
-		have := moduleImportPath(dir)
+		have, err := moduleImportPath(dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar", have)
 	})
 
@@ -333,9 +338,10 @@ func Test_moduleImportPath(t *testing.T) {
 		sub := oskit.MkdirAll(t, dir, "cmd", "app")
 
 		// --- When ---
-		have := moduleImportPath(sub)
+		have, err := moduleImportPath(sub)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "github.com/foo/bar", have)
 	})
 
@@ -344,10 +350,36 @@ func Test_moduleImportPath(t *testing.T) {
 		dir := t.TempDir()
 
 		// --- When ---
-		have := moduleImportPath(dir)
+		have, err := moduleImportPath(dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - unreadable go.mod", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, "go.mod")
+
+		// --- When ---
+		_, err := moduleImportPath(dir)
+
+		// --- Then ---
+		assert.ErrorContain(t, "go.mod", err)
+	})
+
+	t.Run("error - module line too long", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		line := "module " + strings.Repeat("a", bufio.MaxScanTokenSize)
+		oskit.Write(t, line, dir, "go.mod")
+
+		// --- When ---
+		_, err := moduleImportPath(dir)
+
+		// --- Then ---
+		assert.ErrorIs(t, bufio.ErrTooLong, err)
 	})
 }
 
