@@ -22,8 +22,8 @@ const devel = "(devel)"
 // tooling injects into the same variable [LDFlags] targets.
 var scmRev string
 
-// Version returns a human-readable version line for cmd.
-func Version(cmd string) string {
+// Line returns a human-readable version line for cmd.
+func Line(cmd string) string {
 	return cmd + " " + revision()
 }
 

@@ -20,7 +20,7 @@ import (
 func main() {
 	ctx := context.Background()
 	rng := ring.New()
-	ver := version.Version("gomake")
+	ver := version.Line("gomake")
 	bip := builtin.Generated()
 	code := cli.Main(ctx, rng, ver, bip)
 	os.Exit(code)

@@ -12,13 +12,13 @@ import (
 	"github.com/ctx42/xdef/pkg/xdef"
 )
 
-func Test_Version(t *testing.T) {
+func Test_Line(t *testing.T) {
 	// --- Given ---
 	saveVars(t)
 	scmRev = "v1.2.3"
 
 	// --- When ---
-	have := Version("gomake")
+	have := Line("gomake")
 
 	// --- Then ---
 	assert.Equal(t, "gomake v1.2.3", have)
