@@ -56,6 +56,13 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
 func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err error) {
+	// Build metadata embedded by the Go toolchain gives the installation
+	// mode: "(devel)" for `go run ./cmd/install`, an actual version for
+	// `go run ...@version`. Reject a missing value before any env mutation.
+	if info == nil {
+		return errors.New("gomake: build info unavailable")
+	}
+
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
@@ -64,13 +71,6 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 	// Isolate go tool invocations from the caller's ambient workspace;
 	// setupWorkspace may override with a private workfile when needed.
 	rng.EnvSet("GOWORK", "off")
-
-	// Build metadata embedded by the Go toolchain gives the installation
-	// mode: "(devel)" for `go run ./cmd/install`, an actual version for
-	// `go run ...@version`.
-	if info == nil {
-		return errors.New("gomake: build info unavailable")
-	}
 
 	// Resolve the read-only source: module root for a devel build (not CWD),
 	// the module-cache directory for a published one.
@@ -102,8 +102,22 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 	ldflags := version.LDFlags(info.Main.Version)
 
 	// Fast path: no external targets. Build directly from the read-only source
-	// without copying, fetching, or regenerating builtins.
+	// without copying, fetching, or regenerating builtins. A devel build still
+	// runs in the source tree, where GOFLAGS=-mod=mod can rewrite go.sum, so
+	// snapshot those files and restore them after the build.
 	if len(cfg.Imports()) == 0 {
+		if devel {
+			var restore func() error
+			restore, err = snapshotGenerated(src)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				if rerr := restore(); err == nil {
+					err = rerr
+				}
+			}()
+		}
 		return Build(rng, src, dst, ldflags)
 	}
 
@@ -190,9 +204,18 @@ func effectiveImports(
 // moduleCacheDir runs `go mod download -json <module>` and returns the local
 // cache directory for that module.
 func moduleCacheDir(env ring.Environ, module string) (string, error) {
+	// A neutral directory keeps a go.mod in the process working directory
+	// from changing which module is downloaded.
+	dir, err := os.MkdirTemp("", "gomake-mod-*")
+	if err != nil {
+		return "", fmt.Errorf("module download temp: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
 	args := []string{"mod", "download", "-json", module}
 	cmd := exec.Command("go", args...)
 	cmd.Env = env.EnvAll()
+	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
 		// go mod download -json puts the structured Error on stdout; stderr is
@@ -248,7 +271,10 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 		strings.HasPrefix(lower, "https://") {
 		return "", noop, nil
 	}
-	mod, root, ok := moduleAt(env, filepath.Dir(tgs))
+	mod, root, ok, err := moduleAt(env, filepath.Dir(tgs))
+	if err != nil {
+		return "", noop, err
+	}
 	if !ok {
 		return "", noop, nil
 	}
@@ -272,9 +298,13 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 
 // moduleAt reports the Go module that dir belongs to, returning the module's
 // import path and root directory. The ok result is false when dir is not
-// inside a module or the toolchain reports no usable module, signalling the
-// caller to fall back to `go get`.
-func moduleAt(env ring.Environ, dir string) (mod, root string, ok bool) {
+// inside a module, signalling the caller to fall back to `go get`. A
+// toolchain failure is returned as an error so it is not mistaken for that.
+func moduleAt(
+	env ring.Environ,
+	dir string,
+) (mod, root string, ok bool, err error) {
+
 	// GOWORK=off so a multi-module ambient workspace does not emit multiple
 	// Path::Dir lines that break Cut parsing.
 	cmd := exec.Command("go", "list", "-m", "-f", "{{.Path}}::{{.Dir}}")
@@ -282,7 +312,10 @@ func moduleAt(env ring.Environ, dir string) (mod, root string, ok bool) {
 	cmd.Dir = dir
 	out, err := cmd.Output()
 	if err != nil {
-		return "", "", false
+		if notModule(err) {
+			return "", "", false, nil
+		}
+		return "", "", false, fmt.Errorf("go list -m: %w", err)
 	}
 	// Take the first non-empty line (main module for this directory).
 	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
@@ -292,10 +325,23 @@ func moduleAt(env ring.Environ, dir string) (mod, root string, ok bool) {
 		}
 		mod, root, ok = strings.Cut(line, "::")
 		if ok && mod != "" && root != "" {
-			return mod, root, true
+			return mod, root, true, nil
 		}
 	}
-	return "", "", false
+	return "", "", false, nil
+}
+
+// notModule reports whether err is go list saying dir is outside a module.
+func notModule(err error) bool {
+	ee, ok := errors.AsType[*exec.ExitError](err)
+	if !ok {
+		return false
+	}
+	msg := string(ee.Stderr)
+	if strings.Contains(msg, "go.mod file not found") {
+		return true
+	}
+	return strings.Contains(msg, "cannot find main module")
 }
 
 // goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the

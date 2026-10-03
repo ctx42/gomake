@@ -12,6 +12,33 @@ import (
 	"github.com/ctx42/xflag/pkg/xflag"
 )
 
+func Test_rejectArgs(t *testing.T) {
+	t.Run("none", func(t *testing.T) {
+		// --- Given ---
+		fs := xflag.NewFlagSet("install", flag.ContinueOnError)
+		must.Nil(fs.Parse(nil))
+
+		// --- When ---
+		err := rejectArgs(fs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+	})
+
+	t.Run("error - positional", func(t *testing.T) {
+		// --- Given ---
+		fs := xflag.NewFlagSet("install", flag.ContinueOnError)
+		_ = fs.String("targets", "", "")
+		must.Nil(fs.Parse([]string{"--targets=./targets.yaml", "some/path"}))
+
+		// --- When ---
+		err := rejectArgs(fs)
+
+		// --- Then ---
+		assert.ErrorContain(t, "unexpected argument: some/path", err)
+	})
+}
+
 func Test_emptyTargetsNote_tabular(t *testing.T) {
 	tt := []struct {
 		testN string

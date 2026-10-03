@@ -75,13 +75,17 @@ func Test_installTo(t *testing.T) {
 	t.Run("error - build info unavailable", func(t *testing.T) {
 		// --- Given ---
 		t.Chdir(t.TempDir())
-		rng := ringtest.New(t)
+		r := ringtest.New(t).Ring()
+		r.EnvSet("GOWORK", "keep")
 
 		// --- When ---
-		err := installTo(rng.Ring(), nil, t.TempDir(), "")
+		err := installTo(r, nil, t.TempDir(), "")
 
 		// --- Then ---
 		assert.ErrorContain(t, "build info unavailable", err)
+
+		work, _ := r.EnvLookup("GOWORK")
+		assert.Equal(t, "keep", work)
 	})
 
 	t.Run("error - nonexistent targets file", func(t *testing.T) {
@@ -256,6 +260,40 @@ func Test_installTo(t *testing.T) {
 		assert.False(t, oskit.PathExists(t, gen))
 		assert.False(t, oskit.PathExists(t, filepath.Join(src, "pkg")))
 	})
+}
+
+func Test_installTo_fastPathRestoresGoSum(t *testing.T) {
+	// --- Given ---
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Main.Version != "(devel)" {
+		t.Skip("fast path restore runs on a devel build")
+	}
+	src := t.TempDir()
+	gomod := "" +
+		"module example.test\n" +
+		"\n" +
+		"go 1.24\n" +
+		"\n" +
+		"require github.com/ctx42/ring v0.7.0\n"
+	oskit.Write(t, gomod, src, "go.mod")
+	oskit.MkdirAll(t, src, "cmd", "gomake")
+	mainSrc := "" +
+		"package main\n" +
+		"\n" +
+		"import _ \"github.com/ctx42/ring/pkg/ring\"\n" +
+		"\n" +
+		"func main() {}\n"
+	oskit.Write(t, mainSrc, src, "cmd", "gomake", "main.go")
+	t.Chdir(src)
+	r := ringtest.New(t).Ring()
+	r.EnvSet("GOFLAGS", "-mod=mod")
+
+	// --- When ---
+	err := installTo(r, info, t.TempDir(), "")
+
+	// --- Then ---
+	assert.NoError(t, err)
+	assert.NoFileExist(t, filepath.Join(src, "go.sum"))
 }
 
 func Test_installTo_compilesExternalTargetIntoBinary(t *testing.T) {
@@ -476,6 +514,21 @@ func Test_moduleCacheDir(t *testing.T) {
 		assert.NotEqual(t, "", dir)
 	})
 
+	t.Run("ignores the working directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "not a module\n", dir, "go.mod")
+		t.Chdir(dir)
+		env := ring.New()
+
+		// --- When ---
+		have, err := moduleCacheDir(env, "github.com/ctx42/ring@v0.7.0")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.True(t, filepath.IsAbs(have))
+	})
+
 	t.Run("error - invalid module", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
@@ -602,9 +655,10 @@ func Test_moduleAt(t *testing.T) {
 		oskit.Write(t, "module example.com/mod\n\ngo 1.24\n", dir, "go.mod")
 
 		// --- When ---
-		mod, root, ok := moduleAt(rng, dir)
+		mod, root, ok, err := moduleAt(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "example.com/mod", mod)
 		assert.NotEqual(t, "", root)
@@ -613,11 +667,31 @@ func Test_moduleAt(t *testing.T) {
 	t.Run("not a module", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+		dir := t.TempDir()
 
 		// --- When ---
-		mod, root, ok := moduleAt(rng, t.TempDir())
+		mod, root, ok, err := moduleAt(rng, dir)
 
 		// --- Then ---
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.Equal(t, "", mod)
+		assert.Equal(t, "", root)
+	})
+
+	t.Run("error - go binary not in PATH", func(t *testing.T) {
+		// --- Given ---
+		empty := t.TempDir()
+		t.Setenv("PATH", empty)
+		rng := ringtest.New(t).Ring()
+		rng.EnvSet("PATH", empty)
+		dir := t.TempDir()
+
+		// --- When ---
+		mod, root, ok, err := moduleAt(rng, dir)
+
+		// --- Then ---
+		assert.ErrorContain(t, "executable file not found", err)
 		assert.False(t, ok)
 		assert.Equal(t, "", mod)
 		assert.Equal(t, "", root)

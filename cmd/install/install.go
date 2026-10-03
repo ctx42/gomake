@@ -36,6 +36,10 @@ func main() {
 	_ = fs.Parse(os.Args[1:])
 
 	rng := ring.New()
+	if err := rejectArgs(fs); err != nil {
+		_, _ = fmt.Fprintln(rng.Stderr(), err)
+		os.Exit(2)
+	}
 
 	// Trim so whitespace-only --targets= is treated as empty, matching the
 	// note and the value passed to install.Main.
@@ -52,6 +56,16 @@ func main() {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
 		os.Exit(1)
 	}
+}
+
+// rejectArgs reports the first positional argument. The targets file is
+// taken only from --targets, so a bare path must not be ignored.
+func rejectArgs(fs *xflag.FlagSet) error {
+	args := fs.Args()
+	if len(args) == 0 {
+		return nil
+	}
+	return fmt.Errorf("unexpected argument: %s", args[0])
 }
 
 // emptyTargetsNote returns the note to print when --targets was set on fs with
