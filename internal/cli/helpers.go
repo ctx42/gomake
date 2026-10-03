@@ -77,18 +77,18 @@ type errCompile struct {
 	eout  string // Contents of standard error.
 }
 
-func (e *errCompile) Unwrap() error { return e.error }
+func (erc *errCompile) Unwrap() error { return erc.error }
 
-func (e *errCompile) Error() string {
+func (erc *errCompile) Error() string {
 	var msg string
-	if e.error != nil {
-		msg = e.error.Error()
+	if erc.error != nil {
+		msg = erc.error.Error()
 	}
-	if e.eout != "" {
-		return e.eout + "\n" + msg
+	if erc.eout != "" {
+		return erc.eout + "\n" + msg
 	}
-	if e.sout != "" {
-		return e.sout + "\n" + msg
+	if erc.sout != "" {
+		return erc.sout + "\n" + msg
 	}
 	return msg
 }
@@ -804,13 +804,17 @@ func absolutizeGoModReplaces(
 	return nil
 }
 
-// xflagModPath is the module path of the xflag package inlined into generated
-// makefiles.
-const xflagModPath = "github.com/ctx42/xflag"
+// xflag pins are the module path and the fallback version inlined into
+// generated makefiles.
+const (
+	// xflagModPath is the module path of the xflag package inlined into
+	// generated makefiles.
+	xflagModPath = "github.com/ctx42/xflag"
 
-// xflagFallbackVer pins the xflag version used when build information is
-// unavailable at runtime.
-const xflagFallbackVer = "v0.10.0"
+	// xflagFallbackVer pins the xflag version used when build information is
+	// unavailable at runtime.
+	xflagFallbackVer = "v0.10.0"
+)
 
 // xflagVersion returns the xflag module version gomake was built with, so the
 // generated makefile pins the same version. It falls back to [xflagFallbackVer]
@@ -1017,4 +1021,14 @@ func allTargets(
 	}
 
 	return append(combined, pmf.Targets.List()...), nil
+}
+
+// fileContainsStr reports whether the file at the path contains substr.
+// Returns false (not true) when the file does not exist.
+func fileContainsStr(path, substr string) (bool, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false, err
+	}
+	return strings.Contains(string(data), substr), nil
 }

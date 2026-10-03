@@ -33,8 +33,8 @@ func TestMain(m *testing.M) {
 
 // /////////////////////////////////////////////////////////////////////////////
 
-// ErrTest is a general error used in tests.
-var ErrTest = errors.New("test error")
+// errTest is a general error used in tests.
+var errTest = errors.New("test error")
 
 // ensureSymlink makes link a symlink to target. An existing symlink is left
 // in place. Any other file at link is removed first.
@@ -159,11 +159,11 @@ func Test_ensureSymlink(t *testing.T) {
 	})
 }
 
-// TError is a test structure implementing error and exitStatus interfaces.
-type TError struct {
+// tError is a test structure implementing error and exitStatus interfaces.
+type tError struct {
 	Err      string
 	ExStatus int
 }
 
-func (e TError) Error() string   { return e.Err }
-func (e TError) ExitStatus() int { return e.ExStatus }
+func (ter tError) Error() string   { return ter.Err }
+func (ter tError) ExitStatus() int { return ter.ExStatus }

@@ -13,7 +13,7 @@ import (
 	"github.com/ctx42/testkit/pkg/oskit"
 )
 
-func Test_Build(t *testing.T) {
+func Test_build(t *testing.T) {
 	const mainSrc = "package main\n\nfunc main() {}\n"
 	const goMod = "module example.test\n\ngo 1.24\n"
 
@@ -37,7 +37,7 @@ func Test_Build(t *testing.T) {
 		blank := ""
 
 		// --- When ---
-		err := Build(env, root, dst, blank)
+		err := build(env, root, dst, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -57,7 +57,7 @@ func Test_Build(t *testing.T) {
 		blank := ""
 
 		// --- When ---
-		err := Build(env, root, dst, blank)
+		err := build(env, root, dst, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -76,7 +76,7 @@ func Test_Build(t *testing.T) {
 		blank := ""
 
 		// --- When ---
-		err := Build(env, root, dst, blank)
+		err := build(env, root, dst, blank)
 
 		// --- Then ---
 		var ee *exec.ExitError

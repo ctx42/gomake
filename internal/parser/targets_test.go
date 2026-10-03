@@ -1069,35 +1069,37 @@ func Test_Targets_GoImports(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("alias does not collide with natural package name", func(t *testing.T) {
-		// --- Given ---
-		// Two packages named "foo" force foo2; a third package literally
-		// named "foo2" must get a free alias (foo3), not a redeclared foo2.
-		tgt0 := &mkf.Target{
-			Name: "a", PkgName: "foo", ImpSpec: "example.com/a/foo",
-		}
+	t.Run(
+		"alias does not collide with natural package name",
+		func(t *testing.T) {
+			// --- Given ---
+			// Two packages named "foo" force foo2; a third package literally
+			// named "foo2" must get a free alias (foo3), not a redeclared foo2.
+			tgt0 := &mkf.Target{
+				Name: "a", PkgName: "foo", ImpSpec: "example.com/a/foo",
+			}
 
-		tgt1 := &mkf.Target{
-			Name: "b", PkgName: "foo", ImpSpec: "example.com/b/foo",
-		}
+			tgt1 := &mkf.Target{
+				Name: "b", PkgName: "foo", ImpSpec: "example.com/b/foo",
+			}
 
-		tgt2 := &mkf.Target{
-			Name: "c", PkgName: "foo2", ImpSpec: "example.com/c/foo2",
-		}
+			tgt2 := &mkf.Target{
+				Name: "c", PkgName: "foo2", ImpSpec: "example.com/c/foo2",
+			}
 
-		tgs := NewTargets()
-		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2))
+			tgs := NewTargets()
+			assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2))
 
-		// --- When ---
-		have := tgs.GoImports()
+			// --- When ---
+			have := tgs.GoImports()
 
-		// --- Then ---
-		want := "\n" +
-			"\"example.com/a/foo\"\n" +
-			"foo2 \"example.com/b/foo\"\n" +
-			"foo3 \"example.com/c/foo2\"\n"
-		assert.Equal(t, want, have)
-	})
+			// --- Then ---
+			want := "\n" +
+				"\"example.com/a/foo\"\n" +
+				"foo2 \"example.com/b/foo\"\n" +
+				"foo3 \"example.com/c/foo2\"\n"
+			assert.Equal(t, want, have)
+		})
 
 	t.Run("method VarName unique per aliased import", func(t *testing.T) {
 		// --- Given ---

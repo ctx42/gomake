@@ -426,7 +426,12 @@ func (tgs *Targets) importAliasMap() map[string]string {
 
 // uniqueImportAlias returns base when free, otherwise stem2, stem3, … where
 // stem is base with trailing digits stripped so "foo2" does not become "foo22".
-func uniqueImportAlias(base string, taken map[string]string, spec string) string {
+func uniqueImportAlias(
+	base string,
+	taken map[string]string,
+	spec string,
+) string {
+
 	if other, ok := taken[base]; !ok || other == spec {
 		return base
 	}

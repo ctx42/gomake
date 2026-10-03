@@ -78,7 +78,8 @@ func binaryCacheKey(
 
 	modRoot := findModuleRoot(srcDir)
 	if modRoot != "" {
-		if err := hashFile(h, "go.mod", filepath.Join(modRoot, "go.mod")); err != nil {
+		gomod := filepath.Join(modRoot, "go.mod")
+		if err := hashFile(h, "go.mod", gomod); err != nil {
 			return "", err
 		}
 		// Optional go.sum at module root. A stat failure other than a
@@ -157,7 +158,10 @@ func hashExternalModuleTrees(
 			workRels = append(workRels, filepath.Join(workDir, rel))
 		}
 	}
-	rels := append(workRels, localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...)
+	rels := append(
+		workRels,
+		localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...,
+	)
 	if len(rels) == 0 {
 		return nil
 	}
@@ -401,7 +405,11 @@ func isLocalDiskPath(pth string) bool {
 
 // hashFile writes a labeled file into h. Returns an error only when the file
 // exists but cannot be read.
-func hashFile(h interface{ Write([]byte) (int, error) }, label, pth string) error {
+func hashFile(
+	h interface{ Write([]byte) (int, error) },
+	label, pth string,
+) error {
+
 	data, err := os.ReadFile(pth)
 	if err != nil {
 		return err
@@ -415,9 +423,18 @@ func hashFile(h interface{ Write([]byte) (int, error) }, label, pth string) erro
 // relative-path order, and the files those sources name with //go:embed.
 // Skips vendor, module cache, and VCS directories so the key tracks local
 // package sources the makefile may import via replace.
-func hashModuleGoFiles(h interface{ Write([]byte) (int, error) }, modRoot string) error {
+func hashModuleGoFiles(
+	h interface{ Write([]byte) (int, error) },
+	modRoot string,
+) error {
+
 	var paths []string
-	err := filepath.WalkDir(modRoot, func(pth string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(modRoot, func(
+		pth string,
+		d fs.DirEntry,
+		err error,
+	) error {
+
 		if err != nil {
 			return err
 		}
@@ -428,7 +445,8 @@ func hashModuleGoFiles(h interface{ Write([]byte) (int, error) }, modRoot string
 			}
 			return nil
 		}
-		if !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if !strings.HasSuffix(name, ".go") ||
+			strings.HasSuffix(name, "_test.go") {
 			return nil
 		}
 		paths = append(paths, pth)

@@ -237,11 +237,14 @@ func render(ver string, goos, goarch []string) ([]byte, error) {
 }
 
 func quoteList(ss []string) string {
+	if len(ss) == 0 {
+		return ""
+	}
 	parts := make([]string, len(ss))
 	for i, s := range ss {
-		parts[i] = strconv.Quote(s)
+		parts[i] = "\t" + strconv.Quote(s)
 	}
-	return strings.Join(parts, ", ")
+	return "\n" + strings.Join(parts, ",\n") + ",\n"
 }
 
 // moduleRoot walks up from the working directory to the gomake module root.

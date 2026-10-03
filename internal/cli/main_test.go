@@ -2033,7 +2033,8 @@ func mainErrors(t *testing.T) {
 	t.Run("--help target with timeout", func(t *testing.T) {
 		// --- Given ---
 		// Non-default --timeout rebuilds cfg.args with makefile flags before
-		// the target name; help must still resolve the target, not the duration.
+		// the target name; help must still resolve the target, not the
+		// duration.
 		tst := ringtest.New(t).WetStderr()
 
 		relPath := "testdata/projects/showcase_targets/project"

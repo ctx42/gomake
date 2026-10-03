@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -148,31 +147,5 @@ func Test_setupBashCompletion(t *testing.T) {
 
 		data := oskit.ReadFileStr(t, scriptPath)
 		assert.Equal(t, string(bashCompleteScript), data)
-	})
-}
-
-func Test_fileContainsStr(t *testing.T) {
-	t.Run("present", func(t *testing.T) {
-		dir := t.TempDir()
-		p := filepath.Join(dir, "f")
-		oskit.Write(t, "foo bar baz", p)
-		ok, err := fileContainsStr(p, "bar")
-		assert.NoError(t, err)
-		assert.True(t, ok)
-	})
-
-	t.Run("absent", func(t *testing.T) {
-		dir := t.TempDir()
-		p := filepath.Join(dir, "f")
-		oskit.Write(t, "foo baz", p)
-		ok, err := fileContainsStr(p, "bar")
-		assert.NoError(t, err)
-		assert.False(t, ok)
-	})
-
-	t.Run("file does not exist", func(t *testing.T) {
-		ok, err := fileContainsStr("/nonexistent/path", "x")
-		assert.False(t, ok)
-		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 }

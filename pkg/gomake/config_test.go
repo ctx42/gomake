@@ -563,8 +563,8 @@ func Test_GetCfg(t *testing.T) {
 
 	t.Run("duration from number", func(t *testing.T) {
 		// --- Given ---
-		// A JSON number is the nanosecond count, the form encoding/json marshals
-		// a time.Duration to.
+		// A JSON number is the nanosecond count, the form encoding/json
+		// marshals a time.Duration to.
 		cfg := configFrom(t, `{"timeout":300000000000}`)
 
 		timeout := "timeout"

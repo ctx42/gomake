@@ -17,40 +17,44 @@ import (
 //go:embed data/makefile_user_empty.go_
 var TgsUserEmptySrc []byte
 
-// BuildTag is Go build tag that might be used by files defining targets.
-const BuildTag = "gomake"
+// Target file tags are the build tag and the gomake comment markers.
+const (
+	// BuildTag is Go build tag that might be used by files defining targets.
+	BuildTag = "gomake"
 
-// BuildTagLine represents how the build tag line should look like in the file.
-const BuildTagLine = "//go:build " + BuildTag + "\n"
+	// BuildTagLine represents how the build tag line should look like in the
+	// file.
+	BuildTagLine = "//go:build " + BuildTag + "\n"
 
-// nsTag represents a comment to tag a type to be namespace root.
-//
-//	type NS0 struct{} //gomake:ns_root
-const nsTag = "gomake:ns_root"
+	// nsTag represents a comment to tag a type to be namespace root.
+	//
+	//	type NS0 struct{} //gomake:ns_root
+	nsTag = "gomake:ns_root"
 
-// importTag represents a comment used to tag package imports from which
-// you wish to import targets.
-//
-// Examples:
-//
-//	import github.com/user/targets/git //gomake:import
-//	import github.com/user/targets/git //gomake:import ns
-const importTag = "gomake:import"
+	// importTag represents a comment used to tag package imports from which
+	// you wish to import targets.
+	//
+	// Examples:
+	//
+	//	import github.com/user/targets/git //gomake:import
+	//	import github.com/user/targets/git //gomake:import ns
+	importTag = "gomake:import"
 
-// hiddenTag represents a comment used to tag a target as hidden.
-//
-// Example usage:
-//
-//	// Not yet ready for prime time.
-//	//
-//	// gomake:hidden optional explanation why target is hidden
-//	func Target(ctx context.Context, rng *ring.Ring) error { ... }
-//
-// Notice there must be a space between "//" and "gomake:".
-const hiddenTag = "gomake:hidden"
+	// hiddenTag represents a comment used to tag a target as hidden.
+	//
+	// Example usage:
+	//
+	//	// Not yet ready for prime time.
+	//	//
+	//	// gomake:hidden optional explanation why target is hidden
+	//	func Target(ctx context.Context, rng *ring.Ring) error { ... }
+	//
+	// Notice there must be a space between "//" and "gomake:".
+	hiddenTag = "gomake:hidden"
 
-// metaBuildTag represents [ring.Ring] metadata key for build tag.
-const metaBuildTag = "~~gomake-build-tag~~"
+	// metaBuildTag represents [ring.Ring] metadata key for build tag.
+	metaBuildTag = "~~gomake-build-tag~~"
+)
 
 // Go source parsing errors.
 var (

@@ -85,13 +85,3 @@ func setupBashCompletion(home string) (string, error) {
 		"  source %s\n"
 	return fmt.Sprintf(format, scriptPath, rcPath, rcPath), nil
 }
-
-// fileContainsStr reports whether the file at the path contains substr.
-// Returns false (not true) when the file does not exist.
-func fileContainsStr(path, substr string) (bool, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return false, err
-	}
-	return strings.Contains(string(data), substr), nil
-}

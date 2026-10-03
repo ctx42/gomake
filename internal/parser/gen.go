@@ -153,7 +153,8 @@ import (
 func init() { targets = append(targets, targets{{ .fn_name_suffix }}()...) }
 {{ end -}}
 {{ if .fn_name_suffix }}
-// targets{{ .fn_name_suffix }} returns slice of targets named "{{ .fn_name_suffix }}".
+// targets{{ .fn_name_suffix }} returns slice of targets named {{
+"" }}"{{ .fn_name_suffix }}".
 {{- else -}}
 // targets returns slice of targets.
 {{- end }}

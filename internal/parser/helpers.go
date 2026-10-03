@@ -20,11 +20,7 @@ import (
 // genMakefileUser parses targets in `makefile*.go` files in given directory.
 // Returns source code for [mkf.MakefileUser] file and matching targets
 // collection.
-func genMakefileUser(
-	rng *ring.Ring,
-	dir string,
-) ([]byte, *Targets, error) {
-
+func genMakefileUser(rng *ring.Ring, dir string) ([]byte, *Targets, error) {
 	// Parse makefile*.go files with user defined targets.
 	pmf, err := NewMakefile(rng, dir)
 	if err != nil {
@@ -184,24 +180,27 @@ func breadcrumbs(typ *doc.Type) []string {
 	return pth
 }
 
-// partCrumb represents breadcrumb element indicating incomplete trail. It
-// happens when the type is based on a type defined in a different file or that
-// the type is not a namespace.
-//
-// Example:
-//
-// first.go:
-//
-//	type First struct{} //gomake:ns_root
-//
-// second.go:
-//
-//	type Second First
-const partCrumb = "__!!!__"
+// Breadcrumb markers delimit a target name trail.
+const (
+	// partCrumb represents breadcrumb element indicating incomplete trail. It
+	// happens when the type is based on a type defined in a different file or
+	// that the type is not a namespace.
+	//
+	// Example:
+	//
+	// first.go:
+	//
+	//	type First struct{} //gomake:ns_root
+	//
+	// second.go:
+	//
+	//	type Second First
+	partCrumb = "__!!!__"
 
-// rootCrumb is the first (root) breadcrumb element in the target's breadcrumb
-// trail. All valid trails must start with it.
-const rootCrumb = "__root__"
+	// rootCrumb is the first (root) breadcrumb element in the target's
+	// breadcrumb trail. All valid trails must start with it.
+	rootCrumb = "__root__"
+)
 
 // isNS returns breadcrumb trail for the given type or nil if it isn't
 // namespace. When non-nil slice is returned the first element in it may be:

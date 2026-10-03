@@ -28,7 +28,7 @@ func Test_ExitStatus(t *testing.T) {
 
 	t.Run("has ExitStatus method", func(t *testing.T) {
 		// --- Given ---
-		ter := TError{Err: "test error", ExStatus: 123}
+		ter := tError{Err: "test error", ExStatus: 123}
 
 		// --- When ---
 		have := ExitStatus(ter)
@@ -72,7 +72,7 @@ func Test_ExitStatus(t *testing.T) {
 
 	t.Run("unknown error", func(t *testing.T) {
 		// --- When ---
-		have := ExitStatus(ErrTest)
+		have := ExitStatus(errTest)
 
 		// --- Then ---
 		assert.Equal(t, 1, have)
@@ -109,7 +109,7 @@ func Test_HasRun(t *testing.T) {
 
 	t.Run("unknown error", func(t *testing.T) {
 		// --- When ---
-		have := HasRun(ErrTest)
+		have := HasRun(errTest)
 
 		// --- Then ---
 		assert.False(t, have)

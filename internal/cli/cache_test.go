@@ -219,58 +219,60 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, hBefore, hAfter)
 	})
 
-	t.Run("ignores a file the embed directive does not name", func(t *testing.T) {
-		// --- Given ---
-		root := t.TempDir()
-		oskit.Write(t, "module example.com/m\n", root, "go.mod")
-		oskit.Write(t, "package main\n", root, "makefile.go")
-		oskit.MkdirAll(t, root, "lib")
+	t.Run(
+		"ignores a file the embed directive does not name",
+		func(t *testing.T) {
+			// --- Given ---
+			root := t.TempDir()
+			oskit.Write(t, "module example.com/m\n", root, "go.mod")
+			oskit.Write(t, "package main\n", root, "makefile.go")
+			oskit.MkdirAll(t, root, "lib")
 
-		src := "" +
-			"package lib\n" +
-			"\n" +
-			"import \"embed\"\n" +
-			"\n" +
-			"//go:embed data.txt\n" +
-			"var data embed.FS\n"
-		oskit.Write(t, src, root, "lib", "lib.go")
+			src := "" +
+				"package lib\n" +
+				"\n" +
+				"import \"embed\"\n" +
+				"\n" +
+				"//go:embed data.txt\n" +
+				"var data embed.FS\n"
+			oskit.Write(t, src, root, "lib", "lib.go")
 
-		oskit.Write(t, "one\n", root, "lib", "data.txt")
+			oskit.Write(t, "one\n", root, "lib", "data.txt")
 
-		oskit.Write(t, "other\n", root, "lib", "other.txt")
+			oskit.Write(t, "other\n", root, "lib", "other.txt")
 
-		mkf := []string{"makefile.go"}
+			mkf := []string{"makefile.go"}
 
-		rng := ring.New()
+			rng := ring.New()
 
-		ver := "1.0"
+			ver := "1.0"
 
-		linux := "linux"
+			linux := "linux"
 
-		amd64 := "amd64"
+			amd64 := "amd64"
 
-		blank := ""
+			blank := ""
 
-		text := "changed\n"
+			text := "changed\n"
 
-		lib := "lib"
+			lib := "lib"
 
-		text2 := "other.txt"
+			text2 := "other.txt"
 
-		rng2 := ring.New()
+			rng2 := ring.New()
 
-		// --- When ---
-		hBefore := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
-		)
-		oskit.Create(t, text, root, lib, text2)
-		hAfter := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
-		)
+			// --- When ---
+			hBefore := must.Value(binaryCacheKey(
+				rng, root, mkf, ver, linux, amd64, blank),
+			)
+			oskit.Create(t, text, root, lib, text2)
+			hAfter := must.Value(binaryCacheKey(
+				rng2, root, mkf, ver, linux, amd64, blank),
+			)
 
-		// --- Then ---
-		assert.Equal(t, hBefore, hAfter)
-	})
+			// --- Then ---
+			assert.Equal(t, hBefore, hAfter)
+		})
 
 	t.Run("changes when go.mod changes", func(t *testing.T) {
 		// --- Given ---

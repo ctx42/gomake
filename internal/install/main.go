@@ -55,7 +55,13 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 // disk through a temporary Go workspace (see [setupWorkspace]) rather than
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
-func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err error) {
+func installTo(
+	rng *ring.Ring,
+	info *debug.BuildInfo,
+	dst string,
+	tgs string,
+) (err error) {
+
 	// Build metadata embedded by the Go toolchain gives the installation
 	// mode: "(devel)" for `go run ./cmd/install`, an actual version for
 	// `go run ...@version`. Reject a missing value before any env mutation.
@@ -118,7 +124,7 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 				}
 			}()
 		}
-		return Build(rng, src, dst, ldflags)
+		return build(rng, src, dst, ldflags)
 	}
 
 	// Full path: external targets present. Build from a writable tree, write
@@ -174,7 +180,7 @@ func installTo(rng *ring.Ring, info *debug.BuildInfo, dst, tgs string) (err erro
 	if err = cli.PrepareTargets(rng, buildDir, skipMod); err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
-	return Build(rng, buildDir, dst, ldflags)
+	return build(rng, buildDir, dst, ldflags)
 }
 
 // effectiveImports resolves the imports the build should compile in. When tgs
@@ -221,17 +227,18 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 		// go mod download -json puts the structured Error on stdout; stderr is
 		// often empty for module-resolution failures.
 		detail := strings.TrimSpace(string(out))
+		format := "module download %s: %w: %s"
 		if e, ok := errors.AsType[*exec.ExitError](err); ok {
 			if detail == "" {
 				detail = strings.TrimSpace(string(e.Stderr))
 			}
 			if detail != "" {
-				return "", fmt.Errorf("module download %s: %w: %s", module, e, detail)
+				return "", fmt.Errorf(format, module, e, detail)
 			}
 			return "", fmt.Errorf("module download %s: %w", module, e)
 		}
 		if detail != "" {
-			return "", fmt.Errorf("module download %s: %w: %s", module, err, detail)
+			return "", fmt.Errorf(format, module, err, detail)
 		}
 		return "", fmt.Errorf("module download %s: %w", module, err)
 	}
@@ -264,6 +271,7 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 	func(),
 	error,
 ) {
+
 	noop := func() {}
 	lower := strings.ToLower(tgs)
 	if tgs == "" ||
@@ -411,7 +419,10 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 				continue
 			}
 			if werr := os.WriteFile(pth, snap.data, snap.mode); werr != nil {
-				rerr = errors.Join(rerr, fmt.Errorf("restore %s: %w", pth, werr))
+				rerr = errors.Join(
+					rerr,
+					fmt.Errorf("restore %s: %w", pth, werr),
+				)
 			}
 		}
 		return rerr

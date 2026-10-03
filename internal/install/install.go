@@ -22,12 +22,12 @@ import (
 
 const gomakeBinName = "gomake" // Installed binary name.
 
-// Build creates dst (parents included) if absent, then compiles cmd/gomake
+// build creates dst (parents included) if absent, then compiles cmd/gomake
 // from src into dst/<binary-name>. The caller resolves the destination via
 // [cli.GoBinPath]. MkdirAll matches `go install`: a missing bin directory is
 // created, and a path component that is a file surfaces a clear error. The env
 // supplies the build subprocess environment.
-func Build(env ring.Environ, src, dst, ldflags string) error {
+func build(env ring.Environ, src, dst, ldflags string) error {
 	if err := os.MkdirAll(dst, 0o755); err != nil {
 		return fmt.Errorf("create %q: %w", dst, err)
 	}

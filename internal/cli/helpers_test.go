@@ -1079,15 +1079,30 @@ func Test_editGoWork(t *testing.T) {
 
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
-		oskit.Write(t, "module example.com/parent\n\ngo 1.23\n", wsPth, "go.mod")
+		oskit.Write(
+			t,
+			"module example.com/parent\n\ngo 1.23\n",
+			wsPth,
+			"go.mod",
+		)
 
-		oskit.Write(t, "module example.com/project\n\ngo 1.23\n", prjRoot, "go.mod")
+		oskit.Write(
+			t,
+			"module example.com/project\n\ngo 1.23\n",
+			prjRoot,
+			"go.mod",
+		)
 
 		srcWork := filepath.Join(wsPth, "go.work")
 		oskit.Write(t, "go 1.23\n\nuse .\nuse ./project\n", srcWork)
 
 		outPth := oskit.MkdirTemp(t, "", "project")
-		oskit.Write(t, "module example.com/project\n\ngo 1.23\n", outPth, "go.mod")
+		oskit.Write(
+			t,
+			"module example.com/project\n\ngo 1.23\n",
+			outPth,
+			"go.mod",
+		)
 		// Destination starts with a copy of the parent workfile.
 		oskit.Write(t, "go 1.23\n\nuse .\nuse ./project\n", outPth, "go.work")
 
@@ -1102,7 +1117,8 @@ func Test_editGoWork(t *testing.T) {
 		assert.NoError(t, err)
 
 		text := oskit.ReadFileStr(t, filepath.Join(outPth, "go.work"))
-		// go work edit may emit a use ( ... ) block; parent is abs, project is .
+		// go work edit may emit a use ( ... ) block; parent is absolute,
+		// project is ".".
 		assert.Contain(t, wsPth, text)
 		assert.Contain(t, "\t.\n", text)
 		assert.NotContain(t, "./project", text)
@@ -1911,5 +1927,31 @@ func Test_allTargets(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.True(t, len(have) > len(gen))
+	})
+}
+
+func Test_fileContainsStr(t *testing.T) {
+	t.Run("present", func(t *testing.T) {
+		dir := t.TempDir()
+		p := filepath.Join(dir, "f")
+		oskit.Write(t, "foo bar baz", p)
+		ok, err := fileContainsStr(p, "bar")
+		assert.NoError(t, err)
+		assert.True(t, ok)
+	})
+
+	t.Run("absent", func(t *testing.T) {
+		dir := t.TempDir()
+		p := filepath.Join(dir, "f")
+		oskit.Write(t, "foo baz", p)
+		ok, err := fileContainsStr(p, "bar")
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("file does not exist", func(t *testing.T) {
+		ok, err := fileContainsStr("/nonexistent/path", "x")
+		assert.False(t, ok)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 }
