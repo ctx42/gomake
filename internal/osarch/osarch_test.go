@@ -6,6 +6,8 @@ package osarch
 import (
 	"bufio"
 	"bytes"
+	"net/http"
+	"net/http/httptest"
 	"os/exec"
 	"strings"
 	"testing"
@@ -13,6 +15,7 @@ import (
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
+	"github.com/ctx42/testkit/pkg/oskit"
 )
 
 // Test_IsGOOS guards that every GOOS the active toolchain reports is in the
@@ -97,6 +100,46 @@ func Test_IsGOARCH_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have)
 		})
 	}
+}
+
+func Test_generateVersions(t *testing.T) {
+	t.Run("error - invalid GOMAKE_GO_VERSION", func(t *testing.T) {
+		// --- Given ---
+		t.Setenv("GOMAKE_GO_VERSION", "nope")
+
+		cmd := exec.CommandContext(t.Context(), "go", "run",
+			"00_generate_versions.go")
+
+		// --- When ---
+		out, err := cmd.CombinedOutput()
+
+		// --- Then ---
+		assert.Error(t, err)
+		assert.Contain(t, "invalid GOMAKE_GO_VERSION", string(out))
+	})
+
+	t.Run("error - version endpoint", func(t *testing.T) {
+		// --- Given ---
+		srv := httptest.NewServer(http.HandlerFunc(http.NotFound))
+		t.Cleanup(srv.Close)
+
+		before := oskit.ReadFileStr(t, "versions_gen.go")
+
+		t.Setenv("GOMAKE_VERSION_URL", srv.URL)
+		t.Setenv("GOMAKE_GO_VERSION", "")
+		ctx := t.Context()
+		cmd := exec.CommandContext(ctx, "go", "run", "00_generate_versions.go")
+
+		// --- When ---
+		out, err := cmd.CombinedOutput()
+
+		// --- Then ---
+		assert.Error(t, err)
+		assert.Contain(t, "HTTP 404", string(out))
+
+		after := oskit.ReadFileStr(t, "versions_gen.go")
+		assert.Equal(t, before, after)
+	})
 }
 
 // distList returns the unique GOOS and GOARCH values from `go tool dist list`.

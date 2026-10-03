@@ -152,6 +152,34 @@ func Test_goCache(t *testing.T) {
 		// --- Then ---
 		tspy.AssertExpectations()
 	})
+
+	t.Run("error - go fails", func(t *testing.T) {
+		// --- Given ---
+		bin := t.TempDir()
+
+		script := filepath.Join(bin, "go")
+
+		body := "" +
+			"#!/bin/sh\n" +
+			"exit 1\n"
+		must.Nil(os.WriteFile(script, []byte(body), 0o755))
+
+		path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
+		t.Setenv("PATH", path)
+
+		tspy := tester.New(t)
+		tspy.ExpectFatal()
+		tspy.ExpectLogContain("exit status 1")
+		tspy.Close()
+
+		fn := func() { goCache(tspy) }
+
+		// --- When ---
+		assert.Panic(t, fn)
+
+		// --- Then ---
+		tspy.AssertExpectations()
+	})
 }
 
 func Test_findMakefiles(t *testing.T) {

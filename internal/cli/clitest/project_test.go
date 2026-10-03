@@ -159,6 +159,33 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		prj.Close() // Must close to prevent error.
 	})
 
+	t.Run("leading build tag", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectTempDir(1)
+		tspy.Close()
+
+		prj := NewProject(tspy)
+
+		src := oskit.MkdirAll(t, t.TempDir(), "src")
+
+		body := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package testdata\n"
+		oskit.Write(t, body, src, "makefile.go")
+
+		// --- When ---
+		prj.MakefilesFrom(src)
+
+		// --- Then ---
+		text := oskit.ReadFileStr(t, prj.Root(), "makefile.go")
+		assert.Equal(t, "package testdata\n", text)
+
+		prj.Close() // Must close to prevent error.
+	})
+
 	t.Run("error - used more than once", func(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t)

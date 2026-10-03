@@ -27,19 +27,34 @@ func Test_ctxKey_String(t *testing.T) {
 }
 
 func Test_NewTstProvider(t *testing.T) {
-	// --- Given ---
-	pre := []mkf.PreRunFn{TestPreRun}
+	t.Run("no hooks", func(t *testing.T) {
+		// --- When ---
+		have := NewTstProvider()
 
-	// --- When ---
-	have := NewTstProvider(pre...)
+		// --- Then ---
+		assert.Len(t, 0, have.PreRuns())
+	})
 
-	// --- Then ---
-	assert.Len(t, 1, have.PreRuns())
-	assert.Same(t, pre[0], have.PreRuns()[0])
-	// PreRuns returns a clone so a caller cannot replace a hook.
-	pr := have.PreRuns()
-	pr[0] = nil
-	assert.Same(t, TestPreRun, have.PreRuns()[0])
+	t.Run("clones the hooks", func(t *testing.T) {
+		// --- Given ---
+		pre := []mkf.PreRunFn{TestPreRun}
+
+		// --- When ---
+		have := NewTstProvider(pre...)
+
+		// --- Then ---
+		assert.Len(t, 1, have.PreRuns())
+		assert.Same(t, pre[0], have.PreRuns()[0])
+
+		// PreRuns returns a clone so a caller cannot replace a hook.
+		pr := have.PreRuns()
+		pr[0] = nil
+		assert.Same(t, TestPreRun, have.PreRuns()[0])
+
+		// The input slice is cloned too.
+		pre[0] = nil
+		assert.Same(t, TestPreRun, have.PreRuns()[0])
+	})
 }
 
 func Test_TestTargets(t *testing.T) {
