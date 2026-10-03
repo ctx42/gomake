@@ -24,6 +24,15 @@ var (
 	// errInvArg is an error indicating a target has invalid argument(s).
 	errInvArg = errors.New("invalid target argument")
 
+	// errGeneric indicates a function has type parameters. Generated code
+	// calls the function with no type arguments, so it cannot be a target.
+	errGeneric = errors.New("generic target")
+
+	// errAliased indicates an exported function matches the target shape but
+	// names context.Context or *ring.Ring through an import alias. It is not
+	// registered.
+	errAliased = errors.New("aliased context or ring parameter")
+
 	// ErrDupTarget is an error indicating a target (name) is a duplicate
 	// of already existing target.
 	ErrDupTarget = errors.New("duplicated target")
@@ -52,6 +61,9 @@ func newTarget(
 	tgt.FuncName = df.Name
 
 	ft := df.Decl.Type
+	if ft.TypeParams != nil && len(ft.TypeParams.List) > 0 {
+		return nil, errGeneric
+	}
 
 	if err := checkParams(ft.Params); err != nil {
 		return nil, err
@@ -68,6 +80,18 @@ func newTarget(
 	setDerivedFields(tgt)
 
 	return tgt, nil
+}
+
+// selName returns the identifier at the end of a type expression.
+func selName(expr ast.Expr) string {
+	switch v := expr.(type) {
+	case *ast.Ident:
+		return v.Name
+	case *ast.SelectorExpr:
+		return v.Sel.Name
+	default:
+		return ""
+	}
 }
 
 // stripRecvStar removes a leading "*" from a go/doc receiver string so
@@ -136,15 +160,20 @@ func checkParams(params *ast.FieldList) error {
 
 	typ := qIdent(params.List[0].Type)
 	if typ != "context.Context" {
+		if selName(params.List[0].Type) == "Context" {
+			return errAliased
+		}
 		return errInvArg
 	}
 	ctxCnt += len(params.List[0].Names)
 
 	// Require an explicit pointer; qIdent strips * so compare StarExpr first.
-	// Known limitation: aliased ring imports (e.g. r "…/ring") are not
-	// recognised and will cause errInvArg here.
+	// An import alias (r "…/ring", *r.Ring) is rejected and reported.
 	star, ok := params.List[1].Type.(*ast.StarExpr)
 	if !ok || qIdent(star.X) != "ring.Ring" {
+		if ok && selName(star.X) == "Ring" {
+			return errAliased
+		}
 		return errInvArg
 	}
 	argsCnt += len(params.List[1].Names)

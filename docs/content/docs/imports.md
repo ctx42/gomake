@@ -21,6 +21,8 @@ import _ "github.com/myorg/build-targets/release"  //gomake:import deploy
 
 - Without a namespace argument: targets are merged into the root namespace.
 - With a namespace argument (`deploy`): targets are prefixed with `deploy:`.
+- The tag may be an end-of-line comment or a doc comment above the import.
+  When both are present, the end-of-line tag wins.
 
 The import uses the blank identifier (`_`) for the ordinary Go reason: the
 package is never referenced in your code, so a named import would fail to

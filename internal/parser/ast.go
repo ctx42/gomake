@@ -65,6 +65,7 @@ func astFiles(
 			format := "%w at %s: %w"
 			return nil, nil, fmt.Errorf(format, errAstParse, impPath, err)
 		}
+		attachDeclDoc(af)
 		fls[path] = af
 		pkgNames[af.Name.Name] = struct{}{}
 	}

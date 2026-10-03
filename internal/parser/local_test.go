@@ -4,12 +4,15 @@
 package parser
 
 import (
+	"go/build"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testkit/pkg/modkit"
+	"github.com/ctx42/testkit/pkg/oskit"
 )
 
 func Test_newLocalPackage(t *testing.T) {
@@ -89,6 +92,35 @@ func Test_importDir(t *testing.T) {
 		assert.Equal(t, []string{"makefile.go"}, bp.GoFiles)
 	})
 
+	t.Run("cgo disabled drops cgo files", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("CGO_ENABLED", "0")
+		dir := importDirFixture(t)
+
+		// --- When ---
+		bp, err := importDir(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"old.go", "plain.go"}, sortedGoFiles(bp))
+	})
+
+	t.Run("cgo enabled keeps cgo files", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("CGO_ENABLED", "1")
+		dir := importDirFixture(t)
+
+		// --- When ---
+		bp, err := importDir(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		want := []string{"cgo.go", "old.go", "plain.go"}
+		assert.Equal(t, want, sortedGoFiles(bp))
+	})
+
 	t.Run("error - tagged files excluded without tag", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
@@ -99,6 +131,113 @@ func Test_importDir(t *testing.T) {
 
 		// --- Then ---
 		assert.Error(t, err)
+	})
+}
+
+func Test_releaseTagsFor_tabular(t *testing.T) {
+	tt := []struct {
+		testN   string
+		version string
+		want    []string
+		ok      bool
+	}{
+		{"release", "go1.2.0", []string{"go1.1", "go1.2"}, true},
+		{"rc", "go1.3rc1", []string{"go1.1", "go1.2", "go1.3"}, true},
+		{"devel prefix", "devel go1.2-abc", []string{"go1.1", "go1.2"}, true},
+		{"not a version", "tip", nil, false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have, ok := releaseTagsFor(tc.version)
+
+			// --- Then ---
+			assert.Equal(t, tc.ok, ok)
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func importDirFixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	oskit.Write(t, "package p\n", dir, "plain.go")
+	oskit.Write(t, "//go:build cgo\n\npackage p\n", dir, "cgo.go")
+	oskit.Write(t, "//go:build go1.1\n\npackage p\n", dir, "old.go")
+	oskit.Write(t, "//go:build go1.99\n\npackage p\n", dir, "future.go")
+	return dir
+}
+
+func sortedGoFiles(bp *build.Package) []string {
+	have := append([]string(nil), bp.GoFiles...)
+	sort.Strings(have)
+	return have
+}
+
+func Test_buildTags(t *testing.T) {
+	t.Run("meta tag only", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+		rng.EnvSet("GOFLAGS", "")
+
+		// --- When ---
+		have := buildTags(rng)
+
+		// --- Then ---
+		assert.Equal(t, []string{BuildTag}, have)
+	})
+
+	t.Run("unions goflags and the meta tag", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+		rng.EnvSet("GOFLAGS", "-tags=extra,other")
+
+		// --- When ---
+		have := buildTags(rng)
+
+		// --- Then ---
+		want := []string{"extra", "other", BuildTag}
+		assert.Equal(t, want, have)
+	})
+
+	t.Run("goflags without a meta tag", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("GOFLAGS", "-tags extra")
+
+		// --- When ---
+		have := buildTags(rng)
+
+		// --- Then ---
+		assert.Equal(t, []string{"extra"}, have)
+	})
+}
+
+func Test_listTagArgs(t *testing.T) {
+	t.Run("none", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("GOFLAGS", "")
+
+		// --- When ---
+		have := listTagArgs(rng)
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
+
+	t.Run("one flag for the whole list", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+		rng.EnvSet("GOFLAGS", "-tags=extra")
+
+		// --- When ---
+		have := listTagArgs(rng)
+
+		// --- Then ---
+		want := []string{"-tags", "extra," + BuildTag}
+		assert.Equal(t, want, have)
 	})
 }
 

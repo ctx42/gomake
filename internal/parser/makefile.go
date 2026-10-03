@@ -61,6 +61,7 @@ func MakefileFromPackage(rng *ring.Ring, pkg *Package) (*Makefile, error) {
 		return nil, err
 	}
 	pmf.Doc = toOneLine(docPkg.Doc)
+	pmf.Targets.reportSkips(rng)
 	return pmf, nil
 }
 

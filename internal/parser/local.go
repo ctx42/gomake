@@ -10,7 +10,9 @@ import (
 	"fmt"
 	"go/build"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -57,8 +59,10 @@ func newLocalPackage(rng *ring.Ring, pkg *Package) bool {
 	return true
 }
 
-// importDir reads the Go package in dir using the same build tag, GOOS, and
-// GOARCH selection that `go list` would apply, without spawning a subprocess.
+// importDir reads the Go package in dir using the build tag, GOOS, and
+// GOARCH from rng. Release tags and cgo come from the go tool started
+// with rng's environment, which is what `go list` would use. An error
+// from that query is returned so the caller can fall back to `go list`.
 func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 	ctxt := build.Default
 	if goos := rng.EnvGet("GOOS"); goos != "" {
@@ -67,14 +71,76 @@ func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 	if goarch := rng.EnvGet("GOARCH"); goarch != "" {
 		ctxt.GOARCH = goarch
 	}
-	// Start from Default tags, then GOFLAGS -tags, then meta build tag.
-	tags := append([]string{}, ctxt.BuildTags...)
-	tags = append(tags, goFlagsTags(rng.EnvGet("GOFLAGS"))...)
-	if tag := GetBuildTag(rng); tag != "" {
-		tags = append(tags, tag)
+	rel, cgo, err := toolchainFacts(rng)
+	if err != nil {
+		return nil, err
 	}
+	ctxt.ReleaseTags = rel
+	ctxt.CgoEnabled = cgo
+	// Start from Default tags, then the same user list `go list -tags` gets.
+	tags := append([]string{}, ctxt.BuildTags...)
+	tags = append(tags, buildTags(rng)...)
 	ctxt.BuildTags = tags
 	return ctxt.ImportDir(dir, 0)
+}
+
+// toolchainFacts asks the go tool, under env, for the release tags of its
+// version and whether cgo is enabled. CGO_ENABLED in env selects cgo.
+func toolchainFacts(env ring.Environ) (tags []string, cgo bool, err error) {
+	cmd := exec.Command("go", "env", "GOVERSION", "CGO_ENABLED")
+	cmd.Env = env.EnvAll()
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, false, fmt.Errorf("go env: %w", err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) != 2 {
+		format := "go env GOVERSION CGO_ENABLED: %q"
+		return nil, false, fmt.Errorf(format, strings.TrimSpace(string(out)))
+	}
+	tags, ok := releaseTagsFor(strings.TrimSpace(lines[0]))
+	if !ok {
+		format := "go env GOVERSION: %q"
+		return nil, false, fmt.Errorf(format, strings.TrimSpace(lines[0]))
+	}
+	switch strings.TrimSpace(lines[1]) {
+	case "1":
+		cgo = true
+	case "0":
+		cgo = false
+	default:
+		format := "go env CGO_ENABLED: %q"
+		return nil, false, fmt.Errorf(format, strings.TrimSpace(lines[1]))
+	}
+	return tags, cgo, nil
+}
+
+// releaseTagsFor returns the go1.x release tags for a Go version string
+// such as "go1.26.0". The last tag is the version's own minor release.
+func releaseTagsFor(version string) ([]string, bool) {
+	const prefix = "go1."
+	i := strings.Index(version, prefix)
+	if i < 0 {
+		return nil, false
+	}
+	rest := version[i+len(prefix):]
+	n := 0
+	digits := 0
+	for _, c := range rest {
+		if c < '0' || c > '9' {
+			break
+		}
+		n = n*10 + int(c-'0')
+		digits++
+	}
+	if digits == 0 {
+		return nil, false
+	}
+	tags := make([]string, 0, n)
+	for v := 1; v <= n; v++ {
+		tags = append(tags, "go1."+strconv.Itoa(v))
+	}
+	return tags, true
 }
 
 // goFlagsTags extracts build tags from a GOFLAGS value (e.g. "-tags=a,b"
@@ -98,6 +164,29 @@ func goFlagsTags(goflags string) []string {
 		}
 	}
 	return out
+}
+
+// buildTags returns the user build tags for package loading: tags from
+// GOFLAGS, then the meta build tag when one is set. `go list` replaces a
+// GOFLAGS -tags list when -tags is also passed on the command line, so that
+// invocation must pass this whole list.
+func buildTags(rng *ring.Ring) []string {
+	tags := goFlagsTags(rng.EnvGet("GOFLAGS"))
+	if tag := GetBuildTag(rng); tag != "" {
+		tags = append(tags, tag)
+	}
+	return tags
+}
+
+// listTagArgs returns the `-tags` arguments for `go list`, or nil when
+// buildTags is empty. The tag list is comma-joined so one flag carries
+// every tag.
+func listTagArgs(rng *ring.Ring) []string {
+	tags := buildTags(rng)
+	if len(tags) == 0 {
+		return nil
+	}
+	return []string{"-tags", strings.Join(tags, ",")}
 }
 
 // splitTags splits a comma-separated tags list into non-empty tags.

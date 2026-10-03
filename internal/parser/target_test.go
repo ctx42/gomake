@@ -9,11 +9,95 @@ import (
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testkit/pkg/modkit"
 
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 )
+
+func Test_newTarget_generic(t *testing.T) {
+	// --- Given ---
+	pkg := &Package{Name: "main"}
+	fn := &doc.Func{
+		Name: "Generic",
+		Decl: &ast.FuncDecl{
+			Name: ast.NewIdent("Generic"),
+			Type: &ast.FuncType{
+				TypeParams: &ast.FieldList{
+					List: []*ast.Field{{
+						Names: []*ast.Ident{ast.NewIdent("T")},
+						Type:  ast.NewIdent("any"),
+					}},
+				},
+			},
+		},
+	}
+
+	// --- When ---
+	tgt, err := newTarget(pkg, fn)
+
+	// --- Then ---
+	assert.ErrorIs(t, errGeneric, err)
+	assert.Nil(t, tgt)
+}
+
+func Test_Targets_addFunc_alias(t *testing.T) {
+	// --- Given ---
+	pkg := &Package{Name: "main"}
+	fn := &doc.Func{
+		Name: "Aliased",
+		Decl: &ast.FuncDecl{
+			Name: ast.NewIdent("Aliased"),
+			Type: &ast.FuncType{
+				Params: &ast.FieldList{List: []*ast.Field{
+					{
+						Names: []*ast.Ident{ast.NewIdent("ctx")},
+						Type: &ast.SelectorExpr{
+							X:   ast.NewIdent("context"),
+							Sel: ast.NewIdent("Context"),
+						},
+					},
+					{
+						Names: []*ast.Ident{ast.NewIdent("rng")},
+						Type: &ast.StarExpr{X: &ast.SelectorExpr{
+							X:   ast.NewIdent("r"),
+							Sel: ast.NewIdent("Ring"),
+						}},
+					},
+				}},
+				Results: &ast.FieldList{List: []*ast.Field{{
+					Type: ast.NewIdent("error"),
+				}}},
+			},
+		},
+	}
+	tgs := NewTargets()
+
+	// --- When ---
+	err := tgs.addFunc(pkg, fn)
+
+	// --- Then ---
+	assert.NoError(t, err)
+	assert.Equal(t, 0, tgs.Len())
+	assert.Equal(t, []string{"Aliased"}, tgs.skips)
+}
+
+func Test_Targets_reportSkips(t *testing.T) {
+	// --- Given ---
+	tst := ringtest.New(t).WetStderr()
+	rng := tst.Ring()
+	tgs := NewTargets()
+	tgs.noteSkip("Aliased")
+
+	// --- When ---
+	tgs.reportSkips(rng)
+
+	// --- Then ---
+	want := "gomake: skipping Aliased: " +
+		"aliased context or ring parameter\n"
+	assert.Equal(t, want, tst.Stderr())
+}
 
 func Test_newTarget_main_package(t *testing.T) {
 	relPath := "testdata/projects/showcase_targets/project"

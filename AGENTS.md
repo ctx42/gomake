@@ -16,8 +16,8 @@ namespaces, cross-package imports, build tags, etc.).
   `makefile_<GOOS>.go` / `makefile_<GOARCH>.go` / `makefile_<GOOS>_<GOARCH>.go`
   (other suffixes are ignored with a warning). Optionally tagged
   `//go:build gomake`
-- Namespaces: `type Foo struct{} //gomake:ns_root`
-- Imports: `import foo "example.com/bar" //gomake:import [ns]`
+- Namespaces: `type Foo struct{} //gomake:ns_root` (or a doc comment above)
+- Imports: `import foo "example.com/bar" //gomake:import [ns]` (or above)
 - Hidden: `// gomake:hidden reason`
 
 See README.md, internal/parser/parser.go (tags), and especially

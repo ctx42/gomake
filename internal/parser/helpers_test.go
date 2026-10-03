@@ -15,6 +15,7 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/goldy"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 
@@ -518,6 +519,26 @@ func Test_isNSRoot(t *testing.T) {
 		assert.False(t, isNSRoot(&ast.TypeSpec{Comment: nil}))
 		assert.False(t, isNSRoot(&ast.TypeSpec{Comment: &ast.CommentGroup{}}))
 	})
+
+	t.Run("doc comment", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		src := "" +
+			"package p\n" +
+			"\n" +
+			"// Foo groups targets.\n" +
+			"//gomake:ns_root\n" +
+			"type Foo struct{}\n"
+		pth := oskit.Write(t, src, dir, "p.go")
+		_, fls := must.Values(astFiles(dir, []string{pth}))
+		spc := fls[pth].Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)
+
+		// --- When ---
+		have := isNSRoot(spc)
+
+		// --- Then ---
+		assert.True(t, have)
+	})
 }
 
 func Test_toKebabCase_tabular(t *testing.T) {
@@ -643,6 +664,78 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 			assert.Equal(t, tc.wantNS, haveNS)
 		})
 	}
+}
+
+func Test_gmImpSpec_doc(t *testing.T) {
+	t.Run("above the spec", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package p\n" +
+			"import (\n" +
+			"\t//gomake:import ns\n" +
+			"\t_ \"example.com/bar\"\n" +
+			")\n"
+		set := token.NewFileSet()
+		fil := must.Value(goparser.ParseFile(
+			set, "x.go", src, goparser.ParseComments,
+		))
+
+		// --- When ---
+		haveNS, haveSpec := gmImpSpec(fil.Imports[0])
+
+		// --- Then ---
+		assert.Equal(t, "ns", haveNS)
+		assert.Equal(t, "example.com/bar", haveSpec)
+	})
+
+	t.Run("line comment wins", func(t *testing.T) {
+		// --- Given ---
+		is := &ast.ImportSpec{
+			Path: &ast.BasicLit{Value: `"example.com/bar"`},
+			Doc: &ast.CommentGroup{List: []*ast.Comment{
+				{Text: "//gomake:import doc"},
+			}},
+			Comment: &ast.CommentGroup{List: []*ast.Comment{
+				{Text: "//gomake:import line"},
+			}},
+		}
+
+		// --- When ---
+		haveNS, haveSpec := gmImpSpec(is)
+
+		// --- Then ---
+		assert.Equal(t, "line", haveNS)
+		assert.Equal(t, "example.com/bar", haveSpec)
+	})
+
+	t.Run("above a single import", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		src := "" +
+			"package p\n" +
+			"\n" +
+			"//gomake:import ns\n" +
+			"import _ \"example.com/bar\"\n"
+		pth := oskit.Write(t, src, dir, "p.go")
+		_, fls := must.Values(astFiles(dir, []string{pth}))
+		fil := fls[pth]
+
+		// --- When ---
+		haveNS, haveSpec := gmImpSpec(fil.Imports[0])
+
+		// --- Then ---
+		assert.Equal(t, "ns", haveNS)
+		assert.Equal(t, "example.com/bar", haveSpec)
+	})
+
+	t.Run("nil spec", func(t *testing.T) {
+		// --- When ---
+		haveNS, haveSpec := gmImpSpec(nil)
+
+		// --- Then ---
+		assert.Equal(t, "", haveNS)
+		assert.Equal(t, "", haveSpec)
+	})
 }
 
 func Test_unquote_tabular(t *testing.T) {

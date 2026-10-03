@@ -9,6 +9,7 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testkit/pkg/modkit"
+	"github.com/ctx42/testkit/pkg/oskit"
 )
 
 func Test_listCacheKey(t *testing.T) {
@@ -38,6 +39,53 @@ func Test_listCacheKey(t *testing.T) {
 
 		// --- Then ---
 		assert.NotEqual(t, key1, key2)
+	})
+
+	t.Run("changes when ring CGO_ENABLED changes", func(t *testing.T) {
+		// --- Given ---
+		dir := modkit.Path("testdata/projects/simple_tagged/project")
+		base := SetBuildTag(ring.New())
+		base.EnvSet("CGO_ENABLED", "0")
+		alt := SetBuildTag(ring.New())
+		alt.EnvSet("CGO_ENABLED", "1")
+
+		// --- When ---
+		key1, ok1 := listCacheKey(base, dir, "example.com/x")
+		key2, ok2 := listCacheKey(alt, dir, "example.com/x")
+
+		// --- Then ---
+		assert.True(t, ok1)
+		assert.True(t, ok2)
+		assert.NotEqual(t, key1, key2)
+	})
+
+	t.Run("unreadable go.mod is not cached", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, "go.mod")
+
+		// --- When ---
+		key, ok := listCacheKey(rng, dir, "example.com/x")
+
+		// --- Then ---
+		assert.False(t, ok)
+		assert.Equal(t, "", key)
+	})
+
+	t.Run("unreadable go.sum is not cached", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
+		oskit.MkdirAll(t, dir, "go.sum")
+
+		// --- When ---
+		key, ok := listCacheKey(rng, dir, "example.com/x")
+
+		// --- Then ---
+		assert.False(t, ok)
+		assert.Equal(t, "", key)
 	})
 
 	t.Run("not cacheable outside a module", func(t *testing.T) {

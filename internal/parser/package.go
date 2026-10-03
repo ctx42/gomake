@@ -126,9 +126,7 @@ func NewPackage(
 	// Build command arguments.
 	args := make([]string, len(pkg.args), len(pkg.args)+3)
 	copy(args, pkg.args)
-	if bt := GetBuildTag(rng); bt != "" {
-		args = append(args, "-tags", bt)
-	}
+	args = append(args, listTagArgs(rng)...)
 	if pkg.ImpSpec != "" {
 		args = append(args, pkg.ImpSpec)
 	}

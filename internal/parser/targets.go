@@ -5,6 +5,7 @@ package parser
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"go/doc"
 	"sort"
@@ -23,6 +24,7 @@ type Targets struct {
 	unique map[string]struct{} // Map of target names (for uniqueness).
 	list   []*mkf.Target       // List of unique targets (sorted).
 	sorted bool                // True when list is sorted.
+	skips  []string            // Exported funcs skipped because of an alias.
 }
 
 // NewTargets returns new instance of Targets.
@@ -113,9 +115,16 @@ func (tgs *Targets) Len() int {
 }
 
 // Add adds new target(s) to the collection. Returns [ErrDupTarget] when target
-// is already in the collection.
+// is already in the collection. A nil target is ignored. The zero value is
+// safe to add to.
 func (tgs *Targets) Add(ts ...*mkf.Target) error {
+	if tgs.unique == nil {
+		tgs.unique = make(map[string]struct{})
+	}
 	for _, tgt := range ts {
+		if tgt == nil {
+			continue
+		}
 		if got := tgs.Get(tgt.Name); got != nil {
 			format := "%w: %s, %s"
 			return fmt.Errorf(format, ErrDupTarget, got.DefRef, tgt.DefRef)
@@ -151,10 +160,15 @@ func (tgs *Targets) pkgNameForImp(impSpec string) string {
 // the same.
 func (tgs *Targets) addFunc(pkg *Package, fns ...*doc.Func) error {
 	for _, fn := range fns {
-		if tgt, err := newTarget(pkg, fn); err == nil {
+		tgt, err := newTarget(pkg, fn)
+		if err == nil {
 			if err = tgs.Add(tgt); err != nil {
 				return err
 			}
+			continue
+		}
+		if errors.Is(err, errAliased) {
+			tgs.noteSkip(fn.Name)
 		}
 	}
 	return nil
@@ -234,13 +248,39 @@ func (tgs *Targets) addMethods(
 ) error {
 
 	for _, met := range fns {
-		if tgt, err := newTarget(pkg, met, nsp...); err == nil {
+		tgt, err := newTarget(pkg, met, nsp...)
+		if err == nil {
 			if err = tgs.Add(tgt); err != nil {
 				return err
 			}
+			continue
+		}
+		if errors.Is(err, errAliased) {
+			tgs.noteSkip(met.Name)
 		}
 	}
 	return nil
+}
+
+// noteSkip records an exported function that was not registered because its
+// parameters use an import alias.
+func (tgs *Targets) noteSkip(name string) {
+	tgs.skips = append(tgs.skips, name)
+}
+
+// reportSkips writes one warning per skipped alias to the ring. A nil ring
+// writes nothing.
+func (tgs *Targets) reportSkips(rng *ring.Ring) {
+	if rng == nil || len(tgs.skips) == 0 {
+		return
+	}
+	for _, name := range tgs.skips {
+		_, _ = fmt.Fprintf(
+			rng.Stderr(),
+			"gomake: skipping %s: aliased context or ring parameter\n",
+			name,
+		)
+	}
 }
 
 // withReceiver returns the first target information instance with given
@@ -315,8 +355,14 @@ func (tgs *Targets) MarkDefault(defRef string) string {
 
 // BuiltInCB is callback function for [Targets.Map] method which marks given
 // target as built-in. It clears Default so an external package's var Default
-// cannot become the no-arg default of the installed binary.
+// cannot become the no-arg default of the installed binary. A name that
+// already starts with ":" is left as-is, so a second pass does not stack
+// prefixes.
 func BuiltInCB(tgs *Targets, tgt *mkf.Target) {
+	if strings.HasPrefix(tgt.Name, ":") {
+		tgt.Default = false
+		return
+	}
 	delete(tgs.unique, tgt.Name)
 	tgt.Name = ":" + tgt.Name
 	tgt.Default = false

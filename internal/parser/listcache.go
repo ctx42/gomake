@@ -6,7 +6,9 @@ package parser
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -31,11 +33,12 @@ func listCacheDir() (string, error) {
 	return dir, nil
 }
 
-// listCacheKey returns the cache key for resolving import spec from the project
-// at dir under the build tag, GOOS, and GOARCH held by rng. It hashes the
-// project's go.mod and go.sum so any dependency change invalidates the key. It
-// reports false when the project module cannot be located, in which case the
-// `go list` result must not be cached.
+// listCacheKey returns the cache key for resolving import spec from the
+// project at dir under the build tag, GOOS, GOARCH, and toolchain flags
+// held by rng. It hashes the project's go.mod and go.sum so any dependency
+// change invalidates the key. It reports false when the project module
+// cannot be located, or when go.mod or an existing go.sum cannot be read.
+// A missing go.sum is ignored. A false result must not be cached.
 func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	root, err := gomake.Root(dir)
 	if err != nil {
@@ -45,10 +48,14 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	h := sha256.New()
 	for _, name := range []string{"go.mod", "go.sum"} {
 		data, rErr := os.ReadFile(filepath.Join(root, name))
-		if rErr == nil {
-			_, _ = fmt.Fprintf(h, "%s\n", name)
-			_, _ = h.Write(data)
+		if rErr != nil {
+			if errors.Is(rErr, fs.ErrNotExist) && name == "go.sum" {
+				continue
+			}
+			return "", false
 		}
+		_, _ = fmt.Fprintf(h, "%s\n", name)
+		_, _ = h.Write(data)
 	}
 	// Active workspace may be above the module root or set via GOWORK.
 	goworkEnv := strings.TrimSpace(rng.EnvGet("GOWORK"))
@@ -88,9 +95,17 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 			_, _ = h.Write(data)
 		}
 	}
-	// GOFLAGS changes go list file selection (e.g. -tags=…).
-	if goflags := strings.TrimSpace(rng.EnvGet("GOFLAGS")); goflags != "" {
-		_, _ = fmt.Fprintf(h, "GOFLAGS:%s\n", goflags)
+	// Toolchain flags change which files go list selects and how they build.
+	for _, key := range []string{
+		"GOFLAGS",
+		"CGO_ENABLED",
+		"CGO_CFLAGS",
+		"CGO_LDFLAGS",
+		"GOTOOLCHAIN",
+	} {
+		if v := strings.TrimSpace(rng.EnvGet(key)); v != "" {
+			_, _ = fmt.Fprintf(h, "%s:%s\n", key, v)
+		}
 	}
 	format := "spec:%s\ntag:%s\ngoos:%s\ngoarch:%s\ngo:%s\n"
 	_, _ = fmt.Fprintf(

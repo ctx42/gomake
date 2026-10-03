@@ -243,16 +243,60 @@ func isNS(spc *ast.TypeSpec, prev []string) []string {
 }
 
 // isNSRoot returns true when a type spec has a `gomake:ns_root` comment
-// marking the type as a namespace root. Accepts optional space after //
+// marking the type as a namespace root. The comment may be an end-of-line
+// comment or a doc comment above the type. Accepts optional space after //
 // (//gomake:ns_root or // gomake:ns_root).
 func isNSRoot(spc *ast.TypeSpec) bool {
-	if spc == nil || spc.Comment == nil || len(spc.Comment.List) == 0 {
+	if spc == nil {
 		return false
 	}
-	text := strings.TrimSpace(spc.Comment.List[0].Text)
-	text = strings.TrimPrefix(text, "//")
-	text = strings.TrimSpace(text)
-	return text == nsTag || strings.HasPrefix(text, nsTag+" ")
+	lines := append(commentBodies(spc.Comment), commentBodies(spc.Doc)...)
+	for _, text := range lines {
+		if text == nsTag || strings.HasPrefix(text, nsTag+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+// attachDeclDoc copies a one-spec declaration's doc comment onto that spec
+// when the spec has none. go/parser leaves the comment on the GenDecl for
+// `//gomake:ns_root` above `type Foo struct{}` and the same shape of import.
+func attachDeclDoc(f *ast.File) {
+	if f == nil {
+		return
+	}
+	for _, dcl := range f.Decls {
+		gen, ok := dcl.(*ast.GenDecl)
+		if !ok || gen.Doc == nil || len(gen.Specs) != 1 {
+			continue
+		}
+		switch spc := gen.Specs[0].(type) {
+		case *ast.TypeSpec:
+			if spc.Doc == nil {
+				spc.Doc = gen.Doc
+			}
+		case *ast.ImportSpec:
+			if spc.Doc == nil {
+				spc.Doc = gen.Doc
+			}
+		}
+	}
+}
+
+// commentBodies returns each // comment with the prefix and surrounding
+// space removed. A nil group returns nil.
+func commentBodies(grp *ast.CommentGroup) []string {
+	if grp == nil {
+		return nil
+	}
+	out := make([]string, 0, len(grp.List))
+	for _, cmt := range grp.List {
+		text := strings.TrimSpace(cmt.Text)
+		text = strings.TrimPrefix(text, "//")
+		out = append(out, strings.TrimSpace(text))
+	}
+	return out
 }
 
 // builtinTypes represents a list of build in types.
@@ -373,30 +417,31 @@ func importLocalNames(files map[string]*ast.File) map[string]string {
 }
 
 // gmImpSpec returns import namespace and import spec only for specs tagged
-// with `gomake:import`. Otherwise it returns two empty strings. The namespace
-// is always lowercase regardless of how it was written in the source.
+// with `gomake:import`. Otherwise it returns two empty strings. The tag may
+// be an end-of-line comment or a doc comment above the spec; an end-of-line
+// tag wins when both are present. The namespace is always lowercase
+// regardless of how it was written in the source.
 func gmImpSpec(is *ast.ImportSpec) (string, string) {
-	// No comment, no gomake tag.
-	if is.Comment == nil || len(is.Comment.List) == 0 {
+	if is == nil {
 		return "", ""
 	}
-
-	// Get tag and remove leading '//'.
-	tag := is.Comment.List[0].Text[2:]
-	fields := strings.Fields(tag)
-	if len(fields) == 0 || fields[0] != importTag {
-		return "", ""
+	lines := append(commentBodies(is.Comment), commentBodies(is.Doc)...)
+	for _, text := range lines {
+		fields := strings.Fields(text)
+		if len(fields) == 0 || fields[0] != importTag {
+			continue
+		}
+		path := unquote(is.Path)
+		switch len(fields) {
+		case 1:
+			return "", path // Import without namespace.
+		case 2:
+			return strings.ToLower(fields[1]), path // Import with namespace.
+		default:
+			return "", ""
+		}
 	}
-
-	path := unquote(is.Path)
-	switch len(fields) {
-	case 1:
-		return "", path // Import without namespace.
-	case 2:
-		return strings.ToLower(fields[1]), path // Import with namespace.
-	default:
-		return "", ""
-	}
+	return "", ""
 }
 
 // unquote removes quotes from the beginning and the end of a string.
