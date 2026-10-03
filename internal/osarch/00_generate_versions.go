@@ -30,6 +30,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/mod/modfile"
 )
 
 // versionURL reports the latest published Go version as plain text; its first
@@ -245,11 +247,11 @@ func moduleRoot() (string, error) {
 	}
 	for {
 		gomod := filepath.Join(dir, "go.mod")
-		mod, err := directive(gomod, "module ")
-		if err != nil {
+		data, err := os.ReadFile(gomod)
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return "", fmt.Errorf("read %s: %w", gomod, err)
 		}
-		if mod == gomakeModule {
+		if modfile.ModulePath(data) == gomakeModule {
 			return dir, nil
 		}
 		parent := filepath.Dir(dir)
@@ -262,74 +264,20 @@ func moduleRoot() (string, error) {
 
 // goModVersion returns the go directive of the go.mod at pth as major.minor.
 func goModVersion(pth string) (string, error) {
-	line, err := directive(pth, "go ")
+	data, err := os.ReadFile(pth)
 	if err != nil {
 		return "", err
 	}
-	if mm := majorMinor(line); mm != "" {
-		return mm, nil
+	mf, err := modfile.ParseLax(pth, data, nil)
+	if err != nil {
+		return "", err
+	}
+	if mf.Go != nil {
+		if mm := majorMinor(mf.Go.Version); mm != "" {
+			return mm, nil
+		}
 	}
 	return "", fmt.Errorf("no go directive in %s", pth)
-}
-
-// directive returns the trimmed remainder of the first line in the file at
-// pth that starts with prefix. A missing file returns "", nil. Any other
-// read or scan error is returned.
-func directive(pth, prefix string) (string, error) {
-	b, err := os.ReadFile(pth)
-	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return "", nil
-		}
-		return "", err
-	}
-	sc := bufio.NewScanner(bytes.NewReader(b))
-	for sc.Scan() {
-		line := strings.TrimSpace(sc.Text())
-		rest, ok := strings.CutPrefix(line, strings.TrimSpace(prefix))
-		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
-			continue
-		}
-		return directiveValue(rest), nil
-	}
-	if err = sc.Err(); err != nil {
-		return "", err
-	}
-	return "", nil
-}
-
-// directiveValue drops a trailing // comment and surrounding quotes from a
-// go.mod directive value.
-func directiveValue(rest string) string {
-	rest = strings.TrimSpace(rest)
-	inQuote := false
-	escaped := false
-	for i := 0; i < len(rest); i++ {
-		c := rest[i]
-		if inQuote {
-			if escaped {
-				escaped = false
-				continue
-			}
-			if c == '\\' {
-				escaped = true
-				continue
-			}
-			if c == '"' || c == '`' {
-				inQuote = false
-			}
-			continue
-		}
-		if c == '"' || c == '`' {
-			inQuote = true
-			continue
-		}
-		if c == '/' && i+1 < len(rest) && rest[i+1] == '/' {
-			rest = rest[:i]
-			break
-		}
-	}
-	return strings.Trim(strings.TrimSpace(rest), "\"`")
 }
 
 // majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", "1.26",

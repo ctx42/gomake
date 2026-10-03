@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"bufio"
 	"flag"
 	"path/filepath"
 	"strings"
@@ -358,19 +357,6 @@ func Test_moduleImportPath(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorContain(t, "go.mod", err)
-	})
-
-	t.Run("error - module line too long", func(t *testing.T) {
-		// --- Given ---
-		dir := t.TempDir()
-		line := "module " + strings.Repeat("a", bufio.MaxScanTokenSize)
-		oskit.Write(t, line, dir, "go.mod")
-
-		// --- When ---
-		_, err := moduleImportPath(dir)
-
-		// --- Then ---
-		assert.ErrorIs(t, bufio.ErrTooLong, err)
 	})
 }
 

@@ -4,8 +4,6 @@
 package parser
 
 import (
-	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"go/build"
@@ -14,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"golang.org/x/mod/modfile"
 
 	"github.com/ctx42/gomake/pkg/gomake"
 )
@@ -158,21 +157,8 @@ func readModulePath(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}
-
-	scn := bufio.NewScanner(bytes.NewReader(data))
-	for scn.Scan() {
-		line := strings.TrimSpace(scn.Text())
-		rest, ok := strings.CutPrefix(line, "module")
-		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
-			continue
-		}
-		rest = strings.TrimSpace(rest)
-		if i := strings.Index(rest, "//"); i >= 0 {
-			rest = strings.TrimSpace(rest[:i])
-		}
-		if rest = strings.Trim(rest, "\"`"); rest != "" {
-			return rest, nil
-		}
+	if mod := modfile.ModulePath(data); mod != "" {
+		return mod, nil
 	}
 	return "", errNoModule
 }

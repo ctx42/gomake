@@ -14,6 +14,8 @@ import (
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/oskit"
+	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/module"
 )
 
 func Test_binaryCacheDir(t *testing.T) {
@@ -388,29 +390,44 @@ func Test_absWorkPaths(t *testing.T) {
 		}
 		assert.Equal(t, want, have)
 	})
-}
+	t.Run("use forms", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		content := "" +
+			"go 1.22\n" +
+			"use .\n" +
+			"use \"../my work\"\n" +
+			"use (\n" +
+			"  ./a\n" +
+			"  ./b // comment\n" +
+			"  \"./c d\" // comment\n" +
+			")\n"
+		path := oskit.Write(t, content, root, "go.work")
 
-func Test_localPathsFromGoWork(t *testing.T) {
-	// --- Given ---
-	root := t.TempDir()
-	content := "" +
-		"go 1.22\n" +
-		"use .\n" +
-		"use ../other\n" +
-		"use \"../my work\"\n" +
-		"use (\n" +
-		"  ./a\n" +
-		"  ./b // comment\n" +
-		"  \"./c d\" // comment\n" +
-		")\n"
-	path := oskit.Write(t, content, root, "go.work")
+		// --- When ---
+		have := absWorkPaths(path)
 
-	// --- When ---
-	have := localPathsFromGoWork(path)
+		// --- Then ---
+		want := []string{
+			root,
+			filepath.Join(root, "../my work"),
+			filepath.Join(root, "a"),
+			filepath.Join(root, "b"),
+			filepath.Join(root, "c d"),
+		}
+		assert.Equal(t, want, have)
+	})
 
-	// --- Then ---
-	want := []string{".", "../other", "../my work", "./a", "./b", "./c d"}
-	assert.Equal(t, want, have)
+	t.Run("malformed file", func(t *testing.T) {
+		// --- Given ---
+		path := oskit.Write(t, "use (\n", t.TempDir(), "go.work")
+
+		// --- When ---
+		have := absWorkPaths(path)
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
 }
 
 func Test_localPathsFromGoMod(t *testing.T) {
@@ -442,6 +459,21 @@ func Test_localPathsFromGoMod(t *testing.T) {
 		"./dir with space",
 	}
 	assert.Equal(t, want, have)
+}
+
+func Test_localReplacePaths(t *testing.T) {
+	// --- Given ---
+	rpls := []*modfile.Replace{
+		{New: module.Version{Path: "../lib"}},
+		{New: module.Version{Path: "example.com/v", Version: "v1.2.3"}},
+		{New: module.Version{Path: "/abs"}},
+	}
+
+	// --- When ---
+	have := localReplacePaths(rpls)
+
+	// --- Then ---
+	assert.Equal(t, []string{"../lib", "/abs"}, have)
 }
 
 func Test_isLocalDiskPath_tabular(t *testing.T) {

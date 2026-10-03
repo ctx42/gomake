@@ -16,10 +16,10 @@ import (
 	"runtime"
 	"slices"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"golang.org/x/mod/modfile"
 )
 
 // binaryCacheDir returns the gomake binary cache directory, creating it
@@ -197,21 +197,31 @@ func isSubpath(parent, child string) bool {
 	return strings.HasPrefix(child, parent+sep)
 }
 
-// absWorkPaths returns the use and replace paths from the go.work file at
-// goWorkPath, with relative paths joined to that file's directory. An empty
-// path, a missing file, or a file with no local paths yields a nil slice.
+// absWorkPaths returns the local use and replace paths from the go.work file
+// at goWorkPath, with relative paths joined to that file's directory. An
+// empty path, a missing or malformed file, or a file with no local paths
+// yields a nil slice.
 func absWorkPaths(goWorkPath string) []string {
 	if goWorkPath == "" {
 		return nil
 	}
-	workDir := filepath.Dir(goWorkPath)
-	raw := append(
-		localPathsFromGoWork(goWorkPath),
-		localPathsFromGoWorkReplace(goWorkPath)...,
-	)
+	data, err := os.ReadFile(goWorkPath)
+	if err != nil {
+		return nil
+	}
+	wf, err := modfile.ParseWork(goWorkPath, data, nil)
+	if err != nil {
+		return nil
+	}
+	raw := make([]string, 0, len(wf.Use)+len(wf.Replace))
+	for _, use := range wf.Use {
+		raw = append(raw, use.Path)
+	}
+	raw = append(raw, localReplacePaths(wf.Replace)...)
 	if len(raw) == 0 {
 		return nil
 	}
+	workDir := filepath.Dir(goWorkPath)
 	paths := make([]string, 0, len(raw))
 	for _, rel := range raw {
 		if filepath.IsAbs(rel) {
@@ -223,180 +233,31 @@ func absWorkPaths(goWorkPath string) []string {
 	return paths
 }
 
-// localPathsFromGoWork returns relative or absolute use paths from a go.work
-// file. Missing or unreadable files yield a nil slice.
-func localPathsFromGoWork(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	return scanLocalUseOrReplace(string(data), "use")
-}
-
-// localPathsFromGoWorkReplace returns local replace targets from a go.work
-// file (same grammar as go.mod replace).
-func localPathsFromGoWorkReplace(path string) []string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil
-	}
-	return scanLocalUseOrReplace(string(data), "replace")
-}
-
 // localPathsFromGoMod returns local filesystem replace targets from a go.mod
 // file (paths that start with "." or are absolute). Versioned module replaces
-// are ignored.
+// are ignored. A missing or malformed file yields a nil slice.
 func localPathsFromGoMod(path string) []string {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
-	return scanLocalUseOrReplace(string(data), "replace")
+	mf, err := modfile.Parse(path, data, nil)
+	if err != nil {
+		return nil
+	}
+	return localReplacePaths(mf.Replace)
 }
 
-// scanLocalUseOrReplace extracts local disk paths from go.work "use" or
-// go.mod "replace" directives, including parenthesized multi-line forms.
-func scanLocalUseOrReplace(src, keyword string) []string {
+// localReplacePaths returns the replacement paths of rpls that are local
+// disk paths.
+func localReplacePaths(rpls []*modfile.Replace) []string {
 	var out []string
-	inBlock := false
-	for _, line := range strings.Split(src, "\n") {
-		line = stripLineComment(line)
-		if line == "" {
-			continue
-		}
-		if inBlock {
-			if line == ")" {
-				inBlock = false
-				continue
-			}
-			if pth := localPathFromDirective(line, keyword, true); pth != "" {
-				out = append(out, pth)
-			}
-			continue
-		}
-		if !strings.HasPrefix(line, keyword) {
-			continue
-		}
-		rest := strings.TrimSpace(strings.TrimPrefix(line, keyword))
-		if rest == "(" {
-			inBlock = true
-			continue
-		}
-		if pth := localPathFromDirective(rest, keyword, false); pth != "" {
-			out = append(out, pth)
+	for _, rpl := range rpls {
+		if isLocalDiskPath(rpl.New.Path) {
+			out = append(out, rpl.New.Path)
 		}
 	}
 	return out
-}
-
-// localPathFromDirective returns a local path from a single use/replace line
-// body. inBlock is true when the line is inside a parenthesized block (no
-// leading keyword).
-func localPathFromDirective(line, keyword string, inBlock bool) string {
-	line = strings.TrimSpace(line)
-	if line == "" || line == ")" {
-		return ""
-	}
-	if keyword == "use" {
-		// use ./foo  or  use "../foo"
-		tok := firstModuleToken(line)
-		if tok == "" {
-			return ""
-		}
-		return unquotePath(tok)
-	}
-	// replace: "path [version] => local" (keyword already stripped when not
-	// in block? when not inBlock, line is full after "replace").
-	if !inBlock && strings.HasPrefix(line, "replace") {
-		line = strings.TrimSpace(strings.TrimPrefix(line, "replace"))
-	}
-	idx := strings.Index(line, "=>")
-	if idx < 0 {
-		return ""
-	}
-	rhs := strings.TrimSpace(line[idx+2:])
-	tok := firstModuleToken(rhs)
-	if tok == "" {
-		return ""
-	}
-	pth := unquotePath(tok)
-	if !isLocalDiskPath(pth) {
-		return ""
-	}
-	return pth
-}
-
-// stripLineComment drops a // comment that sits outside a double-quoted
-// string and trims the remainder.
-func stripLineComment(line string) string {
-	inQuote := false
-	escaped := false
-	for i := 0; i < len(line); i++ {
-		c := line[i]
-		if inQuote {
-			if escaped {
-				escaped = false
-				continue
-			}
-			if c == '\\' {
-				escaped = true
-				continue
-			}
-			if c == '"' {
-				inQuote = false
-			}
-			continue
-		}
-		if c == '"' {
-			inQuote = true
-			continue
-		}
-		if c == '/' && i+1 < len(line) && line[i+1] == '/' {
-			return strings.TrimSpace(line[:i])
-		}
-	}
-	return strings.TrimSpace(line)
-}
-
-// firstModuleToken returns the first go.mod token. A double-quoted token
-// keeps its quotes and any spaces inside them.
-func firstModuleToken(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return ""
-	}
-	if s[0] != '"' {
-		if i := strings.IndexAny(s, " \t"); i >= 0 {
-			return s[:i]
-		}
-		return s
-	}
-	escaped := false
-	for i := 1; i < len(s); i++ {
-		if escaped {
-			escaped = false
-			continue
-		}
-		if s[i] == '\\' {
-			escaped = true
-			continue
-		}
-		if s[i] == '"' {
-			return s[:i+1]
-		}
-	}
-	return s
-}
-
-// unquotePath decodes a double-quoted go.mod path. An unquoted token is
-// returned unchanged.
-func unquotePath(s string) string {
-	if len(s) >= 2 && s[0] == '"' {
-		if u, err := strconv.Unquote(s); err == nil {
-			return u
-		}
-	}
-	return s
 }
 
 // isLocalDiskPath reports whether pth is a filesystem path rather than a

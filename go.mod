@@ -9,4 +9,5 @@ require (
 	github.com/ctx42/xdef v0.9.0
 	github.com/ctx42/xflag v0.11.0
 	github.com/goccy/go-yaml v1.19.2
+	golang.org/x/mod v0.40.0
 )

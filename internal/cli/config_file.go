@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/goccy/go-yaml"
+	"golang.org/x/mod/modfile"
 
 	"github.com/ctx42/gomake/internal/mkf"
 	"github.com/ctx42/gomake/internal/parser"
@@ -229,26 +229,7 @@ func moduleImportPath(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read module path: %w", err)
 	}
-
-	scn := bufio.NewScanner(bytes.NewReader(data))
-	for scn.Scan() {
-		line := strings.TrimSpace(scn.Text())
-		rest, ok := strings.CutPrefix(line, "module")
-		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
-			continue
-		}
-		rest = strings.TrimSpace(rest)
-		if i := strings.Index(rest, "//"); i >= 0 {
-			rest = strings.TrimSpace(rest[:i])
-		}
-		if rest = strings.Trim(rest, "\"`"); rest != "" {
-			return rest, nil
-		}
-	}
-	if err = scn.Err(); err != nil {
-		return "", fmt.Errorf("read module path: %w", err)
-	}
-	return "", nil
+	return modfile.ModulePath(data), nil
 }
 
 // mergeConfigs merges the settings sections of the user-level and
