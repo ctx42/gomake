@@ -49,7 +49,7 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 
 	h := sha256.New()
 	for _, name := range []string{"go.mod", "go.sum"} {
-		data, rErr := os.ReadFile(filepath.Join(root, name)) //nolint:gosec
+		data, rErr := os.ReadFile(filepath.Join(root, name))
 		if rErr != nil {
 			if errors.Is(rErr, fs.ErrNotExist) && name == "go.sum" {
 				continue
@@ -137,7 +137,7 @@ func loadListCache(key string) ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
-	data, err := os.ReadFile(filepath.Join(dir, key)) //nolint:gosec
+	data, err := os.ReadFile(filepath.Join(dir, key))
 	if err != nil {
 		return nil, false
 	}

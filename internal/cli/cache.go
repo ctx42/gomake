@@ -67,7 +67,7 @@ func binaryCacheKey(
 	names := append([]string(nil), mkfNames...)
 	sort.Strings(names)
 	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(srcDir, name)) //nolint:gosec
+		data, err := os.ReadFile(filepath.Join(srcDir, name))
 		if err != nil {
 			return "", err
 		}
@@ -226,7 +226,7 @@ func absWorkPaths(goWorkPath string) []string {
 // localPathsFromGoWork returns relative or absolute use paths from a go.work
 // file. Missing or unreadable files yield a nil slice.
 func localPathsFromGoWork(path string) []string {
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
@@ -236,7 +236,7 @@ func localPathsFromGoWork(path string) []string {
 // localPathsFromGoWorkReplace returns local replace targets from a go.work
 // file (same grammar as go.mod replace).
 func localPathsFromGoWorkReplace(path string) []string {
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
@@ -247,7 +247,7 @@ func localPathsFromGoWorkReplace(path string) []string {
 // file (paths that start with "." or are absolute). Versioned module replaces
 // are ignored.
 func localPathsFromGoMod(path string) []string {
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil
 	}
@@ -419,7 +419,7 @@ func hashFile(
 	label, pth string,
 ) error {
 
-	data, err := os.ReadFile(pth) //nolint:gosec
+	data, err := os.ReadFile(pth)
 	if err != nil {
 		return err
 	}
@@ -447,7 +447,8 @@ func hashModuleGoFiles(
 	}
 	var embedDirs []string
 	for _, pth := range paths {
-		data, err := os.ReadFile(pth) //nolint:gosec
+		var data []byte
+		data, err = os.ReadFile(pth)
 		if err != nil {
 			return err
 		}
@@ -460,7 +461,8 @@ func hashModuleGoFiles(
 
 	embeds := make(map[string]struct{})
 	for _, dir := range embedDirs {
-		files, err := walkCacheFiles(dir, func(name string) bool {
+		var files []string
+		files, err = walkCacheFiles(dir, func(name string) bool {
 			return !strings.HasSuffix(name, ".go")
 		})
 		if err != nil {

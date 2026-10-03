@@ -172,7 +172,7 @@ func NewPackage(
 	}
 
 	sout, eout := &bytes.Buffer{}, &bytes.Buffer{}
-	cmd := exec.Command("go", args...) //nolint:noctx
+	cmd := exec.Command("go", args...)
 	cmd.Env = rng.EnvAll()
 	cmd.Dir = pkg.ImpPath
 	cmd.Stdout, cmd.Stderr = sout, eout

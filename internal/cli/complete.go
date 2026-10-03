@@ -66,11 +66,7 @@ func setupBashCompletion(home string) (string, error) {
 	}
 
 	// Add source line to ~/.bashrc.
-	f, err := os.OpenFile( //nolint:gosec
-		rcPath,
-		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
-		0644,
-	)
+	f, err := os.OpenFile(rcPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return "", err
 	}

@@ -332,7 +332,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	for _, srcPth := range mkfFiles {
 		var filData []byte
 		srcPth = filepath.Join(src, srcPth)
-		if filData, err = os.ReadFile(srcPth); err != nil { //nolint:gosec
+		if filData, err = os.ReadFile(srcPth); err != nil {
 			return nil, err
 		}
 		filData = stripBuildTag(filData, tagLine)
@@ -358,7 +358,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		return nil, err
 	}
 	goModDst := filepath.Join(buildDir, "go.mod")
-	if err = os.WriteFile(goModDst, content, 0600); err != nil { //nolint:gosec
+	if err = os.WriteFile(goModDst, content, 0600); err != nil {
 		return nil, err
 	}
 
@@ -369,15 +369,11 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		return nil, err
 	}
 	if goWorkSrc != "" {
-		if content, err = os.ReadFile(goWorkSrc); err != nil { //nolint:gosec
+		if content, err = os.ReadFile(goWorkSrc); err != nil {
 			return nil, err
 		}
 		goWorkDst := filepath.Join(buildDir, "go.work")
-		if err = os.WriteFile( //nolint:gosec
-			goWorkDst,
-			content,
-			0600,
-		); err != nil {
+		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
 			return nil, err
 		}
 		if err = editGoWork(rng, goWorkSrc, buildDir, modRoot); err != nil {
@@ -387,17 +383,11 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		// Sibling sum next to the discovered go.work, when present.
 		goWorkSumSrc := goWorkSrc + ".sum"
 		if gomake.FileExists(goWorkSumSrc) {
-			if content, err = os.ReadFile( //nolint:gosec
-				goWorkSumSrc,
-			); err != nil {
+			if content, err = os.ReadFile(goWorkSumSrc); err != nil {
 				return nil, err
 			}
 			sumDst := filepath.Join(buildDir, "go.work.sum")
-			if err = os.WriteFile( //nolint:gosec
-				sumDst,
-				content,
-				0600,
-			); err != nil {
+			if err = os.WriteFile(sumDst, content, 0600); err != nil {
 				return nil, err
 			}
 		}
@@ -406,17 +396,13 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	// Copy "go.sum" file before editing go.mod: editGoMod records the xflag
 	// checksum by appending to this file, so it must exist first.
 	goSum := filepath.Join(filepath.Dir(mod.ModPath), "go.sum")
-	if content, err = os.ReadFile(goSum); err != nil { //nolint:gosec
+	if content, err = os.ReadFile(goSum); err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	} else {
 		goSumDst := filepath.Join(buildDir, "go.sum")
-		if err = os.WriteFile( //nolint:gosec
-			goSumDst,
-			content,
-			0600,
-		); err != nil {
+		if err = os.WriteFile(goSumDst, content, 0600); err != nil {
 			return nil, err
 		}
 	}
@@ -553,7 +539,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	srcEnv := ring.EnvSet(base, "GOWORK", srcWork)
 
 	out := &bytes.Buffer{}
-	cmd := exec.Command("go", "work", "edit", "-json") //nolint:noctx
+	cmd := exec.Command("go", "work", "edit", "-json")
 	cmd.Env = srcEnv
 	cmd.Dir = workDir
 	cmd.Stdout = out
@@ -621,9 +607,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	// adding use "." for the makefile module would remove that entry.
 	for from := range replace {
 		out.Reset()
-		cmd = exec.Command( //nolint:noctx
-			"go", "work", "edit", "-dropuse", from,
-		)
+		cmd = exec.Command("go", "work", "edit", "-dropuse", from)
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -634,7 +618,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	}
 	for _, to := range replace {
 		out.Reset()
-		cmd = exec.Command("go", "work", "edit", "-use", to) //nolint:noctx
+		cmd = exec.Command("go", "work", "edit", "-use", to)
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -659,7 +643,7 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.Command( //nolint:noctx
+		cmd = exec.Command(
 			"go", "work", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,
@@ -690,7 +674,7 @@ func editGoMod(
 	// Pin GOWORK like compile so ambient workspace does not affect go mod.
 	modEnv := pinBuildGOWORK(env.EnvAll(), dir)
 
-	cmd := exec.Command( //nolint:noctx
+	cmd := exec.Command(
 		"go", "mod", "edit",
 		"-module", "makefile",
 		"-require="+pkgImpSpec+"@v0.0.0",
@@ -713,7 +697,7 @@ func editGoMod(
 	// The copied "go.sum" lacks xflag, so populate it from the module cache
 	// (gomake was built with the same version) before the build runs.
 	out.Reset()
-	cmd = exec.Command("go", "mod", "download", xflagReq) //nolint:noctx
+	cmd = exec.Command("go", "mod", "download", xflagReq)
 	cmd.Env = modEnv
 	cmd.Dir = dir
 	cmd.Stdout = out
@@ -728,7 +712,7 @@ func editGoMod(
 // build-dir go.mod so they resolve against the original source module root.
 func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 	out := &bytes.Buffer{}
-	cmd := exec.Command("go", "mod", "edit", "-json") //nolint:noctx
+	cmd := exec.Command("go", "mod", "edit", "-json")
 	cmd.Env = env
 	cmd.Dir = buildDir
 	cmd.Stdout = out
@@ -769,7 +753,7 @@ func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.Command( //nolint:noctx
+		cmd = exec.Command(
 			"go", "mod", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,
@@ -1010,7 +994,7 @@ func allTargets(
 // fileContainsStr reports whether the file at the path contains substr.
 // Returns false (not true) when the file does not exist.
 func fileContainsStr(path, substr string) (bool, error) {
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return false, err
 	}

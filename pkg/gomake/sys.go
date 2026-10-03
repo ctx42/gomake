@@ -46,7 +46,7 @@ func DirExists(pth string) bool {
 // ReadFile is a wrapper around [os.ReadFile] returning string instead of byte
 // slice.
 func ReadFile(pth string) (string, error) {
-	content, err := os.ReadFile(pth) //nolint:gosec
+	content, err := os.ReadFile(pth)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", pth, err)
 	}

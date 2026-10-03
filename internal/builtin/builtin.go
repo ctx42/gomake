@@ -234,12 +234,7 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 		return fmt.Errorf("parsing target specs: %w", err)
 	}
 	if opts.root != "" {
-		tgs.Map(func(_ *parser.Targets, tgt *mkf.Target) {
-			rel, err := filepath.Rel(opts.root, tgt.ImpPath)
-			if err == nil && !strings.HasPrefix(rel, "..") {
-				tgt.ImpPath = filepath.ToSlash(rel)
-			}
-		})
+		tgs.Map(relImpPath(opts.root))
 	}
 	files := make([]genFile, 0, 3)
 	code, err := parser.NewGenerator(tgs).
@@ -283,6 +278,17 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 		}
 	}
 	return nil
+}
+
+// relImpPath returns a [parser.Targets.Map] callback making each target's
+// ImpPath relative to root when it lies under root.
+func relImpPath(root string) parser.TgsMapCB {
+	return func(_ *parser.Targets, tgt *mkf.Target) {
+		rel, err := filepath.Rel(root, tgt.ImpPath)
+		if err == nil && !strings.HasPrefix(rel, "..") {
+			tgt.ImpPath = filepath.ToSlash(rel)
+		}
+	}
 }
 
 // genFile is one generated file waiting to be written.

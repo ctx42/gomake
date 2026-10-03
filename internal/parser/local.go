@@ -154,7 +154,7 @@ func importSpec(modSpec, root, dir string) string {
 // go.mod file at path. It returns an error when the file cannot be read or has
 // no module directive.
 func readModulePath(path string) (string, error) {
-	data, err := os.ReadFile(path) //nolint:gosec
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("read %s: %w", path, err)
 	}

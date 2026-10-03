@@ -5,7 +5,6 @@ package cli
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -2016,44 +2015,41 @@ func Test_RunWithoutCompile(t *testing.T) {
 		tgs := builtintest.NewTstProvider().Targets()
 
 		// --- When ---
-		have := runWithoutCompile(t.Context(), rng, "1.2.3", tgs)
+		have, err := runWithoutCompile(t.Context(), rng, "1.2.3", tgs)
 
 		// --- Then ---
-		assert.NoError(t, have)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, have)
 		assert.Equal(t, "[abc]", tst.Stdout())
 	})
 
-	t.Run("makefile error", func(t *testing.T) {
+	t.Run("error - makefile", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring("--unknown", ":tgt-a")
 		tgs := builtintest.NewTstProvider().Targets()
 
 		// --- When ---
-		have := runWithoutCompile(t.Context(), rng, "1.2.3", tgs)
+		have, err := runWithoutCompile(t.Context(), rng, "1.2.3", tgs)
 
 		// --- Then ---
-		assert.Error(t, have)
-		_, ok := errors.AsType[plainExit](have)
-		assert.True(t, ok)
 		want := "" +
 			"parsing flags: flag provided but " +
 			"not defined: -unknown"
-		assert.Equal(t, want, have.Error())
+		assert.ErrorEqual(t, want, err)
+		assert.Equal(t, mkf.ExitCodeErr, have)
 	})
 
-	t.Run("execute error", func(t *testing.T) {
+	t.Run("error - execute", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t).Ring(":panic-string")
-		bip := builtintest.NewTstProvider().Targets()
+		rng := ringtest.New(t).Ring(":nope")
+		tgs := builtintest.NewTstProvider().Targets()
 
 		// --- When ---
-		have := runWithoutCompile(t.Context(), rng, "1.2.3", bip)
+		have, err := runWithoutCompile(t.Context(), rng, "1.2.3", tgs)
 
 		// --- Then ---
-		assert.Error(t, have)
-		_, ok := errors.AsType[plainExit](have)
-		assert.False(t, ok)
-		assert.Equal(t, "target panicked with: panic string", have.Error())
+		assert.ErrorIs(t, mkf.ErrUnkTarget, err)
+		assert.Equal(t, mkf.ExitCodeUnkTarget, have)
 	})
 }
 

@@ -4,7 +4,6 @@
 package builtin
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -298,7 +297,7 @@ func Test_GenMain(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
-		assert.True(t, strings.HasPrefix(text, "package abc\n"))
+		assert.Contain(t, "\npackage abc\n", text)
 		populated := oskit.ReadFileStr(t, prj.Path("data", mainFN))
 		assert.Contain(t, "pkg0.Pkg0", populated)
 		empty := oskit.ReadFileStr(t, prj.Path("data", mainEmptyFN))

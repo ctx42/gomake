@@ -136,7 +136,7 @@ func projectConfigPath(srcDir string) string {
 // YAML, an unknown gomake-owned key, or an unsupported schema version is
 // reported as an error.
 func loadConfigFile(pth string) (*fileConfig, error) {
-	data, err := os.ReadFile(pth) //nolint:gosec
+	data, err := os.ReadFile(pth)
 	if errors.Is(err, os.ErrNotExist) {
 		return &fileConfig{}, nil
 	}
@@ -225,7 +225,7 @@ func moduleImportPath(dir string) (string, error) {
 		}
 		return "", err
 	}
-	data, err := os.ReadFile(modFile) //nolint:gosec
+	data, err := os.ReadFile(modFile)
 	if err != nil {
 		return "", fmt.Errorf("read module path: %w", err)
 	}

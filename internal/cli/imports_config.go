@@ -203,7 +203,7 @@ func fetchExternalTargets(
 // readExternalTargets reads the file at pth, parses it as targets.yaml, and
 // returns the config with Raw set to the file content.
 func readExternalTargets(pth string) (*ImportsConfig, error) {
-	data, err := os.ReadFile(pth) //nolint:gosec
+	data, err := os.ReadFile(pth)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", pth, err)
 	}

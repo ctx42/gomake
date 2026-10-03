@@ -51,7 +51,7 @@ func buildMain(env ring.Environ, dir, out, mainPkg, ldflags string) error {
 		args = append(args, "-ldflags", ldflags)
 	}
 	args = append(args, mainPkg)
-	cmd := exec.Command("go", args...) //nolint:noctx
+	cmd := exec.Command("go", args...)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	outBytes, err := cmd.CombinedOutput()

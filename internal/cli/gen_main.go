@@ -18,7 +18,7 @@ const codeMarker = "// --- CODE MARK ---\n\n"
 
 // genMain generates "makefile_gen.go" file at path with given version.
 func genMain(pth, ver string) error {
-	fil, err := os.Create(pth) //nolint:gosec
+	fil, err := os.Create(pth)
 	if err != nil {
 		return err
 	}
