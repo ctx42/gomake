@@ -134,6 +134,21 @@ func Test_Generator_Generate(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
+	t.Run("nil targets", func(t *testing.T) {
+		// --- Given ---
+		gen := NewGenerator(nil)
+
+		empty := NewGenerator(NewTargets())
+		want := must.Value(empty.Generate())
+
+		// --- When ---
+		have, err := gen.Generate()
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, want, have)
+	})
+
 	t.Run("builtin targets for the main package", func(t *testing.T) {
 		// --- Given ---
 		impSpecs := []string{

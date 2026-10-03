@@ -69,19 +69,6 @@ func homeDir(rng *ring.Ring) (string, error) {
 	return "", errors.New(unset + " is not defined")
 }
 
-// fail writes err to stderr decorated for the user. It is the single place
-// controlling how command errors are presented.
-func fail(rng *ring.Ring, err error) {
-	_, _ = fmt.Fprintf(rng.Stderr(), "%s: %s\n", binName, err)
-}
-
-// failCode writes err to stderr with [fail] and returns the conventional exit
-// code for err from [mkf.ExitCode].
-func failCode(rng *ring.Ring, err error) int {
-	fail(rng, err)
-	return mkf.ExitCode(err)
-}
-
 // errCompile represents a makefile compilation failure, including captured
 // stdout and stderr from the Go toolchain when available.
 type errCompile struct {

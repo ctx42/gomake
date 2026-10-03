@@ -526,31 +526,34 @@ func invokedTarget(cfg *config, tgs *parser.Targets) *mkf.Target {
 
 // runCheckConfig implements the "--check-config" option. It discovers all
 // targets, reloads the user-level and project-level gomake.yaml files, and
-// prints the report from [checkConfigReport] to standard error.
-func runCheckConfig(rng *ring.Ring, cfg *config, stock []*mkf.Target) error {
+// returns the report from checkConfigReport.
+func runCheckConfig(
+	rng *ring.Ring,
+	cfg *config,
+	stock []*mkf.Target,
+) (string, error) {
+
 	tgts, err := allTargets(rng, cfg, stock)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	user := &fileConfig{}
 	if pth, ok := userConfigPath(rng.EnvAll()); ok {
 		if user, err = loadConfigFile(pth); err != nil {
-			return err
+			return "", err
 		}
 	}
 	project, err := loadConfigFile(projectConfigPath(cfg.src))
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	localImp, err := localImportPath(cfg.src)
 	if err != nil {
-		return err
+		return "", err
 	}
-	report := checkConfigReport(tgts, localImp, user, project)
-	_, _ = fmt.Fprint(rng.Stderr(), report)
-	return nil
+	return checkConfigReport(tgts, localImp, user, project), nil
 }
 
 // checkConfigReport builds the "--check-config" report. It lists every

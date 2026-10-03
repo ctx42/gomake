@@ -40,56 +40,60 @@ const versionURL = "https://go.dev/VERSION?m=text"
 const gomakeModule = "github.com/ctx42/gomake"
 
 func main() {
-	if err := run(); err != nil {
+	msg, err := run()
+	if msg != "" {
+		_, _ = fmt.Fprint(os.Stderr, msg)
+	}
+	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, "generate versions:", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run() (string, error) {
 	root, err := moduleRoot()
 	if err != nil {
-		return err
+		return "", err
 	}
 	repoVer, err := goModVersion(filepath.Join(root, "go.mod"))
 	if err != nil {
-		return err
+		return "", err
 	}
 	localVer := majorMinor(runtime.Version())
 	if localVer == "" {
 		format := "cannot parse toolchain version %q"
-		return fmt.Errorf(format, runtime.Version())
+		return "", fmt.Errorf(format, runtime.Version())
 	}
 
 	targetVer, toolchain, err := target(localVer)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if verLess(targetVer, repoVer) {
 		format := "target Go %s is older than gomake go.mod Go %s"
-		return fmt.Errorf(format, targetVer, repoVer)
+		return "", fmt.Errorf(format, targetVer, repoVer)
 	}
 
 	goos, goarch, err := distList(toolchain)
 	if err != nil {
-		return fmt.Errorf("Go %s (%s): %w", targetVer, toolchain, err)
+		return "", fmt.Errorf("Go %s (%s): %w", targetVer, toolchain, err)
 	}
 	if len(goos) == 0 || len(goarch) == 0 {
 		format := "Go %s (%s): empty dist list"
-		return fmt.Errorf(format, targetVer, toolchain)
+		return "", fmt.Errorf(format, targetVer, toolchain)
 	}
 	format := "gomake: collected Go %s via %s\n"
-	_, _ = fmt.Fprintf(os.Stderr, format, targetVer, toolchain)
+	msg := fmt.Sprintf(format, targetVer, toolchain)
 
 	src, err := render(targetVer, goos, goarch)
 	if err != nil {
-		return err
+		return msg, err
 	}
 	dst := filepath.Join(root, "internal", "osarch", "versions_gen.go")
 	if err = os.WriteFile(dst, src, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", dst, err)
+		return msg, fmt.Errorf("write %s: %w", dst, err)
 	}
-	return nil
+	return msg, nil
 }
 
 // target resolves the Go major.minor version to populate the list from and the

@@ -72,7 +72,8 @@ func NewGenerator(tgs *Targets) *Generator {
 	return &Generator{tgs: tgs}
 }
 
-// Generate generates the target-definitions source code.
+// Generate generates the target-definitions source code. Nil targets are
+// treated as an empty collection.
 func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 	def := defGenOpts()
 	for _, opt := range opts {
@@ -82,18 +83,23 @@ func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 		return nil, errors.New("generated method suffix cannot be empty")
 	}
 
+	tgs := gen.tgs
+	if tgs == nil {
+		tgs = NewTargets()
+	}
+
 	qualifyPkg := true
 	renderImps := true
 	renderImpCtx := true
 	renderImpRing := true
 	if def.pkg == MainName {
 		qualifyPkg = false
-		if gen.tgs.Len() == 0 {
+		if tgs.Len() == 0 {
 			renderImps = false
 		}
 	}
 
-	if gen.tgs.Len() == 0 {
+	if tgs.Len() == 0 {
 		renderImpCtx = false
 		renderImpRing = false
 	}
@@ -102,13 +108,13 @@ func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 	data := map[string]any{
 		"package":             def.pkg,
 		"qualify":             qualifyPkg,
-		"imports":             gen.tgs.GoImports(),
+		"imports":             tgs.GoImports(),
 		"imports_render":      renderImps,
 		"imports_render_ctx":  renderImpCtx,
 		"imports_render_ring": renderImpRing,
 		"fn_name_suffix":      def.suffix,
 		"register_targets":    def.register,
-		"targets":             gen.tgs.GoCode(qualifyPkg),
+		"targets":             tgs.GoCode(qualifyPkg),
 	}
 	if err := tgsTplParsed.Execute(buf, data); err != nil {
 		return nil, fmt.Errorf("execute targets template: %w", err)

@@ -2525,7 +2525,7 @@ func Test_RunWithoutCompile(t *testing.T) {
 		have := runWithoutCompile(ctx, rng, ver, tgs)
 
 		// --- Then ---
-		assert.Equal(t, 0, have)
+		assert.NoError(t, have)
 
 		assert.Equal(t, "[abc]", tst.Stdout())
 	})
@@ -2534,9 +2534,7 @@ func Test_RunWithoutCompile(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
 
-		tst := ringtest.New(t).WetStderr()
-
-		rng := tst.Ring("--unknown", ":tgt-a")
+		rng := ringtest.New(t).Ring("--unknown", ":tgt-a")
 
 		ver := "1.2.3"
 
@@ -2546,21 +2544,20 @@ func Test_RunWithoutCompile(t *testing.T) {
 		have := runWithoutCompile(ctx, rng, ver, tgs)
 
 		// --- Then ---
-		assert.Equal(t, 1, have)
-
+		assert.Error(t, have)
+		_, ok := errors.AsType[plainExit](have)
+		assert.True(t, ok)
 		want := "" +
-			"gomake: parsing flags: flag provided but " +
-			"not defined: -unknown\n"
-		assert.Equal(t, want, tst.Stderr())
+			"parsing flags: flag provided but " +
+			"not defined: -unknown"
+		assert.Equal(t, want, have.Error())
 	})
 
 	t.Run("execute error", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
 
-		tst := ringtest.New(t).WetStderr()
-
-		rng := tst.Ring(":panic-string")
+		rng := ringtest.New(t).Ring(":panic-string")
 
 		ver := "1.2.3"
 
@@ -2570,10 +2567,10 @@ func Test_RunWithoutCompile(t *testing.T) {
 		have := runWithoutCompile(ctx, rng, ver, bip)
 
 		// --- Then ---
-		assert.Equal(t, 1, have)
-
-		want := "gomake: target panicked with: panic string\n"
-		assert.Equal(t, want, tst.Stderr())
+		assert.Error(t, have)
+		_, ok := errors.AsType[plainExit](have)
+		assert.False(t, ok)
+		assert.Equal(t, "target panicked with: panic string", have.Error())
 	})
 }
 

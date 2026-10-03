@@ -1020,7 +1020,7 @@ func Test_invokedTarget(t *testing.T) {
 
 func Test_runCheckConfig(t *testing.T) {
 	// --- Given ---
-	tst := ringtest.New(t).WetStderr()
+	tst := ringtest.New(t)
 
 	absPath := modkit.Path("testdata/projects/config_target/project")
 
@@ -1049,15 +1049,13 @@ func Test_runCheckConfig(t *testing.T) {
 	targets := builtintest.NewTstProvider().Targets()
 
 	// --- When ---
-	err = runCheckConfig(rng, cfg, targets)
+	have, err := runCheckConfig(rng, cfg, targets)
 
 	// --- Then ---
 	assert.NoError(t, err)
-
-	out := tst.Stderr()
-	assert.Contain(t, prjkit.GoModName+":", out)
-	assert.Contain(t, "show", out)
-	assert.Contain(t, "project import path has no target: bogus.com/x", out)
+	assert.Contain(t, prjkit.GoModName+":", have)
+	assert.Contain(t, "show", have)
+	assert.Contain(t, "project import path has no target: bogus.com/x", have)
 }
 
 func Test_checkConfigReport(t *testing.T) {

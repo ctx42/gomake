@@ -47,17 +47,31 @@ func Main(
 	bip builtin.Provider,
 ) (code int) {
 
+	writeErr := func(err error) {
+		_, _ = fmt.Fprintf(rng.Stderr(), "%s: %s\n", binName, err)
+	}
+	exitWithoutCompile := func(err error) int {
+		if err == nil {
+			return 0
+		}
+		writeErr(err)
+		if _, ok := errors.AsType[plainExit](err); ok {
+			return mkf.ExitCodeErr
+		}
+		return mkf.ExitCode(err)
+	}
+
 	defer func() {
 		if v := recover(); v != nil {
 			err := mkf.RecoverError(v)
-			fail(rng, fmt.Errorf("panicked with: %w", err))
+			writeErr(fmt.Errorf("panicked with: %w", err))
 			code = 1
 		}
 	}()
 
 	cfg, err := newConfig(ver, rng)
 	if err != nil {
-		fail(rng, err)
+		writeErr(err)
 		return 1
 	}
 
@@ -82,7 +96,7 @@ func Main(
 			_, _ = fmt.Fprint(rng.Stderr(), msg)
 		}
 		if err != nil {
-			fail(rng, err)
+			writeErr(err)
 		}
 		return mkf.ExitCode(err)
 	}
@@ -104,27 +118,33 @@ func Main(
 	fi, err := os.Stat(cfg.tmp)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 		if err = os.MkdirAll(cfg.tmp, 0755); err != nil {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 	} else if !fi.IsDir() {
-		fail(rng, fmt.Errorf("%s must be a directory", cfg.tmp))
+		writeErr(fmt.Errorf("%s must be a directory", cfg.tmp))
 		return 1
 	}
 
 	if cfg.showCheckConfig {
-		if err = runCheckConfig(rng, cfg, tgs); err != nil {
-			return failCode(rng, err)
+		report, err := runCheckConfig(rng, cfg, tgs)
+		if err != nil {
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
+		_, _ = fmt.Fprint(rng.Stderr(), report)
 		return 0
 	}
 
 	if cfg.showList {
 		all, err := allTargets(rng, cfg, tgs)
 		if err != nil {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 		_, _ = fmt.Fprint(rng.Stderr(), mkf.HelpTargets(all, 0))
 		return 0
@@ -133,7 +153,8 @@ func Main(
 	if cfg.showHelp {
 		all, err := allTargets(rng, cfg, tgs)
 		if err != nil {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 		// HelpUsage expects positionals only (target name, if any). cfg.args
 		// also carries makefile flags such as --timeout / --wd, so pass the
@@ -144,7 +165,7 @@ func Main(
 		}
 		out, err := mkf.HelpUsage(binName, helpArgs, cfg.fs, all)
 		if err != nil {
-			fail(rng, err)
+			writeErr(err)
 			return 1
 		}
 		_, _ = fmt.Fprint(rng.Stderr(), out)
@@ -155,7 +176,7 @@ func Main(
 	runPreRuns := func() int {
 		for _, fn := range bip.PreRuns() {
 			if ctx, rng, err = fn(ctx, rng); err != nil {
-				fail(rng, err)
+				writeErr(err)
 				return 1
 			}
 		}
@@ -172,14 +193,14 @@ func Main(
 				return code
 			}
 			if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
-				fail(rng, err)
+				writeErr(err)
 				return 1
 			}
 			if err = deliverTargetConfig(rng, cfg, tgt, tgs); err != nil {
-				fail(rng, err)
+				writeErr(err)
 				return 1
 			}
-			return runWithoutCompile(ctx, rng, ver, tgs)
+			return exitWithoutCompile(runWithoutCompile(ctx, rng, ver, tgs))
 		}
 	}
 
@@ -194,24 +215,27 @@ func Main(
 		// Outside a module, report the real go.mod error rather than
 		// "unknown target" when the user named a target.
 		if errors.Is(err, gomake.ErrNoGoMod) && cfg.target != "" {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 		if cfg.target != "" {
-			fail(rng, mkf.ErrUnkTarget)
+			writeErr(mkf.ErrUnkTarget)
 			return mkf.ExitCodeUnkTarget
 		}
 
 		if cfg.bin != "" {
-			return failCode(rng, err)
+			writeErr(err)
+			return mkf.ExitCode(err)
 		}
 
 		if code := runPreRuns(); code != 0 {
 			return code
 		}
-		return runWithoutCompile(ctx, rng, ver, tgs)
+		return exitWithoutCompile(runWithoutCompile(ctx, rng, ver, tgs))
 
 	case err != nil:
-		return failCode(rng, err)
+		writeErr(err)
+		return mkf.ExitCode(err)
 	}
 
 	buildDir := gmk.cu.BuildDir
@@ -229,7 +253,8 @@ func Main(
 		// If there are no custom targets, there is no point compiling custom
 		// binary which would have "the same content" as gomake binary.
 		if gmk.targets.Len() == 0 {
-			return failCode(rng, errNoTargets)
+			writeErr(errNoTargets)
+			return mkf.ExitCode(errNoTargets)
 		}
 
 		compileAct := func() error {
@@ -238,7 +263,8 @@ func Main(
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {
-			return compileFailCode(rng, err)
+			writeErr(err)
+			return compileExit(err)
 		}
 		return 0
 	}
@@ -248,21 +274,22 @@ func Main(
 	}
 
 	if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
-		fail(rng, err)
+		writeErr(err)
 		return 1
 	}
 	tgt := invokedTarget(cfg, gmk.targets)
 	err = deliverTargetConfig(rng, cfg, tgt, gmk.targets.List())
 	if err != nil {
-		fail(rng, err)
+		writeErr(err)
 		return 1
 	}
 	if err = gmk.Execute(ctx, rng); err != nil {
 		if _, ok := errors.AsType[*errCompile](err); ok {
-			return compileFailCode(rng, err)
+			writeErr(err)
+			return compileExit(err)
 		}
 		if !gomake.HasRun(err) {
-			fail(rng, err)
+			writeErr(err)
 		}
 		return gomake.ExitStatus(err)
 	}
@@ -284,18 +311,18 @@ func watchBuildDir(dir string, sig <-chan os.Signal) (stop func()) {
 	return func() { close(done) }
 }
 
-// compileFailCode reports a compile failure. Context cancel/deadline wrapped
-// in *errCompile use the context exit codes, not ExitCodeCompile.
-func compileFailCode(rng *ring.Ring, err error) int {
+// compileExit is the exit code for a compile failure. Context
+// cancel/deadline wrapped in *errCompile use the context exit codes, not
+// ExitCodeCompile.
+func compileExit(err error) int {
 	if errors.Is(err, context.DeadlineExceeded) ||
 		errors.Is(err, context.Canceled) {
-		return failCode(rng, err)
+		return mkf.ExitCode(err)
 	}
 	if _, ok := errors.AsType[*errCompile](err); ok {
-		fail(rng, err)
 		return mkf.ExitCodeCompile
 	}
-	return failCode(rng, err)
+	return mkf.ExitCode(err)
 }
 
 // applyExternalTargetMeta loads [gomake.TargetsFile] from srcDir and sets
@@ -331,26 +358,30 @@ func applyExternalTargetMeta(rng *ring.Ring, srcDir string) error {
 	return nil
 }
 
+// plainExit marks an error whose exit code is ExitCodeErr. Main still
+// prints the wrapped error's text. NewMakefile failures use it so a
+// sentinel such as ErrUnkTarget does not select its own code.
+type plainExit struct{ error }
+
+func (plx plainExit) Unwrap() error { return plx.error }
+
 // runWithoutCompile runs a target without compiling a makefile. It is an
-// optimization for built-in targets.
+// optimization for built-in targets. A NewMakefile failure is returned as
+// plainExit so Main uses ExitCodeErr; an Execute failure is returned as-is.
 func runWithoutCompile(
 	ctx context.Context,
 	rng *ring.Ring,
 	ver string,
 	tgs []*mkf.Target,
-) int {
+) error {
 
 	verOF := mkf.WithMakefileVersion(ver)
 	rngOF := mkf.WithMakefileRing(rng)
 	cmf, err := mkf.NewMakefile(tgs, rngOF, verOF)
 	if err != nil {
-		fail(rng, err)
-		return mkf.ExitCodeErr
+		return plainExit{err}
 	}
-	if err = cmf.Execute(ctx); err != nil {
-		return failCode(rng, err)
-	}
-	return 0
+	return cmf.Execute(ctx)
 }
 
 // complete returns the space-joined bash command-line completion suggestions
