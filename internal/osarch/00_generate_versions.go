@@ -74,6 +74,10 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("Go %s (%s): %w", targetVer, toolchain, err)
 	}
+	if len(goos) == 0 || len(goarch) == 0 {
+		format := "Go %s (%s): empty dist list"
+		return fmt.Errorf(format, targetVer, toolchain)
+	}
 	format := "gomake: collected Go %s via %s\n"
 	_, _ = fmt.Fprintf(os.Stderr, format, targetVer, toolchain)
 
@@ -155,7 +159,11 @@ func latestGo() (full, mm string, err error) {
 // GOTOOLCHAIN when not the running one) and returns the sorted, unique GOOS and
 // GOARCH values.
 func distList(toolchain string) (goos, goarch []string, err error) {
-	cmd := exec.Command("go", "tool", "dist", "list")
+	// GOTOOLCHAIN may download a toolchain, so allow several minutes, but
+	// do not let a stuck go tool dist list run forever.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "go", "tool", "dist", "list")
 	cmd.Env = append(os.Environ(), "GOTOOLCHAIN="+toolchain)
 	out, err := cmd.Output()
 	if err != nil {
@@ -281,14 +289,50 @@ func directive(pth, prefix string) (string, error) {
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if rest, ok := strings.CutPrefix(line, prefix); ok {
-			return strings.TrimSpace(rest), nil
+		rest, ok := strings.CutPrefix(line, strings.TrimSpace(prefix))
+		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
+			continue
 		}
+		return directiveValue(rest), nil
 	}
 	if err = sc.Err(); err != nil {
 		return "", err
 	}
 	return "", nil
+}
+
+// directiveValue drops a trailing // comment and surrounding quotes from a
+// go.mod directive value.
+func directiveValue(rest string) string {
+	rest = strings.TrimSpace(rest)
+	inQuote := false
+	escaped := false
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if inQuote {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' {
+				escaped = true
+				continue
+			}
+			if c == '"' || c == '`' {
+				inQuote = false
+			}
+			continue
+		}
+		if c == '"' || c == '`' {
+			inQuote = true
+			continue
+		}
+		if c == '/' && i+1 < len(rest) && rest[i+1] == '/' {
+			rest = rest[:i]
+			break
+		}
+	}
+	return strings.Trim(strings.TrimSpace(rest), "\"`")
 }
 
 // majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", "1.26",
