@@ -18,67 +18,69 @@ import (
 
 func Test_NewTargets(t *testing.T) {
 	// --- When ---
-	tgs := NewTargets()
+	have := NewTargets()
 
 	// --- Then ---
-	assert.NotNil(t, tgs.unique)
-	assert.NotNil(t, tgs.list)
-	assert.False(t, tgs.sorted)
-	assert.Equal(t, 0, tgs.Len())
+	assert.NotNil(t, have.unique)
+	assert.NotNil(t, have.list)
+	assert.False(t, have.sorted)
+	assert.Equal(t, 0, have.Len())
 }
 
 func Test_TargetsFromList(t *testing.T) {
 	t.Run("add", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt1"}
 
 		// --- When ---
-		tgs, err := TargetsFromList(tgt0, tgt1)
+		have, err := TargetsFromList(tgt0, tgt1)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Same(t, tgt0, tgs.Get("tgt0"))
-		assert.Same(t, tgt1, tgs.Get("tgt1"))
-		assert.Equal(t, 2, tgs.Len())
+		assert.Same(t, tgt0, have.Get("tgt0"))
+		assert.Same(t, tgt1, have.Get("tgt1"))
+		assert.Equal(t, 2, have.Len())
 	})
 
 	t.Run("nil target", func(t *testing.T) {
 		// --- When ---
-		tgs, err := TargetsFromList(nil)
+		have, err := TargetsFromList(nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, 0, tgs.Len())
+		assert.Equal(t, 0, have.Len())
 	})
 
-	t.Run("duplicate error", func(t *testing.T) {
+	t.Run("error - duplicate", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt0"}
 
 		// --- When ---
-		tgs, err := TargetsFromList(tgt0, tgt1)
+		have, err := TargetsFromList(tgt0, tgt1)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, have)
 	})
 }
 
 func Test_TargetsFromSpecs(t *testing.T) {
 	t.Run("as regular targets", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -87,21 +89,21 @@ func Test_TargetsFromSpecs(t *testing.T) {
 			"pkg1",
 			"print",
 		}
-		assert.Equal(t, want, tgs.Names())
+		assert.Equal(t, want, have.Names())
 	})
 
 	t.Run("as built-in targets", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -110,22 +112,22 @@ func Test_TargetsFromSpecs(t *testing.T) {
 			":pkg1",
 			":print",
 		}
-		assert.Equal(t, want, tgs.Names())
+		assert.Equal(t, want, have.Names())
 	})
 
 	t.Run("build environment applied", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("GOOS", "windows")
+
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
 
-		rng := ring.New()
-		rng.EnvSet("GOOS", "windows")
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -135,11 +137,13 @@ func Test_TargetsFromSpecs(t *testing.T) {
 			"pkg1",
 			"print",
 		}
-		assert.Equal(t, want, tgs.Names())
+		assert.Equal(t, want, have.Names())
 	})
 
-	t.Run("duplicated target error", func(t *testing.T) {
+	t.Run("error - duplicated target", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		// Both packages expose hello/bye; the tagged one needs the gomake
 		// build tag so go list includes its files.
 		impSpecs := []string{
@@ -147,67 +151,70 @@ func Test_TargetsFromSpecs(t *testing.T) {
 			"github.com/ctx42/gomake/testdata/projects/simple_untagged/project",
 		}
 
-		rng := SetBuildTag(ring.New())
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid import", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/projects/empty",
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, have)
 	})
 
 	t.Run("not existing import spec", func(t *testing.T) {
-		// --- When ---
+		// --- Given ---
+		rng := ring.New()
+
 		impSpecs := []string{
 			"github.com/ctx42/gomake/pkg/not_existing",
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs)
+		hTgs, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, hTgs)
 	})
 
 	t.Run("error creating makefile instance", func(t *testing.T) {
-		// --- When ---
+		// --- Given ---
 		rng := ring.New()
+
 		impSpecs := []string{
 			"testdata/not_existing",
 		}
 
 		// --- When ---
-		tgs, err := TargetsFromSpecs(rng, impSpecs)
+		hTgs, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, hTgs)
 	})
 }
 
 func Test_TargetsFromImports(t *testing.T) {
-	t.Run("namespace prefixes root targets", func(t *testing.T) {
+	t.Run("namespace on root targets", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
+		blank := ""
+
 		imports := []Import{
 			{
 				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
@@ -215,18 +222,20 @@ func Test_TargetsFromImports(t *testing.T) {
 			},
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, "", imports)
+		have, err := TargetsFromImports(rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"myns:pkg0"}, tgs.Names())
+		assert.Equal(t, []string{"myns:pkg0"}, have.Names())
 	})
 
 	t.Run("namespace prefixes type-based targets", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
+		blank := ""
+
 		imports := []Import{
 			{
 				Path:      "github.com/ctx42/gomake/testdata/imports/pkg4",
@@ -234,34 +243,38 @@ func Test_TargetsFromImports(t *testing.T) {
 			},
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, "", imports)
+		have, err := TargetsFromImports(rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"myns:ns:m0", "myns:ns:m1"}, tgs.Names())
+		assert.Equal(t, []string{"myns:ns:m0", "myns:ns:m1"}, have.Names())
 	})
 
 	t.Run("empty namespace leaves targets unprefixed", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
+		blank := ""
+
 		imports := []Import{
 			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, "", imports)
+		have, err := TargetsFromImports(rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"pkg0"}, tgs.Names())
+		assert.Equal(t, []string{"pkg0"}, have.Names())
 	})
 
 	t.Run("namespace applied to built-in targets", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
+		blank := ""
+
 		imports := []Import{
 			{
 				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
@@ -269,14 +282,12 @@ func Test_TargetsFromImports(t *testing.T) {
 			},
 		}
 
-		rng := ring.New()
-
 		// --- When ---
-		tgs, err := TargetsFromImports(rng, "", imports, BuiltInCB)
+		have, err := TargetsFromImports(rng, blank, imports, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{":myns:pkg0"}, tgs.Names())
+		assert.Equal(t, []string{":myns:pkg0"}, have.Names())
 	})
 }
 
@@ -284,6 +295,7 @@ func Test_Targets_Add(t *testing.T) {
 	t.Run("add not existing", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgs := NewTargets()
 
 		// --- When ---
@@ -291,13 +303,16 @@ func Test_Targets_Add(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Same(t, tgt0, tgs.Get("tgt0"))
+
 		assert.Equal(t, 1, tgs.Len())
 	})
 
 	t.Run("add existing", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt0"}
 
 		tgs := NewTargets()
@@ -308,6 +323,7 @@ func Test_Targets_Add(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
+
 		assert.Equal(t, 1, tgs.Len())
 	})
 
@@ -321,12 +337,14 @@ func Test_Targets_Add(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, 1, tgs.Len())
 	})
 
 	t.Run("zero value", func(t *testing.T) {
 		// --- Given ---
 		var tgs Targets
+
 		tgt := &mkf.Target{Name: "build"}
 
 		// --- When ---
@@ -334,6 +352,7 @@ func Test_Targets_Add(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Same(t, tgt, tgs.Get("build"))
 	})
 
@@ -346,6 +365,7 @@ func Test_Targets_Add(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, 0, tgs.Len())
 	})
 }
@@ -354,12 +374,16 @@ func Test_Targets_Has(t *testing.T) {
 	t.Run("has", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt1"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		tgt02 := "tgt0"
+
 		// --- When ---
-		have := tgs.Has("tgt0")
+		have := tgs.Has(tgt02)
 
 		// --- Then ---
 		assert.True(t, have)
@@ -368,12 +392,16 @@ func Test_Targets_Has(t *testing.T) {
 	t.Run("doesnt has", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt1"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		tgt3 := "tgt3"
+
 		// --- When ---
-		have := tgs.Has("tgt3")
+		have := tgs.Has(tgt3)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -383,8 +411,10 @@ func Test_Targets_Has(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
 
+		tgt3 := "tgt3"
+
 		// --- When ---
-		have := tgs.Has("tgt3")
+		have := tgs.Has(tgt3)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -398,15 +428,19 @@ func Test_Targets_addFunc(t *testing.T) {
 	t.Run("add not existing", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
 
+		fns := tst.Funcs()
+
 		// --- When ---
-		err := tgs.addFunc(tst.pkg, tst.Funcs()...)
+		err := tgs.addFunc(tst.pkg, fns...)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := []string{
 			"basic",
 			"basic-args",
@@ -422,15 +456,20 @@ func Test_Targets_addFunc(t *testing.T) {
 	t.Run("add existing", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 		assert.NoError(t, tgs.addFunc(tst.pkg, tst.Funcs()...))
 
+		fns := tst.Funcs()
+
 		// --- When ---
-		err := tgs.addFunc(tst.pkg, tst.Funcs()...)
+		err := tgs.addFunc(tst.pkg, fns...)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
+
 		assert.Len(t, 7, tgs.List())
 	})
 }
@@ -439,25 +478,35 @@ func Test_Targets_addType(t *testing.T) {
 	t.Run("add targets across files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
+
 		tgs := NewTargets()
 
+		types := tst.Types()
+
 		// --- When ---
-		err := tgs.addType(tst.pkg, tst.Types()...)
+		err := tgs.addType(tst.pkg, types...)
 
 		// --- Then ---
 		assert.NoError(t, err)
 
 		// makefile_ns_0.go
 		assert.NotNil(t, tgs.Get("ns0:hello"))
+
 		assert.NotNil(t, tgs.Get("ns0:ns1:hello"))
+
 		assert.NotNil(t, tgs.Get("kebab-case:hello-world"))
+
 		assert.NotNil(t, tgs.Get("ns0:ns1:ns2:hello-hello"))
 
 		// makefile_ns_1.go
 		assert.NotNil(t, tgs.Get("ns0:ns3:hello"))
+
 		assert.NotNil(t, tgs.Get("ns0:ns3:ns4:hello"))
 
 		// makefile_ns_with_default.go
@@ -467,36 +516,55 @@ func Test_Targets_addType(t *testing.T) {
 	t.Run("file with incomplete namespaces", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
+
 		tgs := NewTargets()
 
+		types := tst.Types()
+
 		// --- When ---
-		err := tgs.addType(tst.pkg, tst.Types()...)
+		err := tgs.addType(tst.pkg, types...)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Nil(t, tgs.Get("not0"))
+
 		assert.Nil(t, tgs.Get("not1"))
+
 		assert.Nil(t, tgs.Get("not2"))
+
 		assert.Nil(t, tgs.Get("not3"))
+
 		assert.Nil(t, tgs.Get("not4"))
+
 		assert.Nil(t, tgs.Get("not5"))
+
 		assert.Nil(t, tgs.Get("not6"))
 	})
 
 	t.Run("add existing", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		tgs := NewTargets()
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 		assert.NoError(t, tgs.addType(tst.pkg, tst.Types()...))
 
+		types := tst.Types()
+
 		// --- When ---
-		err := tgs.addType(tst.pkg, tst.Types()...)
+		err := tgs.addType(tst.pkg, types...)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -505,18 +573,27 @@ func Test_Targets_addType(t *testing.T) {
 	t.Run("add namespace with default", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		tgs := NewTargets()
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		types := tst.Types()
+
 		// --- When ---
-		err := tgs.addType(tst.pkg, tst.Types()...)
+		err := tgs.addType(tst.pkg, types...)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.NotNil(t, tgs.Get("ns-def:hello"))
+
 		assert.NotNil(t, tgs.Get("ns-def:world"))
+
 		assert.NotNil(t, tgs.Get("ns-def"))
 	})
 }
@@ -525,12 +602,16 @@ func Test_Targets_withReceiver(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt0 := &mkf.Target{Name: "b", Receiver: "R0"}
+
 		tgt1 := &mkf.Target{Name: "a", Receiver: "R1"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		R0 := "R0"
+
 		// --- When ---
-		have := tgs.withReceiver("R0")
+		have := tgs.withReceiver(R0)
 
 		// --- Then ---
 		assert.Same(t, tgt0, have)
@@ -539,12 +620,16 @@ func Test_Targets_withReceiver(t *testing.T) {
 	t.Run("not found", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt0 := &mkf.Target{Name: "b", Receiver: "R0"}
+
 		tgt1 := &mkf.Target{Name: "a", Receiver: "R1"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		R2 := "R2"
+
 		// --- When ---
-		have := tgs.withReceiver("R2")
+		have := tgs.withReceiver(R2)
 
 		// --- Then ---
 		assert.Nil(t, have)
@@ -554,8 +639,10 @@ func Test_Targets_withReceiver(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
 
+		R2 := "R2"
+
 		// --- When ---
-		have := tgs.withReceiver("R2")
+		have := tgs.withReceiver(R2)
 
 		// --- Then ---
 		assert.Nil(t, have)
@@ -577,7 +664,9 @@ func Test_Targets_Sort(t *testing.T) {
 	t.Run("sorts", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt1 := &mkf.Target{Name: "b"}
+
 		tgt0 := &mkf.Target{Name: "a"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
@@ -600,8 +689,10 @@ func Test_Targets_Get(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
 
+		abc := "abc"
+
 		// --- When ---
-		have := tgs.Get("abc")
+		have := tgs.Get(abc)
 
 		// --- Then ---
 		assert.Nil(t, have)
@@ -610,12 +701,16 @@ func Test_Targets_Get(t *testing.T) {
 	t.Run("get specific", func(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
+
 		tgt0 := &mkf.Target{Name: "a"}
+
 		tgt1 := &mkf.Target{Name: "b"}
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		b2 := "b"
+
 		// --- When ---
-		have := tgs.Get("b")
+		have := tgs.Get(b2)
 
 		// --- Then ---
 		assert.Same(t, tgt1, have)
@@ -676,8 +771,11 @@ func Test_Targets_Names(t *testing.T) {
 	t.Run("list is sorted", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt1"}
+
 		tgt2 := &mkf.Target{Name: "tgt2"}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt2, tgt0, tgt1))
 
@@ -706,8 +804,10 @@ func Test_Targets_MarkDefault(t *testing.T) {
 		// --- Given ---
 		tgs := NewTargets()
 
+		tgt0 := "tgt0"
+
 		// --- When ---
-		have := tgs.MarkDefault("tgt0")
+		have := tgs.MarkDefault(tgt0)
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -716,34 +816,44 @@ func Test_Targets_MarkDefault(t *testing.T) {
 	t.Run("mark proper target", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0", DefRef: "Tgt0"}
+
 		tgt1 := &mkf.Target{Name: "tgt1", DefRef: "Tgt1"}
 
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		Tgt0 := "Tgt0"
+
 		// --- When ---
-		have := tgs.MarkDefault("Tgt0")
+		have := tgs.MarkDefault(Tgt0)
 
 		// --- Then ---
 		assert.Equal(t, "tgt0", have)
+
 		assert.True(t, tgs.Get("tgt0").Default)
+
 		assert.False(t, tgs.Get("tgt1").Default)
 	})
 
 	t.Run("change default target", func(t *testing.T) {
 		// --- Given ---
 		tgt0 := &mkf.Target{Name: "tgt0", DefRef: "Tgt0", Default: true}
+
 		tgt1 := &mkf.Target{Name: "tgt1", DefRef: "Tgt1", Default: false}
 
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
+		Tgt1 := "Tgt1"
+
 		// --- When ---
-		have := tgs.MarkDefault("Tgt1")
+		have := tgs.MarkDefault(Tgt1)
 
 		// --- Then ---
 		assert.Equal(t, "tgt1", have)
+
 		assert.False(t, tgs.Get("tgt0").Default)
+
 		assert.True(t, tgs.Get("tgt1").Default)
 	})
 }
@@ -751,8 +861,11 @@ func Test_Targets_MarkDefault(t *testing.T) {
 func Test_BuiltInCB(t *testing.T) {
 	// --- Given ---
 	tgt0 := &mkf.Target{Name: "tgt0", Default: true}
+
 	tgt1 := &mkf.Target{Name: "tgt1"}
+
 	tgt2 := &mkf.Target{Name: "tgt2"}
+
 	tgs := must.Value(TargetsFromList(tgt0, tgt1, tgt2))
 
 	// --- When ---
@@ -765,15 +878,18 @@ func Test_BuiltInCB(t *testing.T) {
 		":tgt2",
 	}
 	assert.Equal(t, want, tgs.Names())
+
 	assert.HasKey(t, ":tgt0", tgs.unique)
 	assert.HasKey(t, ":tgt1", tgs.unique)
 	assert.HasKey(t, ":tgt2", tgs.unique)
+
 	assert.False(t, tgs.Get(":tgt0").Default)
 }
 
 func Test_BuiltInCB_second_call(t *testing.T) {
 	// --- Given ---
 	tgt := &mkf.Target{Name: "build", Default: true}
+
 	tgs := must.Value(TargetsFromList(tgt))
 	tgs.Map(BuiltInCB)
 
@@ -782,29 +898,34 @@ func Test_BuiltInCB_second_call(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, []string{":build"}, tgs.Names())
+
 	assert.False(t, tgs.Get(":build").Default)
 }
 
 func Test_Targets_Map(t *testing.T) {
 	// --- Given ---
 	tgt0 := &mkf.Target{Name: "tgt0"}
+
 	tgt1 := &mkf.Target{Name: "tgt1"}
 
 	tgs := NewTargets()
 	assert.NoError(t, tgs.Add(tgt0, tgt1))
 
-	// --- When ---
 	fn := func(tgs *Targets, tgt *mkf.Target) {
 		delete(tgs.unique, tgt.Name)
 		tgt.Name = ":" + tgt.Name
 		tgt.Doc = "abc"
 		tgs.unique[tgt.Name] = struct{}{}
 	}
+
+	// --- When ---
 	tgs.Map(fn)
 
 	// --- Then ---
 	assert.Equal(t, "abc", tgs.Get(":tgt0").Doc)
+
 	assert.Equal(t, "abc", tgs.Get(":tgt1").Doc)
+
 	assert.Equal(t, 2, tgs.Len())
 }
 
@@ -827,17 +948,21 @@ func Test_Targets_GoImports(t *testing.T) {
 			PkgName: "pkg1",
 			ImpSpec: "git.com/prj/pkg1",
 		}
+
 		tgt1 := &mkf.Target{
 			Name:    "b",
 			PkgName: "pkg2",
 			ImpSpec: "git.com/prj/pkg2",
 		}
+
 		tgt2 := &mkf.Target{
 			Name:    "c",
 			PkgName: "pkg3",
 			ImpSpec: "git.com/prj/pkg3",
 		}
+
 		tgt3 := &mkf.Target{Name: "e", PkgName: "main", ImpSpec: ""}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2, tgt3))
 
@@ -859,16 +984,19 @@ func Test_Targets_GoImports(t *testing.T) {
 			PkgName: "pkg1",
 			ImpSpec: "git.com/prj/pkg1",
 		}
+
 		tgt1 := &mkf.Target{
 			Name:    "b",
 			PkgName: "pkg1",
 			ImpSpec: "git.com/prj/pkg1",
 		}
+
 		tgt2 := &mkf.Target{
 			Name:    "c",
 			PkgName: "pkg3",
 			ImpSpec: "git.com/prj/pkg3",
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2))
 
@@ -887,15 +1015,19 @@ func Test_Targets_GoImports(t *testing.T) {
 		tgt0 := &mkf.Target{
 			Name: "a", PkgName: "context", ImpSpec: "example.com/ctx",
 		}
+
 		tgt1 := &mkf.Target{
 			Name: "b", PkgName: "ring", ImpSpec: "example.com/rng",
 		}
+
 		tgt2 := &mkf.Target{
 			Name: "c", PkgName: "targets", ImpSpec: "example.com/tgs",
 		}
+
 		tgt3 := &mkf.Target{
 			Name: "d", PkgName: "tgt", ImpSpec: "example.com/tgt",
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2, tgt3))
 
@@ -916,11 +1048,13 @@ func Test_Targets_GoImports(t *testing.T) {
 			PkgName: "git",
 			ImpSpec: "example.com/one/git",
 		}
+
 		tgt1 := &mkf.Target{
 			Name:    "b",
 			PkgName: "git",
 			ImpSpec: "example.com/two/git",
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
@@ -942,12 +1076,15 @@ func Test_Targets_GoImports(t *testing.T) {
 		tgt0 := &mkf.Target{
 			Name: "a", PkgName: "foo", ImpSpec: "example.com/a/foo",
 		}
+
 		tgt1 := &mkf.Target{
 			Name: "b", PkgName: "foo", ImpSpec: "example.com/b/foo",
 		}
+
 		tgt2 := &mkf.Target{
 			Name: "c", PkgName: "foo2", ImpSpec: "example.com/c/foo2",
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1, tgt2))
 
@@ -973,6 +1110,7 @@ func Test_Targets_GoImports(t *testing.T) {
 			CodeRef:  "_vgitNS.M",
 			FuncName: "M",
 		}
+
 		tgt1 := &mkf.Target{
 			Name:     "b:m",
 			PkgName:  "git",
@@ -982,6 +1120,7 @@ func Test_Targets_GoImports(t *testing.T) {
 			CodeRef:  "_vgitNS.M",
 			FuncName: "M",
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 
@@ -998,7 +1137,9 @@ func Test_Targets_GoImports(t *testing.T) {
 	t.Run("imports from showcase example", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		relPath := "testdata/projects/showcase_imports/project"
+
 		absPath := modkit.Path(relPath)
 
 		pmf := must.Value(NewMakefile(rng, absPath))
@@ -1019,7 +1160,9 @@ func Test_Targets_GoImports(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
+
 		relPath := "testdata/projects/showcase_imports/project"
+
 		absPath := modkit.Path(relPath)
 
 		pmf := must.Value(NewMakefile(rng, absPath))
@@ -1042,11 +1185,17 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("target from main package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		gfp := pathkit.AbsPath(t, "testdata/target_from_main.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
@@ -1062,11 +1211,17 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("target from imported package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
+
 		absPath := modkit.Path(relPath)
+
 		gfp := pathkit.AbsPath(t, "testdata/target_from_imported.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
@@ -1082,11 +1237,17 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("namespaced target from main package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		gfp := pathkit.AbsPath(t, "testdata/target_from_main_ns.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
@@ -1102,11 +1263,17 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("namespaced target from imported package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
+
 		absPath := modkit.Path(relPath)
+
 		gfp := pathkit.AbsPath(t, "testdata/target_from_imported_ns.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
@@ -1122,11 +1289,17 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("targets with core qualified identifier", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		gfp := pathkit.AbsPath(t, "testdata/target_qualified_code.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
+
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		tgs := NewTargets()
@@ -1154,7 +1327,9 @@ func Test_Targets_GoCode(t *testing.T) {
 	t.Run("first target hidden", func(t *testing.T) {
 		// --- Given ---
 		gfp := pathkit.AbsPath(t, "testdata/targets_first_hidden.gld")
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		tgt0 := &mkf.Target{
@@ -1164,6 +1339,7 @@ func Test_Targets_GoCode(t *testing.T) {
 			ImpSpec: "git.com/prj/pkg1",
 			Hidden:  true,
 		}
+
 		tgt1 := &mkf.Target{
 			Name:    "b",
 			PkgName: "pkg2",
@@ -1171,6 +1347,7 @@ func Test_Targets_GoCode(t *testing.T) {
 			ImpSpec: "git.com/prj/pkg2",
 			Hidden:  false,
 		}
+
 		tgs := NewTargets()
 		assert.NoError(t, tgs.Add(tgt0, tgt1))
 

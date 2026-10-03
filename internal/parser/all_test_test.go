@@ -22,21 +22,27 @@ func Test_getFile(t *testing.T) {
 			"dir/file1.go": {FileStart: 1},
 		}
 
+		dir := "dir"
+
+		path := "file1.go"
+
 		// --- When ---
-		have := getFile(tspy, fls, "dir", "file1.go")
+		have := getFile(tspy, fls, dir, path)
 
 		// --- Then ---
 		assert.Equal(t, 1, int(have.FileStart))
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	t.Run("error - missing file", func(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t, 1)
 		tspy.ExpectError()
+
 		wMsg := "" +
 			"expected map to have a file:\n" +
 			"  path: dir/file2.go"
 		tspy.ExpectLogContain(wMsg)
+
 		tspy.Close()
 
 		fls := map[string]*ast.File{
@@ -44,8 +50,12 @@ func Test_getFile(t *testing.T) {
 			"dir/file1.go": {FileStart: 1},
 		}
 
+		dir := "dir"
+
+		path := "file2.go"
+
 		// --- When ---
-		have := getFile(tspy, fls, "dir", "file2.go")
+		have := getFile(tspy, fls, dir, path)
 
 		// --- Then ---
 		assert.Nil(t, have)

@@ -17,75 +17,101 @@ import (
 
 func Test_PathExists(t *testing.T) {
 	t.Run("path does not exist", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/not-existing"
+
 		// --- When ---
-		exists := PathExists("testdata/not-existing")
+		have := PathExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("file", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0.txt"
+
 		// --- When ---
-		exists := PathExists("testdata/file0.txt")
+		have := PathExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 
 	t.Run("link", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0_link.txt"
+
 		// --- When ---
-		exists := PathExists("testdata/file0_link.txt")
+		have := PathExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 
 	t.Run("directory", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/dir"
+
 		// --- When ---
-		exists := PathExists("testdata/dir")
+		have := PathExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 }
 
 func Test_FileExists(t *testing.T) {
 	t.Run("file does not exist", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/not-existing"
+
 		// --- When ---
-		exists := FileExists("testdata/not-existing")
+		have := FileExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("file", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0.txt"
+
 		// --- When ---
-		exists := FileExists("testdata/file0.txt")
+		have := FileExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 
 	t.Run("link", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0_link.txt"
+
 		// --- When ---
-		exists := FileExists("testdata/file0_link.txt")
+		have := FileExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 
 	t.Run("directory", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/dir"
+
 		// --- When ---
-		exists := FileExists("testdata/dir")
+		have := FileExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("socket", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
+
 		pth := filepath.Join(dir, "sock")
+
 		ln := must.Value(net.Listen("unix", pth))
 		t.Cleanup(func() { _ = ln.Close() })
 
@@ -99,74 +125,98 @@ func Test_FileExists(t *testing.T) {
 
 func Test_DirExists(t *testing.T) {
 	t.Run("directory does not exist", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/not-existing"
+
 		// --- When ---
-		exists := DirExists("testdata/not-existing")
+		have := DirExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("file", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0.txt"
+
 		// --- When ---
-		exists := DirExists("testdata/file0.txt")
+		have := DirExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("link", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0_link.txt"
+
 		// --- When ---
-		exists := DirExists("testdata/file0_link.txt")
+		have := DirExists(path)
 
 		// --- Then ---
-		assert.False(t, exists)
+		assert.False(t, have)
 	})
 
 	t.Run("directory", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/dir"
+
 		// --- When ---
-		exists := DirExists("testdata/dir")
+		have := DirExists(path)
 
 		// --- Then ---
-		assert.True(t, exists)
+		assert.True(t, have)
 	})
 }
 
 func Test_ReadFile(t *testing.T) {
 	t.Run("does not exist", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/not-existing"
+
 		// --- When ---
-		content, err := ReadFile("testdata/not-existing")
+		have, err := ReadFile(path)
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrNotExist, err)
-		assert.Equal(t, "", content)
+		assert.Equal(t, "", have)
 	})
 
 	t.Run("file", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0.txt"
+
 		// --- When ---
-		content, err := ReadFile("testdata/file0.txt")
+		have, err := ReadFile(path)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "content", content)
+		assert.Equal(t, "content", have)
 
 	})
 
 	t.Run("link", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/file0_link.txt"
+
 		// --- When ---
-		content, err := ReadFile("testdata/file0_link.txt")
+		have, err := ReadFile(path)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "content", content)
+		assert.Equal(t, "content", have)
 	})
 
 	t.Run("directory", func(t *testing.T) {
+		// --- Given ---
+		path := "testdata/dir"
+
 		// --- When ---
-		content, err := ReadFile("testdata/dir")
+		have, err := ReadFile(path)
 
 		// --- Then ---
 		assert.ErrorContain(t, "directory", err)
-		assert.Equal(t, "", content)
+		assert.Equal(t, "", have)
 	})
 }
 
@@ -246,6 +296,18 @@ func Test_ReadLine(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "two", have)
 	})
+
+	t.Run("error - eof without newline", func(t *testing.T) {
+		// --- Given ---
+		rdr := bytes.NewBufferString("  last  ")
+
+		// --- When ---
+		have, err := ReadLine(rdr)
+
+		// --- Then ---
+		assert.ErrorIs(t, io.EOF, err)
+		assert.Equal(t, "last", have)
+	})
 }
 
 func Test_ReadLine_tabular(t *testing.T) {
@@ -275,16 +337,4 @@ func Test_ReadLine_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have)
 		})
 	}
-}
-
-func Test_ReadLine_eofWithoutNewline(t *testing.T) {
-	// --- Given ---
-	rdr := bytes.NewBufferString("  last  ")
-
-	// --- When ---
-	have, err := ReadLine(rdr)
-
-	// --- Then ---
-	assert.ErrorIs(t, io.EOF, err)
-	assert.Equal(t, "last", have)
 }

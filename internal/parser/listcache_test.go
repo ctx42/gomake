@@ -16,89 +16,110 @@ func Test_listCacheKey(t *testing.T) {
 	t.Run("stable and cacheable inside a module", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
+		path := "example.com/x"
+
 		// --- When ---
-		key1, ok1 := listCacheKey(rng, dir, "example.com/x")
-		key2, ok2 := listCacheKey(rng, dir, "example.com/x")
+		hKey1, hOk1 := listCacheKey(rng, dir, path)
+		hKey2, hOk2 := listCacheKey(rng, dir, path)
 
 		// --- Then ---
-		assert.True(t, ok1)
-		assert.True(t, ok2)
-		assert.Equal(t, key1, key2)
+		assert.True(t, hOk1)
+		assert.True(t, hOk2)
+		assert.Equal(t, hKey1, hKey2)
 	})
 
-	t.Run("different spec yields different key", func(t *testing.T) {
+	t.Run("different spec", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
+		path := "example.com/a"
+
+		path2 := "example.com/b"
+
 		// --- When ---
-		key1, _ := listCacheKey(rng, dir, "example.com/a")
-		key2, _ := listCacheKey(rng, dir, "example.com/b")
+		hKey1, _ := listCacheKey(rng, dir, path)
+		hKey2, _ := listCacheKey(rng, dir, path2)
 
 		// --- Then ---
-		assert.NotEqual(t, key1, key2)
+		assert.NotEqual(t, hKey1, hKey2)
 	})
 
 	t.Run("changes when ring CGO_ENABLED changes", func(t *testing.T) {
 		// --- Given ---
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
+
 		base := SetBuildTag(ring.New())
 		base.EnvSet("CGO_ENABLED", "0")
+
 		alt := SetBuildTag(ring.New())
 		alt.EnvSet("CGO_ENABLED", "1")
 
+		path := "example.com/x"
+
 		// --- When ---
-		key1, ok1 := listCacheKey(base, dir, "example.com/x")
-		key2, ok2 := listCacheKey(alt, dir, "example.com/x")
+		hKey1, hOk1 := listCacheKey(base, dir, path)
+		hKey2, hOk2 := listCacheKey(alt, dir, path)
 
 		// --- Then ---
-		assert.True(t, ok1)
-		assert.True(t, ok2)
-		assert.NotEqual(t, key1, key2)
+		assert.True(t, hOk1)
+		assert.True(t, hOk2)
+		assert.NotEqual(t, hKey1, hKey2)
 	})
 
 	t.Run("unreadable go.mod is not cached", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "go.mod")
 
+		path := "example.com/x"
+
 		// --- When ---
-		key, ok := listCacheKey(rng, dir, "example.com/x")
+		hKey, hOk := listCacheKey(rng, dir, path)
 
 		// --- Then ---
-		assert.False(t, ok)
-		assert.Equal(t, "", key)
+		assert.False(t, hOk)
+		assert.Equal(t, "", hKey)
 	})
 
 	t.Run("unreadable go.sum is not cached", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		dir := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
 		oskit.MkdirAll(t, dir, "go.sum")
 
+		path := "example.com/x"
+
 		// --- When ---
-		key, ok := listCacheKey(rng, dir, "example.com/x")
+		hKey, hOk := listCacheKey(rng, dir, path)
 
 		// --- Then ---
-		assert.False(t, ok)
-		assert.Equal(t, "", key)
+		assert.False(t, hOk)
+		assert.Equal(t, "", hKey)
 	})
 
 	t.Run("not cacheable outside a module", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		dir := t.TempDir()
 
+		path := "example.com/x"
+
 		// --- When ---
-		key, ok := listCacheKey(rng, dir, "example.com/x")
+		hKey, hOk := listCacheKey(rng, dir, path)
 
 		// --- Then ---
-		assert.False(t, ok)
-		assert.Equal(t, "", key)
+		assert.False(t, hOk)
+		assert.Equal(t, "", hKey)
 	})
 }
 
@@ -133,15 +154,17 @@ func Test_listCache_roundtrip(t *testing.T) {
 	t.Run("store then load", func(t *testing.T) {
 		// --- Given ---
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
+
 		key := "deadbeef"
+
 		want := []byte(`{"Name":"x"}`)
 
 		// --- When ---
 		storeListCache(key, want)
-		have, ok := loadListCache(key)
+		have, hOk := loadListCache(key)
 
 		// --- Then ---
-		assert.True(t, ok)
+		assert.True(t, hOk)
 		assert.Equal(t, want, have)
 	})
 
@@ -149,11 +172,13 @@ func Test_listCache_roundtrip(t *testing.T) {
 		// --- Given ---
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
+		missing := "missing"
+
 		// --- When ---
-		have, ok := loadListCache("missing")
+		have, hOk := loadListCache(missing)
 
 		// --- Then ---
-		assert.False(t, ok)
+		assert.False(t, hOk)
 		assert.Nil(t, have)
 	})
 }

@@ -51,80 +51,118 @@ func Test_genMain(t *testing.T) {
 	t.Run("no targets", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/no_targets/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		prj.Exe("go", "mod", "tidy")
+
 		want := "pick a target to execute\n"
-		have := exekit.New(t, exekit.WithExitCode(126)).ExeStderr(prj.Compile())
-		assert.Equal(t, want, have)
+		stderr := exekit.New(t, exekit.WithExitCode(126)).
+			ExeStderr(prj.Compile())
+		assert.Equal(t, want, stderr)
 	})
 
 	t.Run("no targets list targets", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/no_targets/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "no targets\n"
-		have := exekit.New(t).ExeStderr(prj.Compile(), "--list")
-		assert.Equal(t, want, have)
+		stderr := exekit.New(t).ExeStderr(prj.Compile(), "--list")
+		assert.Equal(t, want, stderr)
 	})
 
 	t.Run("no targets print version", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/no_targets/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "1.2.3\n"
-		have := exekit.New(t).ExeStderr(prj.Compile(), "--version")
-		assert.Equal(t, want, have)
+		stderr := exekit.New(t).ExeStderr(prj.Compile(), "--version")
+		assert.Equal(t, want, stderr)
 	})
 
 	t.Run("makefile without targets print help", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/no_targets/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		gfp := filepath.Join(absPth, "help_without_builtin.no_trim.gld")
+
 		gld := goldy.Open(t, gfp)
-		have := exekit.New(t).ExeStderr(prj.Compile(), "--help")
-		assert.Equal(t, gld.String(), have)
+		stderr := exekit.New(t).ExeStderr(prj.Compile(), "--help")
+		assert.Equal(t, gld.String(), stderr)
 	})
 
 	t.Run("list targets", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/showcase_imports/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "" +
 			"abc:ns0:hello\n" +
 			"abc:ns0:ns1:hello\n" +
@@ -136,162 +174,227 @@ func Test_genMain(t *testing.T) {
 			"is a test target with help message\n" +
 			"ns:pkg1\n" +
 			"pkg0                           is an example target\n"
-		have := exekit.New(t).ExeStderr(prj.Compile(), "--list")
-		assert.Equal(t, want, have)
+		stderr := exekit.New(t).ExeStderr(prj.Compile(), "--list")
+		assert.Equal(t, want, stderr)
 	})
 
 	t.Run("run local target", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/showcase_imports/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "local target says hello"
-		have := exekit.New(t).ExeStdout(prj.Compile(), "local")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "local")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run local target using an import", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/showcase_imports/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "pkg8.Pkg8F1"
-		have := exekit.New(t).ExeStdout(prj.Compile(), "imported")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "imported")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run imported not namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/showcase_imports/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "pkg0.Pkg0"
-		have := exekit.New(t).ExeStdout(prj.Compile(), "pkg0")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "pkg0")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run imported namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/showcase_imports/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "pkg1.Pkg1"
-		have := exekit.New(t).ExeStdout(prj.Compile(), "ns:pkg1")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "ns:pkg1")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run default local target", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/default_local/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "gomake says hello"
-		have := exekit.New(t).ExeStdout(prj.Compile())
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile())
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run default local namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/default_from_ns/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := "NS says hello"
-		have := exekit.New(t).ExeStdout(prj.Compile())
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile())
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run target from OS related file", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/arch_os_build_tag/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := fmt.Sprintf("TargetOS=os:%s", runtime.GOOS)
-		have := exekit.New(t).ExeStdout(prj.Compile(), "target-os")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "target-os")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("run target from not tagged makefiles", func(t *testing.T) {
 		// --- Given ---
 		relPth := "testdata/projects/arch_os/project"
+
 		absPth := modkit.Path(relPth)
+
 		prj := setup(t, absPth)
 
+		path := prj.Path(mkf.MakefileGen)
+
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+		err := genMain(path, ver)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		want := fmt.Sprintf("TargetOS=os:%s", runtime.GOOS)
-		have := exekit.New(t).ExeStdout(prj.Compile(), "target-os")
-		assert.Equal(t, want, have)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "target-os")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("target can read its own name via gomake.TargetName",
 		func(t *testing.T) {
 			// --- Given ---
 			relPth := "testdata/projects/showcase_targets/project"
+
 			absPth := modkit.Path(relPth)
+
 			prj := setup(t, absPth)
 
+			path := prj.Path(mkf.MakefileGen)
+
+			ver := "1.2.3"
+
 			// --- When ---
-			err := genMain(prj.Path(mkf.MakefileGen), "1.2.3")
+			err := genMain(path, ver)
 
 			// --- Then ---
 			assert.NoError(t, err)
+
 			want := "my name is ns0:ns1:ns2:say-my-name\n"
-			have := exekit.New(t).
+			stdout := exekit.New(t).
 				ExeStdout(prj.Compile(), "ns0:ns1:ns2:say-my-name")
-			assert.Equal(t, want, have)
+			assert.Equal(t, want, stdout)
 		})
 
 	t.Run("cannot create main file error", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(t.TempDir(), "not_existing", mkf.MakefileMain)
 
+		ver := "1.2.3"
+
 		// --- When ---
-		err := genMain(pth, "1.2.3")
+		err := genMain(pth, ver)
 
 		// --- Then ---
 		var e *fs.PathError

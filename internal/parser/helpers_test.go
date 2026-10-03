@@ -26,6 +26,8 @@ import (
 func Test_GenMakefileUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		relPath := "testdata/projects/showcase_imports/project"
 
 		prj := gmt.NewProject(t)
@@ -36,10 +38,10 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := SetBuildTag(ring.New())
+		root := prj.Root()
 
 		// --- When ---
-		code, tgs, err := genMakefileUser(rng, prj.Root())
+		hCode, hTgs, err := genMakefileUser(rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -54,18 +56,24 @@ func Test_GenMakefileUser(t *testing.T) {
 			"ns:pkg1",
 			"pkg0",
 		}
-		assert.Equal(t, wantNames, tgs.Names())
+		assert.Equal(t, wantNames, hTgs.Names())
 
 		prj.ChdirBack()
+
 		gfp := "testdata/mkf_user_main.gld"
+
 		gfd := map[string]any{"gmk_root": modkit.Root(), "prj_root": prj.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
-		assert.Equal(t, gld.String(), string(code))
+		assert.Equal(t, gld.String(), string(hCode))
 	})
 
-	t.Run("duplicated targets error", func(t *testing.T) {
+	t.Run("error - duplicated targets", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		relPath := "testdata/projects/dup_imported/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -74,22 +82,25 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := SetBuildTag(ring.New())
+		root := prj.Root()
 
 		// --- When ---
-		code, tgs, err := genMakefileUser(rng, prj.Root())
+		hCode, hTgs, err := genMakefileUser(rng, root)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
-		assert.Nil(t, tgs)
-		assert.Nil(t, code)
+		assert.Nil(t, hTgs)
+		assert.Nil(t, hCode)
 	})
 }
 
 func Test_GenMakefileUserAndSave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		relPath := "testdata/projects/no_targets/project"
+
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(modkit.Path(relPath))
@@ -97,26 +108,33 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		prj.GoModTidy()
 		prj.Close()
 
-		rng := SetBuildTag(ring.New())
 		dst := prj.Path(mkf.MakefileUser)
 
+		root := prj.Root()
+
 		// --- When ---
-		tgs, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, root, dst)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, 0, tgs.Len())
+		assert.Equal(t, 0, have.Len())
 
 		gfp := "testdata/gen_no_targets_main_init.gld"
+
 		gfd := map[string]any{"prj_root": modkit.Root()}
+
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 		assert.Equal(t, gld.String(), oskit.ReadFileStr(t, dst))
 	})
 
-	t.Run("error generating code", func(t *testing.T) {
+	t.Run("error - generating code", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		relPath := "testdata/projects/dup_imported/project"
+
 		absPath := modkit.Path(relPath)
+
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -124,21 +142,26 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		prj.GoModTidy()
 		prj.Close()
 
-		rng := SetBuildTag(ring.New())
 		dst := prj.Path(mkf.MakefileUser)
 
+		root := prj.Root()
+
 		// --- When ---
-		tgs, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, root, dst)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
-		assert.Nil(t, tgs)
+		assert.Nil(t, have)
 	})
 
 	t.Run("error writing file", func(t *testing.T) {
 		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
 		relPath := "testdata/projects/no_targets/project"
+
 		absPath := modkit.Path(relPath)
+
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -146,17 +169,18 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		prj.GoModTidy()
 		prj.Close()
 
-		rng := SetBuildTag(ring.New())
 		dst := t.TempDir()
 
+		root := prj.Root()
+
 		// --- When ---
-		tgs, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, root, dst)
 
 		// --- Then ---
 		var e *os.PathError
 		assert.ErrorAs(t, &e, err)
 		assert.Equal(t, dst, e.Path)
-		assert.Nil(t, tgs)
+		assert.Nil(t, have)
 	})
 }
 
@@ -168,20 +192,21 @@ func Test_SetBuildTag_GetBuildTag_RemBuildTag(t *testing.T) {
 	assert.Empty(t, GetBuildTag(rng0))
 
 	// --- When ---
-	rng1 := SetBuildTag(rng0)
+	hRng1 := SetBuildTag(rng0)
 
 	// --- Then ---
-	assert.Equal(t, rng0.MetaAll(), rng1.MetaAll())
+	assert.Equal(t, rng0.MetaAll(), hRng1.MetaAll())
 
 	// --- Then ---
-	assert.Equal(t, BuildTag, GetBuildTag(rng1))
+	assert.Equal(t, BuildTag, GetBuildTag(hRng1))
 
 	// --- When ---
-	rng2 := RemBuildTag(rng1)
+	hRng2 := RemBuildTag(hRng1)
 
 	// --- Then ---
-	assert.Empty(t, GetBuildTag(rng1))
-	assert.Empty(t, GetBuildTag(rng2))
+	assert.Empty(t, GetBuildTag(hRng1))
+
+	assert.Empty(t, GetBuildTag(hRng2))
 }
 
 func Test_toOneLine_tabular(t *testing.T) {
@@ -237,11 +262,11 @@ func Test_isHidden(t *testing.T) {
 		doc := "abc\n\ngomake:hidden\ndef"
 
 		// --- When ---
-		haveDoc, haveHidden := isHidden(doc)
+		hDoc, hHidden := isHidden(doc)
 
 		// --- Then ---
-		assert.Equal(t, "abc\n\ndef", haveDoc)
-		assert.True(t, haveHidden)
+		assert.Equal(t, "abc\n\ndef", hDoc)
+		assert.True(t, hHidden)
 	})
 
 	t.Run("not hidden target", func(t *testing.T) {
@@ -249,11 +274,11 @@ func Test_isHidden(t *testing.T) {
 		doc := "abc\ndef\nghi"
 
 		// --- When ---
-		haveDoc, haveHidden := isHidden(doc)
+		hDoc, hHidden := isHidden(doc)
 
 		// --- Then ---
-		assert.Equal(t, "abc\ndef\nghi", haveDoc)
-		assert.False(t, haveHidden)
+		assert.Equal(t, "abc\ndef\nghi", hDoc)
+		assert.False(t, hHidden)
 	})
 }
 
@@ -306,11 +331,11 @@ func Test_removeLines_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have, n := removeLines(tc.in, tc.remove)
+			have, hN := removeLines(tc.in, tc.remove)
 
 			// --- Then ---
 			assert.Equal(t, tc.wantStr, have)
-			assert.Equal(t, tc.wantNum, n)
+			assert.Equal(t, tc.wantNum, hN)
 		})
 	}
 }
@@ -353,8 +378,11 @@ func Test_breadcrumbs(t *testing.T) {
 	t.Run("invalid type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		relPath := "testdata/projects/ns_crossfile/project"
+
 		absPath := modkit.Path(relPath)
+
 		tst := NewTestHelper(t, rng, absPath)
 
 		typ := tst.Types()[0]
@@ -410,7 +438,7 @@ func Test_breadcrumbs_tabular(t *testing.T) {
 }
 
 func Test_isNS(t *testing.T) {
-	t.Run("cyclic type chain does not overflow", func(t *testing.T) {
+	t.Run("cyclic type chain", func(t *testing.T) {
 		// The child process builds a cyclic type chain and calls isNS.
 		// Without the cycle guard the recursion overflows the stack and the
 		// child dies; the guard makes it return and the child exits cleanly.
@@ -446,17 +474,21 @@ func Test_isNS(t *testing.T) {
 
 		// --- Given ---
 		exe := os.Args[0]
+
 		env := append(os.Environ(), "GOMAKE_ISNS_CYCLE=1")
 
+		text := "-test.run=^Test_isNS$"
+
 		// --- When ---
-		cmd := exec.Command(exe, "-test.run=^Test_isNS$")
-		cmd.Env = env
-		out, err := cmd.CombinedOutput()
+		hCmd := exec.Command(exe, text)
+		hCmd.Env = env
+		hOut, err := hCmd.CombinedOutput()
 
 		// --- Then ---
 		if err != nil {
-			t.Log(string(out))
+			t.Log(string(hOut))
 		}
+
 		assert.NoError(t, err)
 	})
 }
@@ -523,14 +555,18 @@ func Test_isNSRoot(t *testing.T) {
 	t.Run("doc comment", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
+
 		src := "" +
 			"package p\n" +
 			"\n" +
 			"// Foo groups targets.\n" +
 			"//gomake:ns_root\n" +
 			"type Foo struct{}\n"
+
 		pth := oskit.Write(t, src, dir, "p.go")
+
 		_, fls := must.Values(astFiles(dir, []string{pth}))
+
 		spc := fls[pth].Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)
 
 		// --- When ---
@@ -564,6 +600,30 @@ func Test_toKebabCase_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, toKebabCase(tc.in))
 		})
 	}
+}
+
+func Test_importLocalNames(t *testing.T) {
+	// --- Given ---
+	src := "" +
+		"package main\n" +
+		"import (\n" +
+		"\ta \"example.com/one/git\"\n" +
+		"\t\"example.com/pkg\"\n" +
+		")\n"
+
+	set := token.NewFileSet()
+
+	fil, err := goparser.ParseFile(set, "x.go", src, goparser.ImportsOnly)
+	assert.NoError(t, err)
+
+	files := map[string]*ast.File{"x.go": fil}
+
+	// --- When ---
+	have := importLocalNames(files)
+
+	// --- Then ---
+	assert.Equal(t, "example.com/one/git", have["a"])
+	assert.Equal(t, "example.com/pkg", have["pkg"])
 }
 
 func Test_gmImpSpec_tabular(t *testing.T) {
@@ -656,12 +716,15 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			elem := iss[tc.index]
+
 			// --- When ---
-			haveNS, haveSpec := gmImpSpec(iss[tc.index])
+			hNS, hSpec := gmImpSpec(elem)
 
 			// --- Then ---
-			assert.Equal(t, tc.wantSpec, haveSpec)
-			assert.Equal(t, tc.wantNS, haveNS)
+			assert.Equal(t, tc.wantSpec, hSpec)
+			assert.Equal(t, tc.wantNS, hNS)
 		})
 	}
 }
@@ -675,17 +738,21 @@ func Test_gmImpSpec_doc(t *testing.T) {
 			"\t//gomake:import ns\n" +
 			"\t_ \"example.com/bar\"\n" +
 			")\n"
+
 		set := token.NewFileSet()
+
 		fil := must.Value(goparser.ParseFile(
 			set, "x.go", src, goparser.ParseComments,
 		))
 
+		elem := fil.Imports[0]
+
 		// --- When ---
-		haveNS, haveSpec := gmImpSpec(fil.Imports[0])
+		hNS, hSpec := gmImpSpec(elem)
 
 		// --- Then ---
-		assert.Equal(t, "ns", haveNS)
-		assert.Equal(t, "example.com/bar", haveSpec)
+		assert.Equal(t, "ns", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
 	})
 
 	t.Run("line comment wins", func(t *testing.T) {
@@ -701,40 +768,46 @@ func Test_gmImpSpec_doc(t *testing.T) {
 		}
 
 		// --- When ---
-		haveNS, haveSpec := gmImpSpec(is)
+		hNS, hSpec := gmImpSpec(is)
 
 		// --- Then ---
-		assert.Equal(t, "line", haveNS)
-		assert.Equal(t, "example.com/bar", haveSpec)
+		assert.Equal(t, "line", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
 	})
 
 	t.Run("above a single import", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
+
 		src := "" +
 			"package p\n" +
 			"\n" +
 			"//gomake:import ns\n" +
 			"import _ \"example.com/bar\"\n"
+
 		pth := oskit.Write(t, src, dir, "p.go")
+
 		_, fls := must.Values(astFiles(dir, []string{pth}))
+
 		fil := fls[pth]
 
+		elem := fil.Imports[0]
+
 		// --- When ---
-		haveNS, haveSpec := gmImpSpec(fil.Imports[0])
+		hNS, hSpec := gmImpSpec(elem)
 
 		// --- Then ---
-		assert.Equal(t, "ns", haveNS)
-		assert.Equal(t, "example.com/bar", haveSpec)
+		assert.Equal(t, "ns", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
 	})
 
 	t.Run("nil spec", func(t *testing.T) {
 		// --- When ---
-		haveNS, haveSpec := gmImpSpec(nil)
+		hNS, hSpec := gmImpSpec(nil)
 
 		// --- Then ---
-		assert.Equal(t, "", haveNS)
-		assert.Equal(t, "", haveSpec)
+		assert.Equal(t, "", hNS)
+		assert.Equal(t, "", hSpec)
 	})
 }
 
@@ -769,7 +842,12 @@ func Test_unquote_tabular(t *testing.T) {
 func Test_gmImpPackages(t *testing.T) {
 	t.Run("imports", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+
+		blank := ""
+
 		relPath := "testdata/projects/showcase_imports/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -778,62 +856,100 @@ func Test_gmImpPackages(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		pks, err := gmImpPackages(rng, "", astFil.Decls...)
+		have, err := gmImpPackages(rng, blank, astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		prj.ChdirBack()
 
-		pkg := pks[0]
+		pkg := have[0]
+
 		assert.Equal(t, "", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg0"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg0", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
-		pkg = pks[1]
+		pkg = have[1]
+
 		assert.Equal(t, "ns", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg1"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg1", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
-		pkg = pks[2]
+		pkg = have[2]
+
 		assert.Equal(t, "mx", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg2"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg2", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go", "file1.go"}, pkg.Files)
 
-		pkg = pks[3]
+		pkg = have[3]
+
 		assert.Equal(t, "abc", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg9"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg9", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
-		assert.Len(t, 4, pks)
+		assert.Len(t, 4, have)
 	})
 
 	t.Run("imports GOOS windows", func(t *testing.T) {
 		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("GOOS", "windows")
+
+		blank := ""
+
 		relPath := "testdata/projects/showcase_imports/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -842,58 +958,89 @@ func Test_gmImpPackages(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
-		rng.EnvSet("GOOS", "windows")
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		pks, err := gmImpPackages(rng, "", astFil.Decls...)
+		have, err := gmImpPackages(rng, blank, astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		prj.ChdirBack()
 
-		pkg := pks[0]
+		pkg := have[0]
+
 		assert.Equal(t, "", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg0"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg0", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
-		pkg = pks[1]
+		pkg = have[1]
+
 		assert.Equal(t, "ns", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg1"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg1", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
-		pkg = pks[2]
+		pkg = have[2]
+
 		assert.Equal(t, "mx", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg2"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg2", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go", "file1.go"}, pkg.Files)
 
-		pkg = pks[3]
+		pkg = have[3]
+
 		assert.Equal(t, "abc", pkg.PkgNS)
+
 		relPath = "testdata/imports/pkg9"
+
 		absPath = modkit.Path(relPath)
+
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
+
 		assert.Equal(t, absPath, pkg.ImpPath)
+
 		assert.Equal(t, impSpec, pkg.ImpSpec)
+
 		assert.Equal(t, "pkg9", pkg.Name)
+
 		assert.Equal(t, []string{"file0.go", "file1_windows.go"}, pkg.Files)
 
-		assert.Len(t, 4, pks)
+		assert.Len(t, 4, have)
 	})
 }
 
@@ -901,6 +1048,7 @@ func Test_findDefault(t *testing.T) {
 	t.Run("no default target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_imports/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -910,18 +1058,20 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
+
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		ref := findDefault(vls...)
+		have := findDefault(vls...)
 
 		// --- Then ---
-		assert.Nil(t, ref)
+		assert.Nil(t, have)
 	})
 
 	t.Run("default target from local package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_local/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -931,18 +1081,20 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
+
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		ref := findDefault(vls...)
+		have := findDefault(vls...)
 
 		// --- Then ---
-		assert.Equal(t, []string{"Hello"}, ref)
+		assert.Equal(t, []string{"Hello"}, have)
 	})
 
 	t.Run("target from imported package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_from_imp/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -952,18 +1104,20 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
+
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		ref := findDefault(vls...)
+		have := findDefault(vls...)
 
 		// --- Then ---
-		assert.Equal(t, []string{"pkg1", "Pkg1"}, ref)
+		assert.Equal(t, []string{"pkg1", "Pkg1"}, have)
 	})
 
 	t.Run("target from local namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_from_ns/project"
+
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -973,13 +1127,14 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
+
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		ref := findDefault(vls...)
+		have := findDefault(vls...)
 
 		// --- Then ---
-		assert.Equal(t, []string{"NS", "Hello"}, ref)
+		assert.Equal(t, []string{"NS", "Hello"}, have)
 	})
 
 	t.Run("default declared without a value", func(t *testing.T) {
@@ -989,16 +1144,17 @@ func Test_findDefault(t *testing.T) {
 			Names: []*ast.Ident{{Name: "Default"}},
 			Type:  &ast.Ident{Name: "Target"},
 		}
+
 		val := &doc.Value{
 			Names: []string{"Default"},
 			Decl:  &ast.GenDecl{Specs: []ast.Spec{spec}},
 		}
 
 		// --- When ---
-		ref := findDefault(val)
+		have := findDefault(val)
 
 		// --- Then ---
-		assert.Nil(t, ref)
+		assert.Nil(t, have)
 	})
 }
 
@@ -1107,25 +1263,4 @@ func Test_qIdent(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, "", have)
 	})
-}
-
-func Test_importLocalNames(t *testing.T) {
-	// --- Given ---
-	src := "" +
-		"package main\n" +
-		"import (\n" +
-		"\ta \"example.com/one/git\"\n" +
-		"\t\"example.com/pkg\"\n" +
-		")\n"
-	set := token.NewFileSet()
-	fil, err := goparser.ParseFile(set, "x.go", src, goparser.ImportsOnly)
-	assert.NoError(t, err)
-	files := map[string]*ast.File{"x.go": fil}
-
-	// --- When ---
-	have := importLocalNames(files)
-
-	// --- Then ---
-	assert.Equal(t, "example.com/one/git", have["a"])
-	assert.Equal(t, "example.com/pkg", have["pkg"])
 }

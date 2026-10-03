@@ -15,10 +15,13 @@ import (
 func Test_Line(t *testing.T) {
 	// --- Given ---
 	saveVars(t)
+
 	scmRev = "v1.2.3"
 
+	gomake := "gomake"
+
 	// --- When ---
-	have := Line("gomake")
+	have := Line(gomake)
 
 	// --- Then ---
 	assert.Equal(t, "gomake v1.2.3", have)
@@ -26,19 +29,26 @@ func Test_Line(t *testing.T) {
 
 func Test_LDFlags(t *testing.T) {
 	t.Run("stamps the version", func(t *testing.T) {
+		// --- Given ---
+		text := "v1.2.3"
+
 		// --- When ---
-		have := LDFlags("v1.2.3")
+		have := LDFlags(text)
 
 		// --- Then ---
 		want := "-X github.com/ctx42/gomake/internal/version.scmRev=v1.2.3"
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("the name comes from xdef", func(t *testing.T) {
+	t.Run("xdef name", func(t *testing.T) {
 		// The injected name is sourced from xdef so that it never drifts
 		// from the name the ctx42 build tooling injects. Guard that linkage.
+
+		// --- Given ---
+		text := "v1.2.3"
+
 		// --- When ---
-		have := LDFlags("v1.2.3")
+		have := LDFlags(text)
 
 		// --- Then ---
 		assert.Contain(t, "."+xdef.VarScmRev+"=", have)
@@ -53,20 +63,22 @@ func Test_LDFlags(t *testing.T) {
 		want := declaredVarNames(t, "version.go")
 		slices.Sort(want)
 
+		text := "v1.2.3"
+
 		// --- When ---
-		flags := LDFlags("v1.2.3")
+		hFlags := LDFlags(text)
 
 		// --- Then ---
-		have := make([]string, 0, len(want))
-		for _, arg := range strings.Fields(flags) {
+		names := make([]string, 0, len(want))
+		for _, arg := range strings.Fields(hFlags) {
 			if arg == "-X" {
 				continue
 			}
 			def, _, _ := strings.Cut(arg, "=")
-			have = append(have, strings.TrimPrefix(def, importPath+"."))
+			names = append(names, strings.TrimPrefix(def, importPath+"."))
 		}
-		slices.Sort(have)
-		assert.Equal(t, want, have)
+		slices.Sort(names)
+		assert.Equal(t, want, names)
 	})
 
 	t.Run("a version the toolchain knows is not stamped", func(t *testing.T) {
@@ -78,8 +90,11 @@ func Test_LDFlags(t *testing.T) {
 	})
 
 	t.Run("an unknown version is not stamped", func(t *testing.T) {
+		// --- Given ---
+		blank := ""
+
 		// --- When ---
-		have := LDFlags("")
+		have := LDFlags(blank)
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -90,6 +105,7 @@ func Test_revision(t *testing.T) {
 	t.Run("a stamped version wins", func(t *testing.T) {
 		// --- Given ---
 		saveVars(t)
+
 		scmRev = "v1.2.3"
 
 		// --- When ---
@@ -106,6 +122,7 @@ func Test_revision(t *testing.T) {
 		// pick covers the choice, and installing gomake exercises the rest.
 		// --- Given ---
 		saveVars(t)
+
 		scmRev = ""
 
 		// --- When ---

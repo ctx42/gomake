@@ -17,65 +17,80 @@ import (
 )
 
 func Test_newLocalPackage(t *testing.T) {
-	t.Run("resolves a tagged package with build tag", func(t *testing.T) {
+	t.Run("tagged package with build tag", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
+
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		ok := newLocalPackage(rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
-		assert.True(t, ok)
+		assert.True(t, have)
+
 		assert.Equal(t, "main", pkg.Name)
+
 		assert.Equal(t, []string{"makefile.go"}, pkg.Files)
+
 		assert.Equal(t, "github.com/ctx42/gomake", pkg.Module.ImpSpec)
+
 		want := pkg.Module.ImpSpec +
 			"/testdata/projects/simple_tagged/project"
 		assert.Equal(t, want, pkg.ImpSpec)
+
 		assert.Equal(t, filepath.Dir(pkg.Module.ModPath), pkg.Module.ImpPath)
 	})
 
 	t.Run("resolves an untagged package", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/simple_untagged/project")
+
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		ok := newLocalPackage(rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
-		assert.True(t, ok)
+		assert.True(t, have)
+
 		assert.Equal(t, "main", pkg.Name)
+
 		assert.Equal(t, []string{"makefile.go"}, pkg.Files)
 	})
 
 	t.Run("tagged file excluded without build tag", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
+
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		ok := newLocalPackage(rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
-		assert.False(t, ok)
+		assert.False(t, have)
 	})
 
 	t.Run("no Go files falls back", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/empty")
+
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		ok := newLocalPackage(rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
-		assert.False(t, ok)
+		assert.False(t, have)
 	})
 }
 
@@ -83,48 +98,52 @@ func Test_importDir(t *testing.T) {
 	t.Run("includes tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		bp, err := importDir(rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"makefile.go"}, bp.GoFiles)
+		assert.Equal(t, []string{"makefile.go"}, have.GoFiles)
 	})
 
 	t.Run("cgo disabled drops cgo files", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "0")
+
 		dir := importDirFixture(t)
 
 		// --- When ---
-		bp, err := importDir(rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"old.go", "plain.go"}, sortedGoFiles(bp))
+		assert.Equal(t, []string{"old.go", "plain.go"}, sortedGoFiles(have))
 	})
 
 	t.Run("cgo enabled keeps cgo files", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "1")
+
 		dir := importDirFixture(t)
 
 		// --- When ---
-		bp, err := importDir(rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		want := []string{"cgo.go", "old.go", "plain.go"}
-		assert.Equal(t, want, sortedGoFiles(bp))
+		assert.Equal(t, want, sortedGoFiles(have))
 	})
 
 	t.Run("error - tagged files excluded without tag", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
@@ -151,10 +170,10 @@ func Test_releaseTagsFor_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have, ok := releaseTagsFor(tc.version)
+			have, hOk := releaseTagsFor(tc.version)
 
 			// --- Then ---
-			assert.Equal(t, tc.ok, ok)
+			assert.Equal(t, tc.ok, hOk)
 			assert.Equal(t, tc.want, have)
 		})
 	}

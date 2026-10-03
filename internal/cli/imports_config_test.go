@@ -4,7 +4,6 @@
 package cli
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -301,11 +300,17 @@ func Test_LoadExternalTargets_tabular(t *testing.T) {
 				oskit.Write(t, tc.content, dir, TargetsFile)
 			}
 
+			ctx := t.Context()
+
+			rng := ring.New()
+
+			join := filepath.Join(dir, TargetsFile)
+
 			// --- When ---
-			cfg, err := LoadExternalTargets(
-				context.Background(),
-				ring.New(),
-				filepath.Join(dir, TargetsFile),
+			have, err := LoadExternalTargets(
+				ctx,
+				rng,
+				join,
 			)
 
 			// --- Then ---
@@ -315,10 +320,10 @@ func Test_LoadExternalTargets_tabular(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			if len(tc.want) == 0 {
-				assert.Equal(t, 0, len(cfg.imports))
+				assert.Equal(t, 0, len(have.imports))
 				return
 			}
-			assert.Equal(t, tc.want, cfg.imports)
+			assert.Equal(t, tc.want, have.imports)
 		})
 	}
 }
@@ -327,41 +332,52 @@ func Test_LoadExternalTargets(t *testing.T) {
 	t.Run("fetches valid YAML from HTTP URL", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		body := "imports:\n  - import: a.com/x\n"
+
 		fn := func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(body))
 		}
+
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
+		rng := ring.New()
+
 		// --- When ---
-		cfg, err := LoadExternalTargets(
-			context.Background(),
-			ring.New(),
+		have, err := LoadExternalTargets(
+			ctx,
+			rng,
 			srv.URL,
 		)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
-		assert.Equal(t, []byte(body), cfg.Raw())
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
+		assert.Equal(t, []byte(body), have.Raw())
 	})
 
 	t.Run("expands a tilde from the ring", func(t *testing.T) {
 		// --- Given ---
 		home := t.TempDir()
+
 		body := "imports:\n  - import: a.com/x\n"
 		oskit.Write(t, body, home, "targets.yaml")
+
 		rng := ring.New()
 		rng.EnvSet("HOME", home)
 		rng.EnvSet("USERPROFILE", home)
 		rng.EnvSet("home", home)
 
+		context := t.Context()
+
+		path := "~/targets.yaml"
+
 		// --- When ---
-		cfg, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+		have, err := LoadExternalTargets(context, rng, path)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
 	})
 
 	t.Run("error - home unset", func(t *testing.T) {
@@ -371,8 +387,12 @@ func Test_LoadExternalTargets(t *testing.T) {
 		rng.EnvSet("USERPROFILE", "")
 		rng.EnvSet("home", "")
 
+		context := t.Context()
+
+		path := "~/targets.yaml"
+
 		// --- When ---
-		_, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+		_, err := LoadExternalTargets(context, rng, path)
 
 		// --- Then ---
 		assert.ErrorContain(t, "is not defined", err)
@@ -383,47 +403,62 @@ func Test_fetchExternalTargets(t *testing.T) {
 	t.Run("returns parsed config and raw bytes on 200", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		body := "imports:\n  - import: a.com/x\n"
+
 		fn := func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte(body))
 		}
+
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		cfg, err := fetchExternalTargets(context.Background(), srv.URL)
+		have, err := fetchExternalTargets(ctx, srv.URL)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
-		assert.Equal(t, []byte(body), cfg.Raw())
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
+		assert.Equal(t, []byte(body), have.Raw())
 	})
 
 	t.Run("returns error on non-200 status", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		fn := func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNotFound)
 		}
+
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		_, err := fetchExternalTargets(context.Background(), srv.URL)
+		_, err := fetchExternalTargets(ctx, srv.URL)
 
 		// --- Then ---
 		assert.ErrorContain(t, "HTTP 404", err)
 	})
 
 	t.Run("returns error on unreachable address", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+
+		path := "http://localhost:0/x"
+
 		// --- When ---
-		_, err := fetchExternalTargets(context.Background(), "http://localhost:0/x")
+		_, err := fetchExternalTargets(ctx, path)
 
 		// --- Then ---
 		assert.ErrorContain(t, "connection refused", err)
 	})
 
 	t.Run("returns error for malformed URL", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+
+		path := "http://\x00invalid"
+
 		// --- When ---
-		_, err := fetchExternalTargets(context.Background(), "http://\x00invalid")
+		_, err := fetchExternalTargets(ctx, path)
 
 		// --- Then ---
 		assert.ErrorContain(t, "invalid control character", err)
@@ -432,13 +467,15 @@ func Test_fetchExternalTargets(t *testing.T) {
 	t.Run("returns error for invalid YAML body", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		fn := func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = w.Write([]byte("{bad yaml"))
 		}
+
 		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
 
 		// --- When ---
-		_, err := fetchExternalTargets(context.Background(), srv.URL)
+		_, err := fetchExternalTargets(ctx, srv.URL)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -478,13 +515,14 @@ func Test_readExternalTargets_tabular(t *testing.T) {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
 			dir := t.TempDir()
+
 			pth := filepath.Join(dir, TargetsFile)
 			if tc.content != "" {
 				oskit.Write(t, tc.content, pth)
 			}
 
 			// --- When ---
-			cfg, err := readExternalTargets(pth)
+			have, err := readExternalTargets(pth)
 
 			// --- Then ---
 			if tc.err != nil {
@@ -492,8 +530,8 @@ func Test_readExternalTargets_tabular(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
-			assert.Equal(t, tc.want, cfg.Paths())
-			assert.Equal(t, []byte(tc.content), cfg.Raw())
+			assert.Equal(t, tc.want, have.Paths())
+			assert.Equal(t, []byte(tc.content), have.Raw())
 		})
 	}
 }
@@ -561,8 +599,11 @@ func Test_parseExternalTargets_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			val := []byte(tc.data)
+
 			// --- When ---
-			have, err := parseExternalTargets([]byte(tc.data))
+			have, err := parseExternalTargets(val)
 
 			// --- Then ---
 			if tc.err != nil {
@@ -629,8 +670,11 @@ func Test_decodeTargetsYAML_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			val := []byte(tc.data)
+
 			// --- When ---
-			have, err := decodeTargetsYAML([]byte(tc.data))
+			have, err := decodeTargetsYAML(val)
 
 			// --- Then ---
 			if tc.err != nil {
@@ -645,13 +689,17 @@ func Test_decodeTargetsYAML_tabular(t *testing.T) {
 
 func Test_decodeTargetsYAML_config(t *testing.T) {
 	t.Run("object with config", func(t *testing.T) {
-		// --- When ---
+		// --- Given ---
 		data := `imports:
   - import: a.com/pkg
     config:
       key: val
 `
-		have, err := decodeTargetsYAML([]byte(data))
+
+		val := []byte(data)
+
+		// --- When ---
+		have, err := decodeTargetsYAML(val)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -661,9 +709,13 @@ func Test_decodeTargetsYAML_config(t *testing.T) {
 	})
 
 	t.Run("object without config", func(t *testing.T) {
-		// --- When ---
+		// --- Given ---
 		data := "imports:\n  - import: a.com/pkg\n"
-		have, err := decodeTargetsYAML([]byte(data))
+
+		val := []byte(data)
+
+		// --- When ---
+		have, err := decodeTargetsYAML(val)
 
 		// --- Then ---
 		assert.NoError(t, err)

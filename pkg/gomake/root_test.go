@@ -13,8 +13,11 @@ import (
 
 func Test_Root(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
+		// --- Given ---
+		dir := "."
+
 		// --- When ---
-		have, err := Root(".")
+		have, err := Root(dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -22,7 +25,7 @@ func Test_Root(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("could not find project root", func(t *testing.T) {
+	t.Run("error - project root not found", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 
@@ -36,8 +39,15 @@ func Test_Root(t *testing.T) {
 	})
 
 	t.Run("path", func(t *testing.T) {
+		// --- Given ---
+		dir := "."
+
+		internal := "internal"
+
+		vtst := "vtst"
+
 		// --- When ---
-		have, err := Root(".", "internal", "vtst")
+		have, err := Root(dir, internal, vtst)
 
 		// --- Then ---
 		assert.NoError(t, err)

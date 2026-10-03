@@ -27,24 +27,34 @@ func Test_Main(t *testing.T) {
 		src := t.TempDir()
 		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
 		oskit.MkdirAll(t, src, "cmd", "gomake")
+
 		main := "package main\n\nfunc main() {}\n"
 		oskit.Write(t, main, src, "cmd", "gomake", "main.go")
+
 		t.Chdir(src)
+
 		gobin := t.TempDir()
+
 		rng := ringtest.New(t).Ring()
 		rng.EnvSet("GOBIN", gobin)
+
 		info, _ := debug.ReadBuildInfo()
 
+		blank := ""
+
 		// --- When ---
-		err := Main(rng, info, "")
+		err := Main(rng, info, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		pth := filepath.Join(gobin, "gomake")
 		assert.True(t, oskit.PathExists(t, pth))
+
 		// The source tree is unchanged: no targets.yaml was written and no
 		// builtins were regenerated into it.
 		assert.False(t, oskit.PathExists(t, filepath.Join(src, "targets.yaml")))
+
 		assert.False(t, oskit.PathExists(t, filepath.Join(src, "pkg")))
 	})
 
@@ -53,11 +63,17 @@ func Test_Main(t *testing.T) {
 		// With no `go` on PATH, GoBinPath cannot resolve the destination, so
 		// Main fails before doing any work.
 		t.Chdir(t.TempDir())
+
 		t.Setenv("PATH", t.TempDir())
+
 		rng := ringtest.New(t)
 
+		rng2 := rng.Ring()
+
+		blank := ""
+
 		// --- When ---
-		err := Main(rng.Ring(), nil, "")
+		err := Main(rng2, nil, blank)
 
 		// --- Then ---
 		assert.ErrorContain(t, "cannot determine GOBIN/GOPATH", err)
@@ -75,11 +91,16 @@ func Test_installTo(t *testing.T) {
 	t.Run("error - build info unavailable", func(t *testing.T) {
 		// --- Given ---
 		t.Chdir(t.TempDir())
+
 		r := ringtest.New(t).Ring()
 		r.EnvSet("GOWORK", "keep")
 
+		tempDir := t.TempDir()
+
+		blank := ""
+
 		// --- When ---
-		err := installTo(r, nil, t.TempDir(), "")
+		err := installTo(r, nil, tempDir, blank)
 
 		// --- Then ---
 		assert.ErrorContain(t, "build info unavailable", err)
@@ -95,12 +116,19 @@ func Test_installTo(t *testing.T) {
 		src := t.TempDir()
 		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
 		t.Chdir(src)
+
 		rng := ringtest.New(t)
+
 		pth := filepath.Join(t.TempDir(), "missing.yaml")
+
 		info, _ := debug.ReadBuildInfo()
 
+		rng2 := rng.Ring()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		err := installTo(rng.Ring(), info, t.TempDir(), pth)
+		err := installTo(rng2, info, tempDir, pth)
 
 		// --- Then ---
 		assert.ErrorContain(t, "read targets", err)
@@ -116,13 +144,20 @@ func Test_installTo(t *testing.T) {
 		src := t.TempDir()
 		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
 		t.Chdir(src)
+
 		rng := ringtest.New(t)
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
+
 		info, _ := debug.ReadBuildInfo()
 
+		rng2 := rng.Ring()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		err := installTo(rng.Ring(), info, t.TempDir(), tgs)
+		err := installTo(rng2, info, tempDir, tgs)
 
 		// --- Then ---
 		// go get runs only on the full path (fast path skips it). Snapshot
@@ -141,13 +176,20 @@ func Test_installTo(t *testing.T) {
 		}
 		t.Cleanup(func() { _ = os.Chmod(src, 0o755) })
 		t.Chdir(src)
+
 		rng := ringtest.New(t)
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
+
 		info, _ := debug.ReadBuildInfo()
 
+		rng2 := rng.Ring()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		err := installTo(rng.Ring(), info, t.TempDir(), tgs)
+		err := installTo(rng2, info, tempDir, tgs)
 
 		// --- Then ---
 		assert.ErrorContain(t, "write targets", err)
@@ -158,13 +200,21 @@ func Test_installTo(t *testing.T) {
 		// A published-version build info with an unknown module causes
 		// moduleCacheDir to fail; installTo must propagate the error.
 		t.Chdir(t.TempDir())
+
 		rng := ringtest.New(t)
+
 		info := &debug.BuildInfo{
 			Main: debug.Module{Path: "example.invalid/mod", Version: "v0.0.1"},
 		}
 
+		rng2 := rng.Ring()
+
+		tempDir := t.TempDir()
+
+		blank := ""
+
 		// --- When ---
-		err := installTo(rng.Ring(), info, t.TempDir(), "")
+		err := installTo(rng2, info, tempDir, blank)
 
 		// --- Then ---
 		assert.ErrorContain(t, "module download example.invalid/mod", err)
@@ -177,14 +227,20 @@ func Test_installTo(t *testing.T) {
 		// installTo must propagate. All temp dirs are resolved before TMPDIR is
 		// changed so the test's own scratch space is unaffected.
 		t.Chdir(t.TempDir())
+
 		rng := ringtest.New(t)
+
 		dst := t.TempDir()
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
+
 		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "nonexistent"))
 
+		rng2 := rng.Ring()
+
 		// --- When ---
-		err := installTo(rng.Ring(), publishedInfo, dst, tgs)
+		err := installTo(rng2, publishedInfo, dst, tgs)
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrNotExist, err)
@@ -196,12 +252,18 @@ func Test_installTo(t *testing.T) {
 		// temp dir (covering the copyToTemp success path), then PrepareTargets
 		// fails because go get cannot resolve the fake import.
 		t.Chdir(t.TempDir())
+
 		rng := ringtest.New(t)
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
 
+		rng2 := rng.Ring()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		err := installTo(rng.Ring(), publishedInfo, t.TempDir(), tgs)
+		err := installTo(rng2, publishedInfo, tempDir, tgs)
 
 		// --- Then ---
 		assert.ErrorContain(t, "go get example.com/pkg@v1.0.0", err)
@@ -223,23 +285,36 @@ func Test_installTo(t *testing.T) {
 		// pkg/builtin. That the compiled binary truly exposes an external
 		// target is covered by Test_regenBuiltins_writesToCompiledPackage.
 		src := t.TempDir()
+
 		const gomod = "module test.example.com\n\ngo 1.24\n\n" +
 			"replace example.com/fakepkg => ./fakepkg\n"
 		oskit.Write(t, gomod, src, "go.mod")
+
 		oskit.MkdirAll(t, src, "fakepkg")
+
 		mod := "module example.com/fakepkg\n\ngo 1.24\n"
 		oskit.Write(t, mod, src, "fakepkg", "go.mod")
+
 		oskit.Write(t, "package fakepkg\n", src, "fakepkg", "fakepkg.go")
+
 		oskit.MkdirAll(t, src, "internal", "builtin", "data")
+
 		oskit.MkdirAll(t, src, "cmd", "gomake")
+
 		main := "package main\n\nfunc main() {}\n"
 		oskit.Write(t, main, src, "cmd", "gomake", "main.go")
+
 		t.Chdir(src)
+
 		dst := t.TempDir()
+
 		tst := ringtest.New(t).WetStderr()
+
 		rng := tst.Ring()
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 		oskit.Write(t, "imports:\n  - import: example.com/fakepkg\n", tgs)
+
 		info, _ := debug.ReadBuildInfo()
 
 		// --- When ---
@@ -247,17 +322,21 @@ func Test_installTo(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		pth := filepath.Join(dst, "gomake")
 		assert.True(t, oskit.PathExists(t, pth))
+
 		assert.Contain(
 			t,
 			"adding external target example.com/fakepkg",
 			tst.Stderr(),
 		)
+
 		// Snapshot restore leaves the working tree clean: regenerated
 		// targets.go is removed when it did not exist before the install.
 		gen := filepath.Join(src, "internal", "builtin", "targets.go")
 		assert.False(t, oskit.PathExists(t, gen))
+
 		assert.False(t, oskit.PathExists(t, filepath.Join(src, "pkg")))
 	})
 }
@@ -268,7 +347,9 @@ func Test_installTo_fastPathRestoresGoSum(t *testing.T) {
 	if !ok || info.Main.Version != "(devel)" {
 		t.Skip("fast path restore runs on a devel build")
 	}
+
 	src := t.TempDir()
+
 	gomod := "" +
 		"module example.test\n" +
 		"\n" +
@@ -276,7 +357,9 @@ func Test_installTo_fastPathRestoresGoSum(t *testing.T) {
 		"\n" +
 		"require github.com/ctx42/ring v0.7.0\n"
 	oskit.Write(t, gomod, src, "go.mod")
+
 	oskit.MkdirAll(t, src, "cmd", "gomake")
+
 	mainSrc := "" +
 		"package main\n" +
 		"\n" +
@@ -284,15 +367,22 @@ func Test_installTo_fastPathRestoresGoSum(t *testing.T) {
 		"\n" +
 		"func main() {}\n"
 	oskit.Write(t, mainSrc, src, "cmd", "gomake", "main.go")
+
 	t.Chdir(src)
+
 	r := ringtest.New(t).Ring()
 	r.EnvSet("GOFLAGS", "-mod=mod")
 
+	tempDir := t.TempDir()
+
+	blank := ""
+
 	// --- When ---
-	err := installTo(r, info, t.TempDir(), "")
+	err := installTo(r, info, tempDir, blank)
 
 	// --- Then ---
 	assert.NoError(t, err)
+
 	assert.NoFileExist(t, filepath.Join(src, "go.sum"))
 }
 
@@ -309,16 +399,19 @@ func Test_installTo_compilesExternalTargetIntoBinary(t *testing.T) {
 
 	// --- Given ---
 	root := goListDir(t, "-m", "-f", "{{.Dir}}", "github.com/ctx42/gomake")
+
 	build := t.TempDir()
 	copyTree(t, root, build)
-
 	// A local module exposing one gomake target, wired via a replace so go get
 	// resolves it without the network.
 	oskit.MkdirAll(t, build, "exttgt")
+
 	ext := filepath.Join(build, "exttgt")
+
 	extMod := "module example.com/exttgt\n\ngo 1.26\n\n" +
 		"require github.com/ctx42/ring v0.7.0\n"
 	oskit.Write(t, extMod, ext, "go.mod")
+
 	target := "" +
 		"package exttgt\n\n" +
 		"import (\n" +
@@ -331,29 +424,37 @@ func Test_installTo_compilesExternalTargetIntoBinary(t *testing.T) {
 		"\treturn nil\n" +
 		"}\n"
 	oskit.Write(t, target, ext, "target.go")
+
 	goModEdit(t, build, "-replace", "example.com/exttgt=./exttgt")
 
 	tgs := filepath.Join(t.TempDir(), "targets.yaml")
 	oskit.Write(t, "imports:\n  - import: example.com/exttgt\n", tgs)
 
 	t.Chdir(build)
+
 	dst := t.TempDir()
+
 	tst := ringtest.New(t).WetStderr()
+
 	info := &debug.BuildInfo{Main: debug.Module{
 		Path:    "github.com/ctx42/gomake",
 		Version: "(devel)",
 	}}
 
+	rng := tst.Ring()
+
 	// --- When ---
-	err := installTo(tst.Ring(), info, dst, tgs)
+	err := installTo(rng, info, dst, tgs)
 
 	// --- Then ---
 	assert.NoError(t, err)
+
 	assert.Contain(
 		t,
 		"adding external target example.com/exttgt",
 		tst.Stderr(),
 	)
+
 	bin := filepath.Join(dst, "gomake")
 	assert.True(t, oskit.PathExists(t, bin))
 
@@ -373,9 +474,12 @@ func Test_installTo_localTargetsResolveViaWorkspace(t *testing.T) {
 
 	// --- Given ---
 	root := goListDir(t, "-m", "-f", "{{.Dir}}", "github.com/ctx42/gomake")
+
 	build := t.TempDir()
 	copyTree(t, root, build)
+
 	goBefore := oskit.ReadFileStr(t, build, "go.mod")
+
 	genBefore := oskit.ReadFileStr(
 		t,
 		build,
@@ -385,9 +489,11 @@ func Test_installTo_localTargetsResolveViaWorkspace(t *testing.T) {
 	// A separate local module exposing one gomake target. It is wired only
 	// through the workspace, never a replace, so go.mod must stay untouched.
 	ext := t.TempDir()
+
 	extMod := "module example.com/wstgt\n\ngo 1.26\n\n" +
 		"require github.com/ctx42/ring v0.7.0\n"
 	oskit.Write(t, extMod, ext, "go.mod")
+
 	target := "" +
 		"package wstgt\n\n" +
 		"import (\n" +
@@ -400,22 +506,29 @@ func Test_installTo_localTargetsResolveViaWorkspace(t *testing.T) {
 		"\treturn nil\n" +
 		"}\n"
 	oskit.Write(t, target, ext, "target.go")
+
 	tgs := filepath.Join(ext, "targets.yaml")
 	oskit.Write(t, "imports:\n  - import: example.com/wstgt\n", tgs)
 
 	t.Chdir(build)
+
 	dst := t.TempDir()
+
 	tst := ringtest.New(t).WetStderr()
+
 	info := &debug.BuildInfo{Main: debug.Module{
 		Path:    "github.com/ctx42/gomake",
 		Version: "(devel)",
 	}}
 
+	rng := tst.Ring()
+
 	// --- When ---
-	err := installTo(tst.Ring(), info, dst, tgs)
+	err := installTo(rng, info, dst, tgs)
 
 	// --- Then ---
 	assert.NoError(t, err)
+
 	assert.Contain(
 		t,
 		"adding external target example.com/wstgt",
@@ -432,6 +545,7 @@ func Test_installTo_localTargetsResolveViaWorkspace(t *testing.T) {
 
 	bin := filepath.Join(dst, "gomake")
 	assert.True(t, oskit.PathExists(t, bin))
+
 	out := runBin(t, bin, "--list")
 	assert.Contain(t, "wsxyzzy", out)
 }
@@ -440,49 +554,73 @@ func Test_effectiveImports(t *testing.T) {
 	t.Run("no flag loads source targets.yaml", func(t *testing.T) {
 		// --- Given ---
 		srcDir := t.TempDir()
+
 		content := "imports:\n  - import: a.com/x\n"
 		oskit.Write(t, content, srcDir, "targets.yaml")
 
+		rng := ring.New()
+
+		blank := ""
+
 		// --- When ---
-		cfg, err := effectiveImports(ring.New(), srcDir, "")
+		have, err := effectiveImports(rng, srcDir, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, cfg.Paths())
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
 	})
 
 	t.Run("no flag, an absent source yields empty config", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+
+		tempDir := t.TempDir()
+
+		blank := ""
+
 		// --- When ---
-		cfg, err := effectiveImports(ring.New(), t.TempDir(), "")
+		have, err := effectiveImports(rng, tempDir, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, 0, len(cfg.Imports()))
+		assert.Equal(t, 0, len(have.Imports()))
 	})
 
 	t.Run("flag file overrides and exposes raw bytes", func(t *testing.T) {
 		// --- Given ---
 		srcDir := t.TempDir()
+
 		content := "imports:\n  - import: src.com/x\n"
 		oskit.Write(t, content, srcDir, "targets.yaml")
+
 		flagFile := filepath.Join(t.TempDir(), "flag.yaml")
 		oskit.Write(t, "imports:\n  - import: flag.com/y\n", flagFile)
 
+		rng := ring.New()
+
 		// --- When ---
-		cfg, err := effectiveImports(ring.New(), srcDir, flagFile)
+		have, err := effectiveImports(rng, srcDir, flagFile)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "imports:\n  - import: flag.com/y\n", string(cfg.Raw()))
-		assert.Equal(t, []string{"flag.com/y"}, cfg.Paths())
+		assert.Equal(
+			t,
+			"imports:\n  - import: flag.com/y\n",
+			string(have.Raw()),
+		)
+		assert.Equal(t, []string{"flag.com/y"}, have.Paths())
 	})
 
 	t.Run("error - missing flag file", func(t *testing.T) {
 		// --- Given ---
 		flagFile := filepath.Join(t.TempDir(), "missing.yaml")
 
+		rng := ring.New()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		_, err := effectiveImports(ring.New(), t.TempDir(), flagFile)
+		_, err := effectiveImports(rng, tempDir, flagFile)
 
 		// --- Then ---
 		assert.ErrorContain(t, "read targets", err)
@@ -493,8 +631,12 @@ func Test_effectiveImports(t *testing.T) {
 		flagFile := filepath.Join(t.TempDir(), "bad.yaml")
 		oskit.Write(t, "{", flagFile)
 
+		rng := ring.New()
+
+		tempDir := t.TempDir()
+
 		// --- When ---
-		_, err := effectiveImports(ring.New(), t.TempDir(), flagFile)
+		_, err := effectiveImports(rng, tempDir, flagFile)
 
 		// --- Then ---
 		assert.ErrorContain(t, "invalid external targets config", err)
@@ -506,13 +648,19 @@ func Test_moduleCacheDir(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
 
+		path := "github.com/ctx42/ring@v0.7.0"
+
 		// --- When ---
-		dir, err := moduleCacheDir(env, "github.com/ctx42/ring@v0.7.0")
+		have, err := moduleCacheDir(env, path)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Contain(t, "github.com/ctx42/ring@v0.7.0", filepath.ToSlash(dir))
-		assert.True(t, oskit.PathExists(t, dir))
+		assert.Contain(
+			t,
+			"github.com/ctx42/ring@v0.7.0",
+			filepath.ToSlash(have),
+		)
+		assert.True(t, oskit.PathExists(t, have))
 	})
 
 	t.Run("ignores the working directory", func(t *testing.T) {
@@ -520,10 +668,13 @@ func Test_moduleCacheDir(t *testing.T) {
 		dir := t.TempDir()
 		oskit.Write(t, "not a module\n", dir, "go.mod")
 		t.Chdir(dir)
+
 		env := ring.New()
 
+		path := "github.com/ctx42/ring@v0.7.0"
+
 		// --- When ---
-		have, err := moduleCacheDir(env, "github.com/ctx42/ring@v0.7.0")
+		have, err := moduleCacheDir(env, path)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -534,8 +685,10 @@ func Test_moduleCacheDir(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
 
+		text := "not.a.module@!!!"
+
 		// --- When ---
-		_, err := moduleCacheDir(env, "not.a.module@!!!")
+		_, err := moduleCacheDir(env, text)
 
 		// --- Then ---
 		// Pin the offending module so the assertion fails if a sibling
@@ -549,11 +702,14 @@ func Test_moduleCacheDir(t *testing.T) {
 		// cmd.Env. Clear PATH before constructing the ring and the command.
 		empty := t.TempDir()
 		t.Setenv("PATH", empty)
+
 		env := ring.New()
 		env.EnvSet("PATH", empty)
 
+		path := "example.com/mod@v1.0.0"
+
 		// --- When ---
-		_, err := moduleCacheDir(env, "example.com/mod@v1.0.0")
+		_, err := moduleCacheDir(env, path)
 
 		// --- Then ---
 		// The exec-not-found cause is unique to this path; a plain
@@ -566,34 +722,43 @@ func Test_setupWorkspace(t *testing.T) {
 	t.Run("empty targets is a no-op", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+
 		buildDir := t.TempDir()
 
+		blank := ""
+
 		// --- When ---
-		mod, cleanup, err := setupWorkspace(rng, buildDir, "")
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", mod)
+		assert.Equal(t, "", hMod)
+
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
-		cleanup()
+
+		hCleanup()
 	})
 
 	t.Run("URL targets is a no-op", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+
 		buildDir := t.TempDir()
+
 		tgs := "https://example.com/targets.yaml"
 
 		// --- When ---
-		mod, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", mod)
+		assert.Equal(t, "", hMod)
+
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
-		cleanup()
+
+		hCleanup()
 	})
 
 	t.Run("targets outside a module is a no-op", func(t *testing.T) {
@@ -601,18 +766,22 @@ func Test_setupWorkspace(t *testing.T) {
 		// The targets file sits in a bare directory with no go.mod, so no
 		// module can be resolved and the caller falls back to go get.
 		rng := ringtest.New(t).Ring()
+
 		buildDir := t.TempDir()
+
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 
 		// --- When ---
-		mod, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", mod)
+		assert.Equal(t, "", hMod)
+
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
-		cleanup()
+
+		hCleanup()
 	})
 
 	t.Run("local module wires GOWORK", func(t *testing.T) {
@@ -620,30 +789,40 @@ func Test_setupWorkspace(t *testing.T) {
 		// The build tree and a separate module tree each carry a go.mod; the
 		// targets file lives at the module root.
 		rng := ringtest.New(t).Ring()
+
 		buildDir := t.TempDir()
+
 		bmod := "module example.com/build\n\ngo 1.24\n"
 		oskit.Write(t, bmod, buildDir, "go.mod")
+
 		modDir := t.TempDir()
 		oskit.Write(t, "module example.com/tgt\n\ngo 1.24\n", modDir, "go.mod")
+
 		tgs := filepath.Join(modDir, "targets.yaml")
 		oskit.Write(t, "imports:\n", tgs)
 
 		// --- When ---
-		mod, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "example.com/tgt", mod)
+		assert.Equal(t, "example.com/tgt", hMod)
+
 		work, set := rng.EnvLookup("GOWORK")
 		assert.True(t, set)
+
 		assert.True(t, oskit.PathExists(t, work))
+
 		assert.FileContain(t, "use", work)
 
 		// Cleanup restores GOWORK=off and removes the workspace file.
-		cleanup()
+		hCleanup()
+
 		workVal, set := rng.EnvLookup("GOWORK")
 		assert.True(t, set)
+
 		assert.Equal(t, "off", workVal)
+
 		assert.False(t, oskit.PathExists(t, work))
 	})
 }
@@ -652,50 +831,54 @@ func Test_moduleAt(t *testing.T) {
 	t.Run("reports module path and root", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+
 		dir := t.TempDir()
 		oskit.Write(t, "module example.com/mod\n\ngo 1.24\n", dir, "go.mod")
 
 		// --- When ---
-		mod, root, ok, err := moduleAt(rng, dir)
+		hMod, hRoot, hOk, err := moduleAt(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.True(t, ok)
-		assert.Equal(t, "example.com/mod", mod)
-		assert.Equal(t, dir, root)
+		assert.True(t, hOk)
+		assert.Equal(t, "example.com/mod", hMod)
+		assert.Equal(t, dir, hRoot)
 	})
 
 	t.Run("not a module", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+
 		dir := t.TempDir()
 
 		// --- When ---
-		mod, root, ok, err := moduleAt(rng, dir)
+		hMod, hRoot, hOk, err := moduleAt(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.False(t, ok)
-		assert.Equal(t, "", mod)
-		assert.Equal(t, "", root)
+		assert.False(t, hOk)
+		assert.Equal(t, "", hMod)
+		assert.Equal(t, "", hRoot)
 	})
 
 	t.Run("error - go binary not in PATH", func(t *testing.T) {
 		// --- Given ---
 		empty := t.TempDir()
 		t.Setenv("PATH", empty)
+
 		rng := ringtest.New(t).Ring()
 		rng.EnvSet("PATH", empty)
+
 		dir := t.TempDir()
 
 		// --- When ---
-		mod, root, ok, err := moduleAt(rng, dir)
+		hMod, hRoot, hOk, err := moduleAt(rng, dir)
 
 		// --- Then ---
 		assert.ErrorContain(t, "executable file not found", err)
-		assert.False(t, ok)
-		assert.Equal(t, "", mod)
-		assert.Equal(t, "", root)
+		assert.False(t, hOk)
+		assert.Equal(t, "", hMod)
+		assert.Equal(t, "", hRoot)
 	})
 }
 
@@ -703,11 +886,15 @@ func Test_goWorkInit(t *testing.T) {
 	t.Run("writes a workspace listing both modules", func(t *testing.T) {
 		// --- Given ---
 		rng := ringtest.New(t).Ring()
+
 		buildDir := t.TempDir()
+
 		bmod := "module example.com/build\n\ngo 1.24\n"
 		oskit.Write(t, bmod, buildDir, "go.mod")
+
 		modDir := t.TempDir()
 		oskit.Write(t, "module example.com/mod\n\ngo 1.24\n", modDir, "go.mod")
+
 		wsDir := t.TempDir()
 
 		// --- When ---
@@ -715,6 +902,7 @@ func Test_goWorkInit(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		work := filepath.Join(wsDir, "go.work")
 		assert.FileContain(t, buildDir, work)
 		assert.FileContain(t, modDir, work)
@@ -725,10 +913,15 @@ func Test_goWorkInit(t *testing.T) {
 		// A non-existent wsDir makes the go subprocess fail to chdir before it
 		// runs, surfacing the wrapped error.
 		rng := ringtest.New(t).Ring()
+
 		wsDir := filepath.Join(t.TempDir(), "nonexistent")
 
+		tempDir := t.TempDir()
+
+		tempDir2 := t.TempDir()
+
 		// --- When ---
-		err := goWorkInit(rng, wsDir, t.TempDir(), t.TempDir())
+		err := goWorkInit(rng, wsDir, tempDir, tempDir2)
 
 		// --- Then ---
 		assert.ErrorContain(t, "go work init", err)
@@ -745,20 +938,25 @@ func Test_snapshotGenerated(t *testing.T) {
 			build, "internal", "builtin", "targets.go")
 		oskit.Write(t, "// original main\n",
 			build, "internal", "builtin", "data", "targets_main.go_")
+
 		restore, err := snapshotGenerated(build)
 		must.Nil(err)
 
 		// The build overwrites the generated files.
 		oskit.Write(t, "imports: changed\n", build, "targets.yaml")
+
 		oskit.Write(t, "package builtin // changed\n",
 			build, "internal", "builtin", "targets.go")
 
+		restore2 := restore()
+
 		// --- When ---
-		assert.NoError(t, restore())
+		assert.NoError(t, restore2)
 
 		// --- Then ---
 		assert.Equal(t, "imports: original\n",
 			oskit.ReadFileStr(t, build, "targets.yaml"))
+
 		assert.Equal(t, "package builtin // original\n",
 			oskit.ReadFileStr(t, build, "internal", "builtin", "targets.go"))
 	})
@@ -771,20 +969,25 @@ func Test_snapshotGenerated(t *testing.T) {
 		oskit.MkdirAll(t, build, "internal", "builtin", "data")
 		oskit.Write(t, "module example.test\n\ngo 1.24\n", build, "go.mod")
 		oskit.Write(t, "h1:original\n", build, "go.sum")
+
 		restore, err := snapshotGenerated(build)
 		must.Nil(err)
 
 		// go get rewrites both files during the build.
 		oskit.Write(t, "module example.test\n\ngo 1.24\n\nrequire x v1\n",
 			build, "go.mod")
+
 		oskit.Write(t, "h1:changed\n", build, "go.sum")
 
+		restore2 := restore()
+
 		// --- When ---
-		assert.NoError(t, restore())
+		assert.NoError(t, restore2)
 
 		// --- Then ---
 		assert.Equal(t, "module example.test\n\ngo 1.24\n",
 			oskit.ReadFileStr(t, build, "go.mod"))
+
 		assert.Equal(t, "h1:original\n", oskit.ReadFileStr(t, build, "go.sum"))
 	})
 
@@ -794,13 +997,17 @@ func Test_snapshotGenerated(t *testing.T) {
 		// Restore must delete it so the tree stays clean.
 		build := t.TempDir()
 		oskit.MkdirAll(t, build, "internal", "builtin", "data")
+
 		restore, err := snapshotGenerated(build)
 		must.Nil(err)
+
 		oskit.Write(t, "package builtin\n",
 			build, "internal", "builtin", "targets.go")
 
+		restore2 := restore()
+
 		// --- When ---
-		assert.NoError(t, restore())
+		assert.NoError(t, restore2)
 
 		// --- Then ---
 		pth := filepath.Join(build, "internal", "builtin", "targets.go")
@@ -810,6 +1017,7 @@ func Test_snapshotGenerated(t *testing.T) {
 	t.Run("error - a generated path cannot be read", func(t *testing.T) {
 		// --- Given ---
 		build := t.TempDir()
+
 		pth := filepath.Join(build, "targets.yaml")
 		oskit.Write(t, "imports:\n", pth)
 		must.Nil(os.Chmod(pth, 0o000))
@@ -830,13 +1038,15 @@ func Test_copyToTemp(t *testing.T) {
 		oskit.Write(t, "hello", src, "a.txt")
 
 		// --- When ---
-		dst, cleanup, err := copyToTemp(src)
+		hDst, hCleanup, err := copyToTemp(src)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.FileContain(t, "hello", filepath.Join(dst, "a.txt"))
-		cleanup()
-		assert.False(t, oskit.PathExists(t, dst))
+		assert.FileContain(t, "hello", filepath.Join(hDst, "a.txt"))
+
+		hCleanup()
+
+		assert.False(t, oskit.PathExists(t, hDst))
 	})
 
 	t.Run("error - missing source", func(t *testing.T) {
@@ -853,6 +1063,7 @@ func Test_copyToTemp(t *testing.T) {
 	t.Run("error - temp dir cannot be created", func(t *testing.T) {
 		// --- Given ---
 		src := t.TempDir()
+
 		t.Setenv("TMPDIR", filepath.Join(t.TempDir(), "nonexistent"))
 
 		// --- When ---
@@ -870,6 +1081,7 @@ func Test_copyDir(t *testing.T) {
 		oskit.Write(t, "hello", src, "a.txt")
 		oskit.MkdirAll(t, src, "sub")
 		oskit.Write(t, "world", src, "sub", "b.txt")
+
 		dst := t.TempDir()
 
 		// --- When ---
@@ -877,14 +1089,18 @@ func Test_copyDir(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.FileContain(t, "hello", filepath.Join(dst, "a.txt"))
+
 		assert.FileContain(t, "world", filepath.Join(dst, "sub", "b.txt"))
+
 		assert.Equal(t, os.FileMode(0o644), oskit.Stat(t, dst, "a.txt").Mode())
 	})
 
 	t.Run("error - missing source", func(t *testing.T) {
 		// --- Given ---
 		src := filepath.Join(t.TempDir(), "missing")
+
 		dst := t.TempDir()
 
 		// --- When ---
@@ -897,10 +1113,12 @@ func Test_copyDir(t *testing.T) {
 	t.Run("error - source file not readable", func(t *testing.T) {
 		// --- Given ---
 		src := t.TempDir()
+
 		pth := filepath.Join(src, "a.txt")
 		oskit.Write(t, "data", pth)
 		_ = os.Chmod(pth, 0o000)
 		t.Cleanup(func() { _ = os.Chmod(pth, 0o644) })
+
 		dst := t.TempDir()
 
 		// --- When ---

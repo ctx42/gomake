@@ -20,38 +20,40 @@ import (
 func Test_ExitStatus(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {
 		// --- When ---
-		code := ExitStatus(nil)
+		have := ExitStatus(nil)
 
 		// --- Then ---
-		assert.Equal(t, 0, code)
+		assert.Equal(t, 0, have)
 	})
 
 	t.Run("has ExitStatus method", func(t *testing.T) {
 		// --- Given ---
-		tmp := TError{Err: "test error", ExStatus: 123}
+		ter := TError{Err: "test error", ExStatus: 123}
 
 		// --- When ---
-		code := ExitStatus(tmp)
+		have := ExitStatus(ter)
 
 		// --- Then ---
-		assert.Equal(t, 123, code)
+		assert.Equal(t, 123, have)
 	})
 
 	t.Run("is ExitError instance", func(t *testing.T) {
 		// --- Given ---
 		cmd := exec.Command(os.Args[0], "--exitCode", "99")
+
 		err := cmd.Run()
 
 		// --- When ---
-		code := ExitStatus(err)
+		have := ExitStatus(err)
 
 		// --- Then ---
-		assert.Equal(t, 99, code)
+		assert.Equal(t, 99, have)
 	})
 
 	t.Run("exit code 0", func(t *testing.T) {
 		// --- Given ---
 		sout, eout := iokit.WetBuffer(t), iokit.DryBuffer(t)
+
 		cmd := exec.Command(os.Args[0], "--exitCode", "0", "--toStdout", "abc")
 		cmd.Stdout = sout
 		cmd.Stderr = eout
@@ -60,19 +62,20 @@ func Test_ExitStatus(t *testing.T) {
 		err := cmd.Run()
 
 		// --- When ---
-		code := ExitStatus(err)
+		have := ExitStatus(err)
 
 		// --- Then ---
-		assert.Equal(t, 0, code)
+		assert.Equal(t, 0, have)
+
 		assert.Equal(t, "|sout: abc|", sout.String())
 	})
 
 	t.Run("unknown error", func(t *testing.T) {
 		// --- When ---
-		code := ExitStatus(ErrTest)
+		have := ExitStatus(ErrTest)
 
 		// --- Then ---
-		assert.Equal(t, 1, code)
+		assert.Equal(t, 1, have)
 	})
 
 	t.Run("signal kill maps to 128 plus signal", func(t *testing.T) {
@@ -83,32 +86,33 @@ func Test_ExitStatus(t *testing.T) {
 		cmd := exec.Command("sleep", "60")
 		assert.NoError(t, cmd.Start())
 		assert.NoError(t, cmd.Process.Kill())
+
 		err := cmd.Wait()
 
 		// --- When ---
-		code := ExitStatus(err)
+		have := ExitStatus(err)
 
 		// --- Then ---
 		// SIGKILL is 9 → 128+9 = 137 on Unix shells.
-		assert.Equal(t, 128+9, code)
+		assert.Equal(t, 128+9, have)
 	})
 }
 
 func Test_HasRun(t *testing.T) {
 	t.Run("nil error", func(t *testing.T) {
 		// --- When ---
-		ran := HasRun(nil)
+		have := HasRun(nil)
 
 		// --- Then ---
-		assert.True(t, ran)
+		assert.True(t, have)
 	})
 
 	t.Run("unknown error", func(t *testing.T) {
 		// --- When ---
-		ran := HasRun(ErrTest)
+		have := HasRun(ErrTest)
 
 		// --- Then ---
-		assert.False(t, ran)
+		assert.False(t, have)
 	})
 
 	t.Run("not run", func(t *testing.T) {
@@ -118,11 +122,13 @@ func Test_HasRun(t *testing.T) {
 		c.Stderr = io.Discard
 		c.Stdin = os.Stdin
 
+		run := c.Run()
+
 		// --- When ---
-		ran := HasRun(c.Run())
+		have := HasRun(run)
 
 		// --- Then ---
-		assert.False(t, ran)
+		assert.False(t, have)
 	})
 
 	t.Run("forced exit", func(t *testing.T) {
@@ -136,11 +142,13 @@ func Test_HasRun(t *testing.T) {
 		c.Stderr = io.Discard
 		c.Stdin = os.Stdin
 
+		run := c.Run()
+
 		// --- When ---
-		ran := HasRun(c.Run())
+		have := HasRun(run)
 
 		// --- Then ---
-		assert.True(t, ran)
+		assert.True(t, have)
 	})
 
 	t.Run("non-zero exit", func(t *testing.T) {
@@ -149,11 +157,13 @@ func Test_HasRun(t *testing.T) {
 		c.Stdout = io.Discard
 		c.Stderr = io.Discard
 
+		run := c.Run()
+
 		// --- When ---
-		ran := HasRun(c.Run())
+		have := HasRun(run)
 
 		// --- Then ---
-		assert.True(t, ran)
+		assert.True(t, have)
 	})
 }
 
@@ -161,6 +171,7 @@ func Test_GetGOOS(t *testing.T) {
 	t.Run("GOOS from runtime", func(t *testing.T) {
 		// --- Given ---
 		want := runtime.GOOS
+
 		var env []string
 
 		// --- When ---
@@ -186,6 +197,7 @@ func Test_GetGOARCH(t *testing.T) {
 	t.Run("GOARCH from runtime", func(t *testing.T) {
 		// --- Given ---
 		want := runtime.GOARCH
+
 		env := make([]string, 0)
 
 		// --- When ---
@@ -249,11 +261,11 @@ func Test_LookupEnv_tabular(t *testing.T) {
 			// --- Given ---
 
 			// --- When ---
-			haveValue, haveExists := LookupEnv(tc.env, tc.findKey)
+			hValue, hExists := LookupEnv(tc.env, tc.findKey)
 
 			// --- Then ---
-			assert.Equal(t, tc.wantValue, haveValue)
-			assert.Equal(t, tc.wantExists, haveExists)
+			assert.Equal(t, tc.wantValue, hValue)
+			assert.Equal(t, tc.wantExists, hExists)
 		})
 	}
 }
@@ -284,10 +296,10 @@ func Test_Getenv_tabular(t *testing.T) {
 			// --- Given ---
 
 			// --- When ---
-			haveValue := Getenv(tc.env, tc.findKey)
+			have := Getenv(tc.env, tc.findKey)
 
 			// --- Then ---
-			assert.Equal(t, tc.wantValue, haveValue)
+			assert.Equal(t, tc.wantValue, have)
 		})
 	}
 }

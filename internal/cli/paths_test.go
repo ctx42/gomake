@@ -13,12 +13,14 @@ import (
 )
 
 func Test_GoBinPath(t *testing.T) {
-	t.Run("resolves from the toolchain", func(t *testing.T) {
+	t.Run("toolchain", func(t *testing.T) {
 		// --- Given ---
 		raw := exekit.New(t).ExeStdout(
 			"go", "env", "-json", "GOBIN", "GOPATH",
 		)
+
 		want := must.Value(goBinPath(raw))
+
 		env := ring.New()
 
 		// --- When ---
@@ -32,6 +34,7 @@ func Test_GoBinPath(t *testing.T) {
 	t.Run("honors GOBIN from the passed environment", func(t *testing.T) {
 		// --- Given ---
 		want := t.TempDir()
+
 		env := ring.New()
 		env.EnvSet("GOBIN", want)
 
@@ -96,7 +99,7 @@ func Test_goBinPath_success_tabular(t *testing.T) {
 }
 
 func Test_goBinPath_error(t *testing.T) {
-	t.Run("both GOBIN and GOPATH empty", func(t *testing.T) {
+	t.Run("error - GOBIN and GOPATH empty", func(t *testing.T) {
 		// --- Given ---
 		output := `{"GOBIN":"","GOPATH":""}`
 
@@ -109,7 +112,7 @@ func Test_goBinPath_error(t *testing.T) {
 		assert.Empty(t, have)
 	})
 
-	t.Run("invalid json from go env", func(t *testing.T) {
+	t.Run("error - invalid json from go env", func(t *testing.T) {
 		// --- Given ---
 		output := `{"GOBIN": 42}`
 

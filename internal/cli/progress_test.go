@@ -28,7 +28,9 @@ func Test_withProgress(t *testing.T) {
 	// TestMain disables progress package-wide; re-enable a short threshold so
 	// the progress goroutine fires within this test.
 	prev := progressThreshold
+
 	progressThreshold = 10 * time.Millisecond
+
 	t.Cleanup(func() { progressThreshold = prev })
 
 	w := &gateWriter{
@@ -52,6 +54,7 @@ func Test_withProgress(t *testing.T) {
 
 	// --- Then ---
 	<-w.entered // The progress goroutine has begun writing and is blocked.
+
 	select {
 	case <-returned:
 		t.Fatal("withProgress returned before the progress goroutine " +
@@ -61,6 +64,7 @@ func Test_withProgress(t *testing.T) {
 	}
 
 	close(w.release) // Let the progress write complete.
+
 	select {
 	case <-returned:
 	case <-time.After(time.Second):

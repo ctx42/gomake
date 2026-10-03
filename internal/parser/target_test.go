@@ -19,6 +19,7 @@ import (
 func Test_newTarget_generic(t *testing.T) {
 	// --- Given ---
 	pkg := &Package{Name: "main"}
+
 	fn := &doc.Func{
 		Name: "Generic",
 		Decl: &ast.FuncDecl{
@@ -35,16 +36,17 @@ func Test_newTarget_generic(t *testing.T) {
 	}
 
 	// --- When ---
-	tgt, err := newTarget(pkg, fn)
+	have, err := newTarget(pkg, fn)
 
 	// --- Then ---
 	assert.ErrorIs(t, errGeneric, err)
-	assert.Nil(t, tgt)
+	assert.Nil(t, have)
 }
 
 func Test_Targets_addFunc_alias(t *testing.T) {
 	// --- Given ---
 	pkg := &Package{Name: "main"}
+
 	fn := &doc.Func{
 		Name: "Aliased",
 		Decl: &ast.FuncDecl{
@@ -72,6 +74,7 @@ func Test_Targets_addFunc_alias(t *testing.T) {
 			},
 		},
 	}
+
 	tgs := NewTargets()
 
 	// --- When ---
@@ -79,14 +82,18 @@ func Test_Targets_addFunc_alias(t *testing.T) {
 
 	// --- Then ---
 	assert.NoError(t, err)
+
 	assert.Equal(t, 0, tgs.Len())
+
 	assert.Equal(t, []string{"Aliased"}, tgs.skips)
 }
 
 func Test_Targets_reportSkips(t *testing.T) {
 	// --- Given ---
 	tst := ringtest.New(t).WetStderr()
+
 	rng := tst.Ring()
+
 	tgs := NewTargets()
 	tgs.noteSkip("Aliased")
 
@@ -107,209 +114,250 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("basic target", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("Basic")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("Basic"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, impSpec, tgt.ImpSpec)
-		assert.Equal(t, absPath, tgt.ImpPath)
-		assert.Equal(t, "main", tgt.PkgName)
-		assert.Equal(t, "", tgt.PkgNS)
-		assert.Nil(t, tgt.Breadcrumbs)
-		assert.Equal(t, "", tgt.Receiver)
-		assert.Equal(t, "Basic", tgt.FuncName)
-		assert.Equal(t, "basic", tgt.Name)
-		assert.Equal(t, "", tgt.VarName)
-		assert.Equal(t, "Basic", tgt.CodeRef)
-		assert.Equal(t, "Basic", tgt.DefRef)
-		assert.False(t, tgt.Default)
-		assert.Equal(t, "prints its name to stdout", tgt.Synopsis)
+		assert.Equal(t, impSpec, have.ImpSpec)
+		assert.Equal(t, absPath, have.ImpPath)
+		assert.Equal(t, "main", have.PkgName)
+		assert.Equal(t, "", have.PkgNS)
+		assert.Nil(t, have.Breadcrumbs)
+		assert.Equal(t, "", have.Receiver)
+		assert.Equal(t, "Basic", have.FuncName)
+		assert.Equal(t, "basic", have.Name)
+		assert.Equal(t, "", have.VarName)
+		assert.Equal(t, "Basic", have.CodeRef)
+		assert.Equal(t, "Basic", have.DefRef)
+		assert.False(t, have.Default)
+		assert.Equal(t, "prints its name to stdout", have.Synopsis)
 		want := "prints its name to stdout. Some more detailed " +
 			"documentation here. Even more detailed documentation."
-		assert.Equal(t, want, tgt.Doc)
-		assert.False(t, tgt.Hidden)
-		assert.NotNil(t, tgt.Run)
-		assert.Fields(t, 16, tgt)
+		assert.Equal(t, want, have.Doc)
+		assert.False(t, have.Hidden)
+		assert.NotNil(t, have.Run)
+		assert.Fields(t, 16, have)
 	})
 
 	t.Run("package imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("ns"))
 
+		fn := tst.Func("Basic")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("Basic"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "ns", tgt.PkgNS)
-		assert.Nil(t, tgt.Breadcrumbs)
-		assert.Equal(t, "ns:basic", tgt.Name)
+		assert.Equal(t, "ns", have.PkgNS)
+		assert.Nil(t, have.Breadcrumbs)
+		assert.Equal(t, "ns:basic", have.Name)
 
 	})
 
 	t.Run("kebab case namespace", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
+
 		met, nsp := tst.Method("KebabCase", "HelloWorld")
 
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, met, nsp...)
+		have, err := newTarget(tst.pkg, met, nsp...)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", tgt.PkgNS)
-		assert.Equal(t, []string{rootCrumb, "KebabCase"}, tgt.Breadcrumbs)
-		assert.Equal(t, "kebab-case:hello-world", tgt.Name)
-		assert.Equal(t, "_vmainKebabCase", tgt.VarName)
-		assert.Equal(t, "_vmainKebabCase.HelloWorld", tgt.CodeRef)
+		assert.Equal(t, "", have.PkgNS)
+		assert.Equal(t, []string{rootCrumb, "KebabCase"}, have.Breadcrumbs)
+		assert.Equal(t, "kebab-case:hello-world", have.Name)
+		assert.Equal(t, "_vmainKebabCase", have.VarName)
+		assert.Equal(t, "_vmainKebabCase.HelloWorld", have.CodeRef)
 	})
 
-	t.Run("not exported error", func(t *testing.T) {
+	t.Run("error - not exported", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("notExported")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("notExported"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errNotExported, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
-	t.Run("invalid argument type", func(t *testing.T) {
+	t.Run("error - invalid argument type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvType")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvType"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid multi context", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvMultiCtx")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtx"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid multi context with reused arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvMultiCtxReuse")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtxReuse"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid context argument position", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvCtxPosition")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvCtxPosition"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid no arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvNoArgs")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvNoArgs"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid no context argument", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvNoCtx")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvNoCtx"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid returning multiple values", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("RetInvMulti")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("RetInvMulti"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvResult, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid to many arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvToMany")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvToMany"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid to many reused arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("ArgInvToManyReuse")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("ArgInvToManyReuse"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 
 	t.Run("invalid return type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("RetInvType")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("RetInvType"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvResult, err)
-		assert.Nil(t, tgt)
+		assert.Nil(t, have)
 	})
 }
 
@@ -317,142 +365,162 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	t.Run("target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
 
+		fn := tst.Func("Pkg1")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("Pkg1"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, impSpec, tgt.ImpSpec)
-		assert.Equal(t, absPath, tgt.ImpPath)
-		assert.Equal(t, "pkg1", tgt.PkgName)
-		assert.Equal(t, "", tgt.PkgNS)
-		assert.Nil(t, tgt.Breadcrumbs)
-		assert.Equal(t, "", tgt.Receiver)
-		assert.Equal(t, "Pkg1", tgt.FuncName)
-		assert.Equal(t, "pkg1", tgt.Name)
-		assert.Equal(t, "", tgt.VarName)
-		assert.Equal(t, "pkg1.Pkg1", tgt.CodeRef)
-		assert.Equal(t, "pkg1.Pkg1", tgt.DefRef)
-		assert.False(t, tgt.Default)
-		assert.Equal(t, "", tgt.Synopsis)
-		assert.Equal(t, "", tgt.Doc)
-		assert.False(t, tgt.Hidden)
-		assert.NotNil(t, tgt.Run)
-		assert.Fields(t, 16, tgt)
+		assert.Equal(t, impSpec, have.ImpSpec)
+		assert.Equal(t, absPath, have.ImpPath)
+		assert.Equal(t, "pkg1", have.PkgName)
+		assert.Equal(t, "", have.PkgNS)
+		assert.Nil(t, have.Breadcrumbs)
+		assert.Equal(t, "", have.Receiver)
+		assert.Equal(t, "Pkg1", have.FuncName)
+		assert.Equal(t, "pkg1", have.Name)
+		assert.Equal(t, "", have.VarName)
+		assert.Equal(t, "pkg1.Pkg1", have.CodeRef)
+		assert.Equal(t, "pkg1.Pkg1", have.DefRef)
+		assert.False(t, have.Default)
+		assert.Equal(t, "", have.Synopsis)
+		assert.Equal(t, "", have.Doc)
+		assert.False(t, have.Hidden)
+		assert.NotNil(t, have.Run)
+		assert.Fields(t, 16, have)
 	})
 
 	t.Run("target imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
 
+		fn := tst.Func("Pkg1")
+
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, tst.Func("Pkg1"))
+		have, err := newTarget(tst.pkg, fn)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, impSpec, tgt.ImpSpec)
-		assert.Equal(t, absPath, tgt.ImpPath)
-		assert.Equal(t, "pkg1", tgt.PkgName)
-		assert.Equal(t, "aa", tgt.PkgNS)
-		assert.Nil(t, tgt.Breadcrumbs)
-		assert.Equal(t, "", tgt.Receiver)
-		assert.Equal(t, "Pkg1", tgt.FuncName)
-		assert.Equal(t, "aa:pkg1", tgt.Name)
-		assert.Equal(t, "", tgt.VarName)
-		assert.Equal(t, "pkg1.Pkg1", tgt.CodeRef)
-		assert.Equal(t, "pkg1.Pkg1", tgt.DefRef)
-		assert.False(t, tgt.Default)
-		assert.Equal(t, "", tgt.Synopsis)
-		assert.Equal(t, "", tgt.Doc)
-		assert.False(t, tgt.Hidden)
-		assert.NotNil(t, tgt.Run)
-		assert.Fields(t, 16, tgt)
+		assert.Equal(t, impSpec, have.ImpSpec)
+		assert.Equal(t, absPath, have.ImpPath)
+		assert.Equal(t, "pkg1", have.PkgName)
+		assert.Equal(t, "aa", have.PkgNS)
+		assert.Nil(t, have.Breadcrumbs)
+		assert.Equal(t, "", have.Receiver)
+		assert.Equal(t, "Pkg1", have.FuncName)
+		assert.Equal(t, "aa:pkg1", have.Name)
+		assert.Equal(t, "", have.VarName)
+		assert.Equal(t, "pkg1.Pkg1", have.CodeRef)
+		assert.Equal(t, "pkg1.Pkg1", have.DefRef)
+		assert.False(t, have.Default)
+		assert.Equal(t, "", have.Synopsis)
+		assert.Equal(t, "", have.Doc)
+		assert.False(t, have.Hidden)
+		assert.NotNil(t, have.Run)
+		assert.Fields(t, 16, have)
 	})
 
 	t.Run("namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath)
+
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, met, nsp...)
+		have, err := newTarget(tst.pkg, met, nsp...)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, impSpec, tgt.ImpSpec)
-		assert.Equal(t, absPath, tgt.ImpPath)
-		assert.Equal(t, "pkg4", tgt.PkgName)
-		assert.Equal(t, "", tgt.PkgNS)
-		assert.Equal(t, []string{"__root__", "NS"}, tgt.Breadcrumbs)
-		assert.Equal(t, "NS", tgt.Receiver)
-		assert.Equal(t, "M0", tgt.FuncName)
-		assert.Equal(t, "ns:m0", tgt.Name)
-		assert.Equal(t, "_vpkg4NS", tgt.VarName)
-		assert.Equal(t, "_vpkg4NS.M0", tgt.CodeRef)
-		assert.Equal(t, "pkg4.NS.M0", tgt.DefRef)
-		assert.False(t, tgt.Default)
-		assert.Equal(t, "is a method in namespace NS", tgt.Synopsis)
+		assert.Equal(t, impSpec, have.ImpSpec)
+		assert.Equal(t, absPath, have.ImpPath)
+		assert.Equal(t, "pkg4", have.PkgName)
+		assert.Equal(t, "", have.PkgNS)
+		assert.Equal(t, []string{"__root__", "NS"}, have.Breadcrumbs)
+		assert.Equal(t, "NS", have.Receiver)
+		assert.Equal(t, "M0", have.FuncName)
+		assert.Equal(t, "ns:m0", have.Name)
+		assert.Equal(t, "_vpkg4NS", have.VarName)
+		assert.Equal(t, "_vpkg4NS.M0", have.CodeRef)
+		assert.Equal(t, "pkg4.NS.M0", have.DefRef)
+		assert.False(t, have.Default)
+		assert.Equal(t, "is a method in namespace NS", have.Synopsis)
 		want := "is a method in namespace NS. The rest of the doc string."
-		assert.Equal(t, want, tgt.Doc)
-		assert.False(t, tgt.Hidden)
-		assert.NotNil(t, tgt.Run)
-		assert.Fields(t, 16, tgt)
+		assert.Equal(t, want, have.Doc)
+		assert.False(t, have.Hidden)
+		assert.NotNil(t, have.Run)
+		assert.Fields(t, 16, have)
 	})
 
 	t.Run("namespaced target imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
+
 		absPath := modkit.Path(relPath)
+
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
+
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
+
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---
-		tgt, err := newTarget(tst.pkg, met, nsp...)
+		have, err := newTarget(tst.pkg, met, nsp...)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, impSpec, tgt.ImpSpec)
-		assert.Equal(t, absPath, tgt.ImpPath)
-		assert.Equal(t, "pkg4", tgt.PkgName)
-		assert.Equal(t, "aa", tgt.PkgNS)
-		assert.Equal(t, []string{"__root__", "NS"}, tgt.Breadcrumbs)
-		assert.Equal(t, "NS", tgt.Receiver)
-		assert.Equal(t, "M0", tgt.FuncName)
-		assert.Equal(t, "aa:ns:m0", tgt.Name)
-		assert.Equal(t, "_vpkg4NS", tgt.VarName)
-		assert.Equal(t, "_vpkg4NS.M0", tgt.CodeRef)
-		assert.Equal(t, "pkg4.NS.M0", tgt.DefRef)
-		assert.False(t, tgt.Default)
-		assert.Equal(t, "is a method in namespace NS", tgt.Synopsis)
+		assert.Equal(t, impSpec, have.ImpSpec)
+		assert.Equal(t, absPath, have.ImpPath)
+		assert.Equal(t, "pkg4", have.PkgName)
+		assert.Equal(t, "aa", have.PkgNS)
+		assert.Equal(t, []string{"__root__", "NS"}, have.Breadcrumbs)
+		assert.Equal(t, "NS", have.Receiver)
+		assert.Equal(t, "M0", have.FuncName)
+		assert.Equal(t, "aa:ns:m0", have.Name)
+		assert.Equal(t, "_vpkg4NS", have.VarName)
+		assert.Equal(t, "_vpkg4NS.M0", have.CodeRef)
+		assert.Equal(t, "pkg4.NS.M0", have.DefRef)
+		assert.False(t, have.Default)
+		assert.Equal(t, "is a method in namespace NS", have.Synopsis)
 		want := "is a method in namespace NS. The rest of the doc string."
-		assert.Equal(t, want, tgt.Doc)
-		assert.False(t, tgt.Hidden)
-		assert.NotNil(t, tgt.Run)
-		assert.Fields(t, 16, tgt)
+		assert.Equal(t, want, have.Doc)
+		assert.False(t, have.Hidden)
+		assert.NotNil(t, have.Run)
+		assert.Fields(t, 16, have)
 	})
 }
 
 func Test_newTarget_strips_nolint_from_doc(t *testing.T) {
 	// --- Given ---
+	pkg := &Package{Name: MainName}
+
 	// A target whose doc carries a spaced "// nolint" line. go/doc keeps such
 	// a line in Func.Doc (only the "//" prefix is stripped), so NewTarget must
 	// remove it from the rendered documentation.
@@ -478,14 +546,13 @@ func Test_newTarget_strips_nolint_from_doc(t *testing.T) {
 			},
 		},
 	}
-	pkg := &Package{Name: MainName}
 
 	// --- When ---
-	tgt, err := newTarget(pkg, df)
+	have, err := newTarget(pkg, df)
 
 	// --- Then ---
 	assert.NoError(t, err)
-	assert.Equal(t, "does stuff. More docs.", tgt.Doc)
+	assert.Equal(t, "does stuff. More docs.", have.Doc)
 }
 
 func Test_targetName_tabular(t *testing.T) {

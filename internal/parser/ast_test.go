@@ -11,66 +11,71 @@ import (
 )
 
 func Test_astFiles(t *testing.T) {
-	t.Run("empty directory", func(t *testing.T) {
+	t.Run("error - empty directory", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/empty"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAstEmpty, err)
 		assert.ErrorContain(t, absPath, err)
-		assert.Nil(t, pkg)
+		assert.Nil(t, have)
 	})
 
-	t.Run("not existing directory", func(t *testing.T) {
+	t.Run("error - not existing directory", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/not_existing"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstParse, err)
 		assert.ErrorContain(t, absPath, err)
-		assert.Nil(t, pkg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("tagged files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "main", pkgName(pkg))
-		assert.Len(t, 1, pkg)
+		assert.Equal(t, "main", pkgName(have))
+		assert.Len(t, 1, have)
+		fil := getFile(t, have, absPath, "makefile.go")
 
-		fil := getFile(t, pkg, absPath, "makefile.go")
 		assert.Equal(t, "main", fil.Name.Name)
 	})
 
 	t.Run("file list", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
+
 		absPath := modkit.Path(relPath)
+
 		files := []string{"makefile.go"}
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, files)
+		_, have, err := astFiles(absPath, files)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "main", pkgName(pkg))
-		assert.Len(t, 1, pkg)
+		assert.Equal(t, "main", pkgName(have))
+		assert.Len(t, 1, have)
+		fil := getFile(t, have, absPath, "makefile.go")
 
-		fil := getFile(t, pkg, absPath, "makefile.go")
 		assert.Equal(t, "main", fil.Name.Name)
 	})
 
@@ -79,48 +84,52 @@ func Test_astFiles(t *testing.T) {
 		// Directory has makefile.go; an explicit empty list must not fall
 		// back to scanning the directory (build-tag / go-list fidelity).
 		relPath := "testdata/projects/simple_untagged/project"
+
 		absPath := modkit.Path(relPath)
+
 		files := []string{}
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, files)
+		_, have, err := astFiles(absPath, files)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAstEmpty, err)
 		assert.ErrorContain(t, absPath, err)
-		assert.Nil(t, pkg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("untagged files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_untagged/project"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "main", pkgName(pkg))
-		assert.Len(t, 1, pkg)
+		assert.Equal(t, "main", pkgName(have))
+		assert.Len(t, 1, have)
+		fil := getFile(t, have, absPath, "makefile.go")
 
-		fil := getFile(t, pkg, absPath, "makefile.go")
 		assert.Equal(t, "main", fil.Name.Name)
 	})
 
 	t.Run("multiple ast packages error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/packages/multi"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, pkg, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
 		assert.ErrorContain(t, absPath, err)
 		assert.ErrorContain(t, "main, multi", err)
-		assert.Nil(t, pkg)
+		assert.Nil(t, have)
 	})
 }
 
@@ -128,31 +137,35 @@ func Test_astAndDocPkg(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_untagged/project"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		astPkg, docPkg, err := astAndDocPkg(absPath, nil)
+		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "main", pkgName(astPkg))
-		assert.Len(t, 1, astPkg)
-		getFile(t, astPkg, absPath, "makefile.go")
-		assert.Equal(t, "main", docPkg.Name)
-		assert.Equal(t, absPath, docPkg.ImportPath)
+		assert.Equal(t, "main", pkgName(hAstPkg))
+		assert.Len(t, 1, hAstPkg)
+
+		getFile(t, hAstPkg, absPath, "makefile.go")
+
+		assert.Equal(t, "main", hDocPkg.Name)
+		assert.Equal(t, absPath, hDocPkg.ImportPath)
 	})
 
 	t.Run("error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/packages/multi"
+
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		astPkg, docPkg, err := astAndDocPkg(absPath, nil)
+		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
-		assert.Nil(t, astPkg)
-		assert.Nil(t, docPkg)
+		assert.Nil(t, hAstPkg)
+		assert.Nil(t, hDocPkg)
 	})
 }

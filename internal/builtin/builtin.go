@@ -192,29 +192,29 @@ func GenMain(specs []string, opts ...GenOption) error {
 //   - dst/[targetsFN]
 //   - dst/data/[mainFN]
 //   - dst/data/[mainEmptyFN]
-func GenImports(imports []parser.Import, opts ...GenOption) error {
-	def := genOpts{
+func GenImports(imports []parser.Import, options ...GenOption) error {
+	opts := genOpts{
 		name:  "builtin",
 		empty: true,
 	}
-	for _, opt := range opts {
-		opt(&def)
+	for _, opt := range options {
+		opt(&opts)
 	}
-	if !validGoIdent(def.name) {
+	if !validGoIdent(opts.name) {
 		return fmt.Errorf(
 			"package name %q is not a Go identifier",
-			def.name,
+			opts.name,
 		)
 	}
-	if def.rng == nil {
-		def.rng = ring.New()
+	if opts.rng == nil {
+		opts.rng = ring.New()
 	}
 
 	// Generate every file before writing any of them, so a later failure
 	// does not replace an earlier file.
 	tgs, err := parser.TargetsFromImports(
-		def.rng,
-		def.dir,
+		opts.rng,
+		opts.dir,
 		imports,
 		parser.BuiltInCB,
 	)
@@ -223,11 +223,11 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	}
 	files := make([]genFile, 0, 3)
 	code, err := parser.NewGenerator(tgs).
-		Generate(parser.WithGenNames(def.name, "BuiltIn"))
+		Generate(parser.WithGenNames(opts.name, "BuiltIn"))
 	if err != nil {
 		return fmt.Errorf("generating %s: %w", targetsFN, err)
 	}
-	dst := filepath.Join(def.dst, targetsFN)
+	dst := filepath.Join(opts.dst, targetsFN)
 	files = append(files, genFile{dst: dst, code: code})
 
 	code, err = parser.NewGenerator(tgs).
@@ -238,10 +238,10 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	if err != nil {
 		return fmt.Errorf("generating %s: %w", mainFN, err)
 	}
-	dst = filepath.Join(def.dst, "data", mainFN)
+	dst = filepath.Join(opts.dst, "data", mainFN)
 	files = append(files, genFile{dst: dst, code: code})
 
-	if def.empty {
+	if opts.empty {
 		gen := parser.NewGenerator(parser.NewTargets())
 		code, err = gen.Generate(
 			parser.WithGenNames(parser.MainName, "BuiltIn"),
@@ -249,12 +249,12 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 		if err != nil {
 			return fmt.Errorf("generating %s: %w", mainEmptyFN, err)
 		}
-		dst = filepath.Join(def.dst, "data", mainEmptyFN)
+		dst = filepath.Join(opts.dst, "data", mainEmptyFN)
 		files = append(files, genFile{dst: dst, code: code})
 	}
 
 	// Create the destination tree; dst/data covers both dst and dst/data.
-	if err = os.MkdirAll(filepath.Join(def.dst, "data"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(opts.dst, "data"), 0o755); err != nil {
 		return fmt.Errorf("creating destination tree: %w", err)
 	}
 	return writeGenerated(files)

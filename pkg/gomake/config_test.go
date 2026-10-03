@@ -30,13 +30,13 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, []byte(`{"region":"eu","count":3}`))
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.True(t, cfg.Has("region"))
-		assert.Equal(t, "eu", must.Value(GetCfg[string](cfg, "region")))
-		assert.Equal(t, 3, must.Value(GetCfg[int](cfg, "count")))
+		assert.True(t, have.Has("region"))
+		assert.Equal(t, "eu", must.Value(GetCfg[string](have, "region")))
+		assert.Equal(t, 3, must.Value(GetCfg[int](have, "count")))
 	})
 
 	t.Run("decodes string block", func(t *testing.T) {
@@ -45,13 +45,13 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, `{"region":"eu","count":3}`)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.True(t, cfg.Has("region"))
-		assert.Equal(t, "eu", must.Value(GetCfg[string](cfg, "region")))
-		assert.Equal(t, 3, must.Value(GetCfg[int](cfg, "count")))
+		assert.True(t, have.Has("region"))
+		assert.Equal(t, "eu", must.Value(GetCfg[string](have, "region")))
+		assert.Equal(t, 3, must.Value(GetCfg[int](have, "count")))
 	})
 
 	t.Run("no config", func(t *testing.T) {
@@ -59,11 +59,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng := ring.New()
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.False(t, cfg.Has("region"))
+		assert.False(t, have.Has("region"))
 	})
 
 	t.Run("unsupported meta value type", func(t *testing.T) {
@@ -72,11 +72,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, 123)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.False(t, cfg.Has("region"))
+		assert.False(t, have.Has("region"))
 	})
 
 	t.Run("error - invalid json", func(t *testing.T) {
@@ -85,11 +85,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, "{not json")
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.ErrorContain(t, "invalid character", err)
-		assert.Nil(t, cfg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("error - trailing bracket", func(t *testing.T) {
@@ -98,11 +98,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, `{"region":"eu"}]`)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.ErrorContain(t, "']'", err)
-		assert.Nil(t, cfg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("error - trailing brace", func(t *testing.T) {
@@ -111,11 +111,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, `{"a":1}}`)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.ErrorContain(t, "'}'", err)
-		assert.Nil(t, cfg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("error - trailing value", func(t *testing.T) {
@@ -124,11 +124,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, `{"a":1} true`)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.ErrorContain(t, "trailing data", err)
-		assert.Nil(t, cfg)
+		assert.Nil(t, have)
 	})
 
 	t.Run("null is an empty block", func(t *testing.T) {
@@ -137,11 +137,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, `null`)
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.False(t, cfg.Has("region"))
+		assert.False(t, have.Has("region"))
 	})
 
 	t.Run("decodes raw message", func(t *testing.T) {
@@ -150,11 +150,11 @@ func Test_TargetConfig(t *testing.T) {
 		rng.MetaSet(ConfigMetaKey, json.RawMessage(`{"region":"eu"}`))
 
 		// --- When ---
-		cfg, err := TargetConfig(rng)
+		have, err := TargetConfig(rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "eu", must.Value(GetCfg[string](cfg, "region")))
+		assert.Equal(t, "eu", must.Value(GetCfg[string](have, "region")))
 	})
 }
 
@@ -268,8 +268,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"region":"eu"}`)
 
+		region := "region"
+
 		// --- When ---
-		have, err := GetCfg[string](cfg, "region")
+		have, err := GetCfg[string](cfg, region)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -280,8 +282,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"count":3}`)
 
+		count := "count"
+
 		// --- When ---
-		have, err := GetCfg[int](cfg, "count")
+		have, err := GetCfg[int](cfg, count)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -292,8 +296,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"dry_run":true}`)
 
+		dry_run := "dry_run"
+
 		// --- When ---
-		have, err := GetCfg[bool](cfg, "dry_run")
+		have, err := GetCfg[bool](cfg, dry_run)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -304,8 +310,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"ratio":0.5}`)
 
+		ratio := "ratio"
+
 		// --- When ---
-		have, err := GetCfg[float64](cfg, "ratio")
+		have, err := GetCfg[float64](cfg, ratio)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -316,8 +324,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":"5m"}`)
 
+		timeout := "timeout"
+
 		// --- When ---
-		have, err := GetCfg[time.Duration](cfg, "timeout")
+		have, err := GetCfg[time.Duration](cfg, timeout)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -328,8 +338,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"hosts":["web-1","web-2"]}`)
 
+		hosts := "hosts"
+
 		// --- When ---
-		have, err := GetCfg[[]string](cfg, "hosts")
+		have, err := GetCfg[[]string](cfg, hosts)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -339,13 +351,16 @@ func Test_GetCfg(t *testing.T) {
 	t.Run("struct", func(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"file":".golangci.yml","fix":true}}`)
+
 		type lint struct {
 			File string `json:"file"`
 			Fix  bool   `json:"fix"`
 		}
 
+		lint2 := "lint"
+
 		// --- When ---
-		have, err := GetCfg[lint](cfg, "lint")
+		have, err := GetCfg[lint](cfg, lint2)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -356,14 +371,18 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"count":3}`)
 
+		count := "count"
+
 		// --- When ---
-		have, err := GetCfg[any](cfg, "count")
+		have, err := GetCfg[any](cfg, count)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		// Numbers stay as json.Number so large integers keep precision.
 		n, ok := have.(json.Number)
+
 		assert.True(t, ok)
+
 		assert.Equal(t, "3", string(n))
 	})
 
@@ -372,8 +391,10 @@ func Test_GetCfg(t *testing.T) {
 		// 2^53+1 is not exactly representable as float64.
 		cfg := configFrom(t, `{"big":9007199254740993}`)
 
+		big := "big"
+
 		// --- When ---
-		have, err := GetCfg[int64](cfg, "big")
+		have, err := GetCfg[int64](cfg, big)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -384,8 +405,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":null}`)
 
+		timeout := "timeout"
+
 		// --- When ---
-		_, err := GetCfg[string](cfg, "timeout")
+		_, err := GetCfg[string](cfg, timeout)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -396,13 +419,17 @@ func Test_GetCfg(t *testing.T) {
 		// Nested any fields must not re-decode as float64.
 		cfg := configFrom(t, `{"obj":{"big":9007199254740993}}`)
 
+		obj := "obj"
+
 		// --- When ---
-		have, err := GetCfg[map[string]any](cfg, "obj")
+		have, err := GetCfg[map[string]any](cfg, obj)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		n, ok := have["big"].(json.Number)
+
 		assert.True(t, ok)
+
 		assert.Equal(t, "9007199254740993", string(n))
 	})
 
@@ -410,12 +437,14 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"version":"v1"}}`)
 
+		lint := "lint"
+
 		// --- When ---
-		have, err := GetCfg[any](cfg, "lint")
+		have, err := GetCfg[any](cfg, lint)
 		assert.NoError(t, err)
-		m, ok := have.(map[string]any)
-		assert.True(t, ok)
-		m["version"] = "mutated"
+		hM, hOk := have.(map[string]any)
+		assert.True(t, hOk)
+		hM["version"] = "mutated"
 
 		// --- Then ---
 		assert.Equal(t, "v1", must.Value(GetCfg[string](cfg, "lint.version")))
@@ -425,8 +454,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"lint":{"version":"v2.13.0"}}`)
 
+		text := "lint.version"
+
 		// --- When ---
-		have, err := GetCfg[string](cfg, "lint.version")
+		have, err := GetCfg[string](cfg, text)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -437,8 +468,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"hosts":["web-1","web-2"]}`)
 
+		text := "hosts.0"
+
 		// --- When ---
-		have, err := GetCfg[string](cfg, "hosts.0")
+		have, err := GetCfg[string](cfg, text)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -467,8 +500,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"region":"eu"}`)
 
+		path := "'github.com/acme"
+
 		// --- When ---
-		_, err := GetCfg[string](cfg, "'github.com/acme")
+		_, err := GetCfg[string](cfg, path)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrMiss, err)
@@ -478,8 +513,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"region":"eu"}`)
 
+		nope := "nope"
+
 		// --- When ---
-		_, err := GetCfg[string](cfg, "nope")
+		_, err := GetCfg[string](cfg, nope)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrMiss, err)
@@ -489,8 +526,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"ratio":3.5}`)
 
+		ratio := "ratio"
+
 		// --- When ---
-		_, err := GetCfg[int](cfg, "ratio")
+		_, err := GetCfg[int](cfg, ratio)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -500,8 +539,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"count":3}`)
 
+		count := "count"
+
 		// --- When ---
-		_, err := GetCfg[string](cfg, "count")
+		_, err := GetCfg[string](cfg, count)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -511,8 +552,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":"nope"}`)
 
+		timeout := "timeout"
+
 		// --- When ---
-		_, err := GetCfg[time.Duration](cfg, "timeout")
+		_, err := GetCfg[time.Duration](cfg, timeout)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -524,8 +567,10 @@ func Test_GetCfg(t *testing.T) {
 		// a time.Duration to.
 		cfg := configFrom(t, `{"timeout":300000000000}`)
 
+		timeout := "timeout"
+
 		// --- When ---
-		have, err := GetCfg[time.Duration](cfg, "timeout")
+		have, err := GetCfg[time.Duration](cfg, timeout)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -536,8 +581,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":3.5}`)
 
+		timeout := "timeout"
+
 		// --- When ---
-		_, err := GetCfg[time.Duration](cfg, "timeout")
+		_, err := GetCfg[time.Duration](cfg, timeout)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -547,8 +594,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"region":"eu"}`)
 
+		text := "region.foo"
+
 		// --- When ---
-		_, err := GetCfg[string](cfg, "region.foo")
+		_, err := GetCfg[string](cfg, text)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
@@ -560,8 +609,12 @@ func Test_GetCfgDefault(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":"5m"}`)
 
+		timeout := "timeout"
+
+		blank := ""
+
 		// --- When ---
-		have, err := GetCfgDefault(cfg, "timeout", "")
+		have, err := GetCfgDefault(cfg, timeout, blank)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -572,8 +625,12 @@ func Test_GetCfgDefault(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"region":"eu"}`)
 
+		timeout := "timeout"
+
+		text := "1m"
+
 		// --- When ---
-		have, err := GetCfgDefault(cfg, "timeout", "1m")
+		have, err := GetCfgDefault(cfg, timeout, text)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -584,8 +641,12 @@ func Test_GetCfgDefault(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{}`)
 
+		timeout := "timeout"
+
+		text := "1m"
+
 		// --- When ---
-		have, err := GetCfgDefault(cfg, "timeout", "1m")
+		have, err := GetCfgDefault(cfg, timeout, text)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -596,8 +657,12 @@ func Test_GetCfgDefault(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"count":3}`)
 
+		count := "count"
+
+		def := "def"
+
 		// --- When ---
-		have, err := GetCfgDefault(cfg, "count", "def")
+		have, err := GetCfgDefault(cfg, count, def)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)

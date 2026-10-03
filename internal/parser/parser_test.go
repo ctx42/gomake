@@ -21,10 +21,11 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.FileExist(t, dst)
 	})
 
-	t.Run("failure", func(t *testing.T) {
+	t.Run("error - parent directory missing", func(t *testing.T) {
 		// --- Given ---
 		dst := filepath.Join(t.TempDir(), "not_existing", "gen.go")
 
@@ -33,6 +34,7 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, fs.ErrNotExist, err)
+
 		assert.NoFileExist(t, dst)
 	})
 }

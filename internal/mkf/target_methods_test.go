@@ -15,34 +15,36 @@ import (
 
 func Test_NewTarget(t *testing.T) {
 	// --- When ---
-	tgt := NewTarget()
+	have := NewTarget()
 
 	// --- Then ---
-	assert.Equal(t, "", tgt.ImpSpec)
-	assert.Equal(t, "", tgt.ImpPath)
-	assert.Equal(t, "", tgt.PkgName)
-	assert.Equal(t, "", tgt.PkgNS)
-	assert.Nil(t, tgt.Breadcrumbs)
-	assert.Equal(t, "", tgt.Receiver)
-	assert.Equal(t, "", tgt.FuncName)
-	assert.Equal(t, "", tgt.Name)
-	assert.Equal(t, "", tgt.VarName)
-	assert.Equal(t, "", tgt.CodeRef)
-	assert.Equal(t, "", tgt.DefRef)
-	assert.False(t, tgt.Default)
-	assert.Equal(t, "", tgt.Synopsis)
-	assert.Equal(t, "", tgt.Doc)
-	assert.False(t, tgt.Hidden)
-	assert.NotNil(t, tgt.Run)
-	assert.NoError(t, tgt.Run(nil, &ring.Ring{}))
-	assert.Fields(t, 16, tgt)
+	assert.Equal(t, "", have.ImpSpec)
+	assert.Equal(t, "", have.ImpPath)
+	assert.Equal(t, "", have.PkgName)
+	assert.Equal(t, "", have.PkgNS)
+	assert.Nil(t, have.Breadcrumbs)
+	assert.Equal(t, "", have.Receiver)
+	assert.Equal(t, "", have.FuncName)
+	assert.Equal(t, "", have.Name)
+	assert.Equal(t, "", have.VarName)
+	assert.Equal(t, "", have.CodeRef)
+	assert.Equal(t, "", have.DefRef)
+	assert.False(t, have.Default)
+	assert.Equal(t, "", have.Synopsis)
+	assert.Equal(t, "", have.Doc)
+	assert.False(t, have.Hidden)
+	assert.NotNil(t, have.Run)
+	assert.NoError(t, have.Run(nil, &ring.Ring{}))
+	assert.Fields(t, 16, have)
 }
 
 func Test_Target_GoCode(t *testing.T) {
 	t.Run("all fields set", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_all_fields.gld"
+
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
+
 		tgt := &Target{
 			ImpSpec:     "ImpSpec",
 			ImpPath:     "ImpPath",
@@ -82,7 +84,9 @@ func Test_Target_GoCode(t *testing.T) {
 	t.Run("target without args", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_without_args.gld"
+
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
+
 		tgt := &Target{
 			Name:    "Name",
 			CodeRef: "CodeRef",
@@ -98,7 +102,9 @@ func Test_Target_GoCode(t *testing.T) {
 	t.Run("Doc and Synopsis with quotes", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_with_quotes_in_docs.gld"
+
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
+
 		tgt := &Target{
 			Name:     "Name",
 			CodeRef:  "CodeRef",
@@ -122,8 +128,10 @@ func Test_Target_genRunCode(t *testing.T) {
 			CodeRef: "pkt.Hello",
 		}
 
+		n := 0
+
 		// --- When ---
-		have := tgt.genRunCode(0)
+		have := tgt.genRunCode(n)
 
 		// --- Then ---
 		want := "return pkt.Hello(ctx, rng)"
@@ -137,8 +145,10 @@ func Test_Target_genRunCode(t *testing.T) {
 			CodeRef: "pkt.Hello",
 		}
 
+		n := 3
+
 		// --- When ---
-		have := tgt.genRunCode(3)
+		have := tgt.genRunCode(n)
 
 		// --- Then ---
 		want := "\t\t\treturn pkt.Hello(ctx, rng)"
@@ -153,9 +163,9 @@ func Test_Target_IsCore_tabular(t *testing.T) {
 		name string
 		want bool
 	}{
-		{"1", ":abc", true},
-		{"2", "abc", false},
-		{"3", "", false},
+		{"leading colon", ":abc", true},
+		{"plain name", "abc", false},
+		{"empty name", "", false},
 	}
 
 	for _, tc := range tt {

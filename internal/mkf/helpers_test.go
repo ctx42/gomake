@@ -59,16 +59,22 @@ func Test_RecoverError(t *testing.T) {
 	})
 
 	t.Run("string", func(t *testing.T) {
+		// --- Given ---
+		text := "string err"
+
 		// --- When ---
-		err := RecoverError("string err")
+		err := RecoverError(text)
 
 		// --- Then ---
 		assert.ErrorEqual(t, "string err", err)
 	})
 
 	t.Run("other", func(t *testing.T) {
+		// --- Given ---
+		n := 123
+
 		// --- When ---
-		err := RecoverError(123)
+		err := RecoverError(n)
 
 		// --- Then ---
 		assert.ErrorEqual(t, "123", err)
@@ -79,10 +85,13 @@ func Test_FindTarget(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		// --- Given ---
 		want := TgtB()
+
 		tgs := []*Target{TgtA(), want, TgtC()}
 
+		text := "tgt-b"
+
 		// --- When ---
-		have, err := FindTarget("tgt-b", tgs)
+		have, err := FindTarget(text, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -92,10 +101,13 @@ func Test_FindTarget(t *testing.T) {
 	t.Run("nil entry", func(t *testing.T) {
 		// --- Given ---
 		want := TgtB()
+
 		tgs := []*Target{nil, want}
 
+		text := "tgt-b"
+
 		// --- When ---
-		have, err := FindTarget("tgt-b", tgs)
+		have, err := FindTarget(text, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -106,8 +118,10 @@ func Test_FindTarget(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA(), TgtB(), TgtC()}
 
+		unknown := "unknown"
+
 		// --- When ---
-		have, err := FindTarget("unknown", tgs)
+		have, err := FindTarget(unknown, tgs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
@@ -120,6 +134,7 @@ func Test_defaultTarget(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		// --- Given ---
 		want := TgtB()
+
 		tgs := []*Target{TgtA(), want, TgtC()}
 
 		// --- When ---
@@ -147,70 +162,90 @@ func Test_pickTarget(t *testing.T) {
 	t.Run("error - empty args no default", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA(), TgtC()}
+
 		var args []string
 
+		ptr := &args
+
 		// --- When ---
-		haveTgt, err := pickTarget(tgs, &args)
+		have, err := pickTarget(tgs, ptr)
 
 		// --- Then ---
-		assert.Nil(t, haveTgt)
+		assert.Nil(t, have)
 		assert.ErrorIs(t, ErrPickTarget, err)
 	})
 
 	t.Run("empty args with default", func(t *testing.T) {
 		// --- Given ---
 		wantTgt := TgtB()
+
 		tgs := []*Target{TgtA(), wantTgt, TgtC()}
+
 		var args []string
 
+		ptr := &args
+
 		// --- When ---
-		haveTgt, err := pickTarget(tgs, &args)
+		have, err := pickTarget(tgs, ptr)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Same(t, wantTgt, haveTgt)
+		assert.Same(t, wantTgt, have)
+
 		assert.Empty(t, args)
 	})
 
 	t.Run("pick target selected in args", func(t *testing.T) {
 		// --- Given ---
 		wantTgt := TgtC()
+
 		tgs := []*Target{TgtA(), TgtB(), wantTgt}
+
 		args := []string{"tgt-c", "arg0", "arg1"}
 
+		ptr := &args
+
 		// --- When ---
-		haveTgt, err := pickTarget(tgs, &args)
+		have, err := pickTarget(tgs, ptr)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Same(t, wantTgt, haveTgt)
+		assert.Same(t, wantTgt, have)
+
 		assert.Equal(t, []string{"arg0", "arg1"}, args)
 	})
 
 	t.Run("error - unknown target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA(), TgtB(), TgtC()}
+
 		args := []string{"unknown"}
 
+		ptr := &args
+
 		// --- When ---
-		haveTgt, err := pickTarget(tgs, &args)
+		have, err := pickTarget(tgs, ptr)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
-		assert.Nil(t, haveTgt)
+		assert.Nil(t, have)
+
 		assert.Equal(t, []string{"unknown"}, args)
 	})
 }
 
-func Test_runTarget_signal_prefers_success_not_cancel(t *testing.T) {
+func Test_runTarget(t *testing.T) {
 	// Cooperative targets that return ctx.Err() after cancel must still
 	// surface as interruptedError (128+n), not a plain context.Canceled.
-	t.Run("signal with cooperative cancel", func(t *testing.T) {
+	t.Run("error - signal with cooperative cancel", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
 		fn := func(c context.Context, _ *ring.Ring) error {
@@ -218,202 +253,220 @@ func Test_runTarget_signal_prefers_success_not_cancel(t *testing.T) {
 			return c.Err()
 		}
 
+		n := 1
+
+		val := 20 * time.Millisecond
+
 		// --- When ---
-		done := make(chan error, 1)
+		have := make(chan error, n)
 		go func() {
-			done <- runTarget(ctx, sig, fn, wd, tst.Ring())
+			have <- runTarget(ctx, sig, fn, wd, tst.Ring())
 		}()
 		// Let the target block on ctx.Done, then signal.
-		time.Sleep(20 * time.Millisecond)
+		time.Sleep(val)
 		sig <- syscall.SIGTERM
-		err := <-done
+		err := <-have
 
 		// --- Then ---
-		var ie interruptedError
-		assert.True(t, errors.As(err, &ie))
-		assert.Equal(t, exitCodeSignal+int(syscall.SIGTERM), ie.Signal())
-	})
-}
-
-func Test_recvDone(t *testing.T) {
-	t.Run("empty", func(t *testing.T) {
-		// --- Given ---
-		done := make(chan error, 1)
-
-		// --- When ---
-		err, ok := recvDone(done)
-
-		// --- Then ---
-		assert.False(t, ok)
-		assert.NoError(t, err)
+		var ier interruptedError
+		assert.True(t, errors.As(err, &ier))
+		assert.Equal(t, exitCodeSignal+int(syscall.SIGTERM), ier.Signal())
 	})
 
-	t.Run("ready result", func(t *testing.T) {
-		// --- Given ---
-		done := make(chan error, 2)
-		done <- nil
-		close(done)
-
-		// --- When ---
-		err, ok := recvDone(done)
-
-		// --- Then ---
-		assert.True(t, ok)
-		assert.NoError(t, err)
-	})
-
-	t.Run("ready error", func(t *testing.T) {
-		// --- Given ---
-		done := make(chan error, 2)
-		want := errors.New("target failed")
-		done <- want
-		close(done)
-
-		// --- When ---
-		have, ok := recvDone(done)
-
-		// --- Then ---
-		assert.True(t, ok)
-		assert.ErrorIs(t, want, have)
-	})
-}
-
-func Test_runTarget(t *testing.T) {
 	t.Run("execute target", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
+		run := TgtA().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtA().Run, wd, tst.Ring())
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "a", tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("pass arguments to target", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
+
 		args := []string{"arg0", "arg1"}
 
+		run := TgtPrintArgs().Run
+
+		rng := tst.Ring(args...)
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtPrintArgs().Run, wd, tst.Ring(args...))
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "[arg0 arg1]", tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
-	t.Run("context timeout shorter than execution time", func(t *testing.T) {
+	t.Run("error - deadline before return", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		ctx, cxl := context.WithTimeout(ctx, 50*time.Millisecond)
 		defer cxl()
 
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
+		run := TgtLong().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtLong().Run, wd, tst.Ring())
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.ErrorIs(t, context.DeadlineExceeded, err)
+
 		assert.Empty(t, tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("context timeout longer than execution time", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		ctx, cxl := context.WithTimeout(ctx, 150*time.Millisecond)
 		defer cxl()
 
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
+		run := TgtLong().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtLong().Run, wd, tst.Ring())
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "done after 100ms", tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("target panicking", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
+		run := TgtPanicString().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtPanicString().Run, wd, tst.Ring())
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.ErrorEqual(t, "target panicked with: panic string", err)
+
 		assert.Empty(t, tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("target canceled with signal", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
 		// Wait for "started" and "exited" to appear on stdout.
 		started := func() bool {
 			return strings.HasPrefix(tst.Stdout(), "started ")
 		}
+
 		exited := func() bool {
 			return strings.HasSuffix(tst.Stdout(), " exited")
 		}
 
 		// --- When ---
-		done := make(chan struct{})
+		have := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(ctx, sig, TgtWaiting().Run, wd, tst.Ring())
-			close(done)
+			close(have)
 		}()
 
 		// --- Then ---
 		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
-		sig <- syscall.SIGINT
-		check.Wait("1s", exited, check.WithWaitThrottle(10*time.Millisecond))
-		<-done // Goroutine exited.
 
-		var e interruptedError
-		assert.ErrorAs(t, &e, err)
-		assert.Equal(t, 128+2, e.Signal())
+		sig <- syscall.SIGINT
+
+		check.Wait("1s", exited, check.WithWaitThrottle(10*time.Millisecond))
+
+		<-have // Goroutine exited.
+
+		var ier interruptedError
+		assert.ErrorAs(t, &ier, err)
+
+		assert.Equal(t, 128+2, ier.Signal())
+
 		assert.Equal(t, "started context canceled exited", tst.Stdout())
+
 		assert.Equal(t, "", tst.Stderr())
 	})
 
 	t.Run("target canceled with SIGTERM", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
 		started := func() bool {
@@ -421,39 +474,51 @@ func Test_runTarget(t *testing.T) {
 		}
 
 		// --- When ---
-		done := make(chan struct{})
+		have := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(ctx, sig, TgtWaiting().Run, wd, tst.Ring())
-			close(done)
+			close(have)
 		}()
 
 		// --- Then ---
 		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
-		sig <- syscall.SIGTERM
-		<-done
 
-		var e interruptedError
-		assert.ErrorAs(t, &e, err)
-		assert.Equal(t, 128+int(syscall.SIGTERM), e.Signal())
+		sig <- syscall.SIGTERM
+
+		<-have
+
+		var ier interruptedError
+		assert.ErrorAs(t, &ier, err)
+
+		assert.Equal(t, 128+int(syscall.SIGTERM), ier.Signal())
 	})
 
 	t.Run("cwd restored after timeout", func(t *testing.T) {
 		// --- Given ---
 		ctx, cxl := context.WithTimeout(t.Context(), 50*time.Millisecond)
 		defer cxl()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 		t.Cleanup(func() { _ = os.Chdir(wd) })
+
 		dir := pathkit.AbsPath(t, "testdata/dir")
 
+		run := TgtWaiting().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtWaiting().Run, dir, tst.Ring())
+		err := runTarget(ctx, sig, run, dir, rng)
 
 		// --- Then ---
 		assert.ErrorIs(t, context.DeadlineExceeded, err)
+
 		// The target goroutine outlives RunTarget; once it observes the
 		// canceled context it terminates and its deferred os.Chdir restores
 		// the working directory. Polling for the restored directory proves the
@@ -461,7 +526,9 @@ func Test_runTarget(t *testing.T) {
 		// cwd contract holds on the timeout path.
 		restored := func() bool { return must.Value(os.Getwd()) == wd }
 		check.Wait("1s", restored, check.WithWaitThrottle(10*time.Millisecond))
+
 		assert.Equal(t, wd, must.Value(os.Getwd()))
+
 		// The directory is restored only after the target's deferred " exited"
 		// print, so by now stdout is complete.
 		assert.Equal(t, "started context canceled exited", tst.Stdout())
@@ -470,11 +537,15 @@ func Test_runTarget(t *testing.T) {
 	t.Run("cwd restored after signal", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 		t.Cleanup(func() { _ = os.Chdir(wd) })
+
 		dir := pathkit.AbsPath(t, "testdata/dir")
 
 		started := func() bool {
@@ -482,81 +553,116 @@ func Test_runTarget(t *testing.T) {
 		}
 
 		// --- When ---
-		done := make(chan struct{})
+		have := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(ctx, sig, TgtWaiting().Run, dir, tst.Ring())
-			close(done)
+			close(have)
 		}()
 
 		// --- Then ---
 		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
-		sig <- syscall.SIGINT
-		<-done // RunTarget returned.
 
-		var e interruptedError
-		assert.ErrorAs(t, &e, err)
+		sig <- syscall.SIGINT
+
+		<-have // RunTarget returned.
+
+		var ier interruptedError
+		assert.ErrorAs(t, &ier, err)
+
 		// The target goroutine outlives RunTarget on the signal path too; its
 		// deferred os.Chdir restores the working directory only after the send
 		// completes. Polling for it proves the goroutine did not leak.
 		restored := func() bool { return must.Value(os.Getwd()) == wd }
 		check.Wait("1s", restored, check.WithWaitThrottle(10*time.Millisecond))
+
 		assert.Equal(t, wd, must.Value(os.Getwd()))
 	})
 
 	t.Run("change working directory", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout().WetStderr()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
+
 		cwd := pathkit.AbsPath(t, "testdata/dir")
 
+		run := TgtListFiles().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtListFiles().Run, cwd, tst.Ring())
+		err := runTarget(ctx, sig, run, cwd, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, "fil0.txt\nfil1.txt\n", tst.Stdout())
+
 		want := fmt.Sprintf("Listing files in: %s\n", cwd)
 		assert.Equal(t, want, tst.Stderr())
+
 		assert.Equal(t, wd, must.Value(os.Getwd()))
 	})
 
 	t.Run("error - change working directory", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
+
 		cwd := pathkit.AbsPath(t, "testdata/not-existing")
 
+		run := TgtListFiles().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtListFiles().Run, cwd, tst.Ring())
+		err := runTarget(ctx, sig, run, cwd, rng)
 
 		// --- Then ---
 		assert.ErrorIs(t, fs.ErrNotExist, err)
+
 		assert.Equal(t, wd, must.Value(os.Getwd()))
+
 		assert.Empty(t, tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("error - target returning", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 
+		run := TgtError().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtError().Run, wd, tst.Ring())
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.ErrorEqual(t, "always error", err)
+
 		assert.Empty(t, tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
@@ -567,9 +673,12 @@ func Test_runTarget(t *testing.T) {
 
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t)
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
 		t.Cleanup(func() { _ = os.Chdir(wd) })
 
@@ -577,36 +686,101 @@ func Test_runTarget(t *testing.T) {
 		assert.NoError(t, os.Chdir(cwd))
 		assert.NoError(t, os.Remove(cwd))
 
+		run := TgtCore().Run
+
+		rng := tst.Ring()
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtCore().Run, cwd, tst.Ring())
+		err := runTarget(ctx, sig, run, cwd, rng)
 
 		// --- Then ---
 		var e *os.SyscallError
 		assert.ErrorAs(t, &e, err)
+
 		assert.Equal(t, e.Syscall, "getwd")
+
 		assert.Equal(t, e.Err, syscall.ENOENT)
+
 		assert.Empty(t, tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
 	})
 
 	t.Run("cwd restored after target changed it", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
+
 		tst := ringtest.New(t).WetStdout()
+
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
+
 		wd := must.Value(os.Getwd())
+
 		cwd := pathkit.AbsPath(t, "testdata")
+
 		args := []string{cwd}
 
+		run := TgtChdir().Run
+
+		rng := tst.Ring(args...)
+
 		// --- When ---
-		err := runTarget(ctx, sig, TgtChdir().Run, wd, tst.Ring(args...))
+		err := runTarget(ctx, sig, run, wd, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
+
 		assert.Equal(t, wd, must.Value(os.Getwd()))
+
 		assert.Equal(t, fmt.Sprintf("changed to %s", cwd), tst.Stdout())
+
 		assert.Empty(t, tst.Stderr())
+	})
+}
+
+func Test_recvDone(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 1)
+
+		// --- When ---
+		err, have := recvDone(done)
+
+		// --- Then ---
+		assert.False(t, have)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ready result", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 2)
+		done <- nil
+		close(done)
+
+		// --- When ---
+		err, have := recvDone(done)
+
+		// --- Then ---
+		assert.True(t, have)
+		assert.NoError(t, err)
+	})
+
+	t.Run("ready error", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 2)
+
+		want := errors.New("target failed")
+		done <- want
+
+		close(done)
+
+		// --- When ---
+		have, hOk := recvDone(done)
+
+		// --- Then ---
+		assert.True(t, hOk)
+		assert.ErrorIs(t, want, have)
 	})
 }
 
@@ -615,8 +789,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
 
+		neg := -1
+
 		// --- When ---
-		have := HelpTargets(tgs, -1)
+		have := HelpTargets(tgs, neg)
 
 		// --- Then ---
 		assert.Equal(t, "tgt-a    syn tgt-a\n", have)
@@ -626,8 +802,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
 
+		n := 0
+
 		// --- When ---
-		have := HelpTargets(tgs, 0)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "" +
@@ -639,8 +817,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA(), TgtB(), TgtC()}
 
+		n := 0
+
 		// --- When ---
-		have := HelpTargets(tgs, 0)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "" +
@@ -654,8 +834,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		var tgs []*Target
 
+		n := 0
+
 		// --- When ---
-		have := HelpTargets(tgs, 0)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "no targets\n"
@@ -666,8 +848,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB(), TgtC()}
 
+		n := 0
+
 		// --- When ---
-		have := HelpTargets(tgs, 0)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "" +
@@ -683,8 +867,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtHidden(), TgtA(), TgtB()}
 
+		n := 0
+
 		// --- When ---
-		have := HelpTargets(tgs, 0)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "" +
@@ -699,8 +885,10 @@ func Test_HelpTargets(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB(), TgtC()}
 
+		n := 2
+
 		// --- When ---
-		have := HelpTargets(tgs, 2)
+		have := HelpTargets(tgs, n)
 
 		// --- Then ---
 		want := "" +
@@ -715,14 +903,19 @@ func Test_HelpTargets(t *testing.T) {
 	t.Run("does not reorder the caller's slice", func(t *testing.T) {
 		// --- Given ---
 		a, b, c := TgtC(), TgtA(), TgtB()
+
 		tgs := []*Target{a, b, c}
 
+		n := 0
+
 		// --- When ---
-		_ = HelpTargets(tgs, 0)
+		_ = HelpTargets(tgs, n)
 
 		// --- Then ---
 		assert.Same(t, a, tgs[0])
+
 		assert.Same(t, b, tgs[1])
+
 		assert.Same(t, c, tgs[2])
 	})
 }
@@ -731,11 +924,15 @@ func Test_HelpUsage(t *testing.T) {
 	t.Run("print target help", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
+
 		argsOF := WithMakefileArgs("-h", "tgt-a")
+
 		cmf := must.Value(NewMakefile(tgs, argsOF))
 
+		args := cmf.rng.Args()
+
 		// --- When ---
-		have, err := HelpUsage(MakefileBin, cmf.rng.Args(), cmf.fs, tgs)
+		have, err := HelpUsage(MakefileBin, args, cmf.fs, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -745,11 +942,17 @@ func Test_HelpUsage(t *testing.T) {
 	t.Run("print general help", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
+
 		argsOF := WithMakefileArgs("-h")
+
 		cmf := must.Value(NewMakefile(tgs, argsOF))
 
+		text := "my-bin"
+
+		args := cmf.rng.Args()
+
 		// --- When ---
-		have, err := HelpUsage("my-bin", cmf.rng.Args(), cmf.fs, tgs)
+		have, err := HelpUsage(text, args, cmf.fs, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -759,11 +962,15 @@ func Test_HelpUsage(t *testing.T) {
 	t.Run("error - help for not existing target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
+
 		argsOF := WithMakefileArgs("-h", "unknown")
+
 		cmf := must.Value(NewMakefile(tgs, argsOF))
 
+		args := cmf.rng.Args()
+
 		// --- When ---
-		have, err := HelpUsage(MakefileBin, cmf.rng.Args(), cmf.fs, tgs)
+		have, err := HelpUsage(MakefileBin, args, cmf.fs, tgs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
@@ -775,7 +982,9 @@ func Test_HelpCommand(t *testing.T) {
 	t.Run("usage", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
+
 		argsOF := WithMakefileArgs("--list")
+
 		cmf := must.Value(NewMakefile(tgs, argsOF))
 
 		// --- When ---
@@ -805,6 +1014,7 @@ targets:
 	t.Run("no targets", func(t *testing.T) {
 		// --- Given ---
 		argsOF := WithMakefileArgs("--list")
+
 		cmf := must.Value(NewMakefile(nil, argsOF))
 
 		// --- When ---

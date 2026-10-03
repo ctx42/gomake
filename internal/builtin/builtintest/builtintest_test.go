@@ -4,7 +4,6 @@
 package builtintest
 
 import (
-	"context"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -37,7 +36,6 @@ func Test_NewTstProvider(t *testing.T) {
 	// --- Then ---
 	assert.Len(t, 1, have.PreRuns())
 	assert.Same(t, pre[0], have.PreRuns()[0])
-
 	// PreRuns returns a clone so a caller cannot replace a hook.
 	pr := have.PreRuns()
 	pr[0] = nil
@@ -63,34 +61,35 @@ func Test_TestTargetsSrc(t *testing.T) {
 }
 
 func Test_TestPreRun(t *testing.T) {
-	t.Run("first call sets counter and env", func(t *testing.T) {
+	t.Run("first call", func(t *testing.T) {
 		// --- Given ---
-		ctx := context.Background()
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		// --- When ---
-		haveCtx, haveRng, err := TestPreRun(ctx, rng)
+		hCtx, hRng, err := TestPreRun(ctx, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Same(t, rng, haveRng)
-
-		assert.Equal(t, "a", haveRng.EnvGet(preRunKey.String()))
-		assert.Equal(t, 1, haveCtx.Value(preRunKey))
+		assert.Same(t, rng, hRng)
+		assert.Equal(t, "a", hRng.EnvGet(preRunKey.String()))
+		assert.Equal(t, 1, hCtx.Value(preRunKey))
 	})
 
 	t.Run("second call increments counter and appends env", func(t *testing.T) {
 		// --- Given ---
-		ctx := context.Background()
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		// --- When ---
 		ctx, rng, _ = TestPreRun(ctx, rng)
-		haveCtx, haveRng, err := TestPreRun(ctx, rng)
+		hCtx, hRng, err := TestPreRun(ctx, rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "aa", haveRng.EnvGet(preRunKey.String()))
-		assert.Equal(t, 2, haveCtx.Value(preRunKey))
+		assert.Equal(t, "aa", hRng.EnvGet(preRunKey.String()))
+		assert.Equal(t, 2, hCtx.Value(preRunKey))
 	})
 }
