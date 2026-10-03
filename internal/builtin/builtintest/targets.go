@@ -21,7 +21,7 @@ func targetsBuiltIn() []*mkf.Target {
 
 	tgt = &mkf.Target{
 		ImpSpec:     "github.com/ctx42/gomake/testdata/imports/pkg2",
-		ImpPath:     "/home/thor/ws/ctx42/gomake/testdata/imports/pkg2",
+		ImpPath:     "testdata/imports/pkg2",
 		PkgName:     "pkg2",
 		PkgNS:       "",
 		Breadcrumbs: nil,
@@ -43,7 +43,7 @@ func targetsBuiltIn() []*mkf.Target {
 
 	tgt = &mkf.Target{
 		ImpSpec:     "github.com/ctx42/gomake/testdata/imports/pkg2",
-		ImpPath:     "/home/thor/ws/ctx42/gomake/testdata/imports/pkg2",
+		ImpPath:     "testdata/imports/pkg2",
 		PkgName:     "pkg2",
 		PkgNS:       "",
 		Breadcrumbs: nil,

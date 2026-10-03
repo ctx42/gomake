@@ -5,12 +5,15 @@ package clitest
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/exekit"
+	"github.com/ctx42/testkit/pkg/oskit"
 	"github.com/ctx42/testkit/pkg/randkit"
 )
 
@@ -24,6 +27,14 @@ func Test_TestEnv(t *testing.T) {
 	have := TestEnv(tspy)
 
 	// --- Then ---
+	xdg := ""
+	for _, kv := range have {
+		if val, ok := strings.CutPrefix(kv, "XDG_CONFIG_HOME="); ok {
+			xdg = val
+		}
+	}
+	assert.Len(t, 0, oskit.List(t, xdg))
+
 	tspy.AssertExpectations()
 
 	assert.Has(t, "GOCACHE="+goCache(t), have)
@@ -104,6 +115,30 @@ func Test_goCache(t *testing.T) {
 		tspy.AssertExpectations()
 		assert.Equal(t, want, have)
 	})
+
+	t.Run("error - stderr", func(t *testing.T) {
+		// --- Given ---
+		bin := t.TempDir()
+		script := filepath.Join(bin, "go")
+		body := "" +
+			"#!/bin/sh\n" +
+			"echo noisy >&2\n" +
+			"echo /cache\n"
+		must.Nil(os.WriteFile(script, []byte(body), 0o755))
+		path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
+		t.Setenv("PATH", path)
+
+		tspy := tester.New(t)
+		tspy.ExpectFatal()
+		tspy.ExpectLogContain("noisy")
+		tspy.Close()
+
+		// --- When ---
+		assert.Panic(t, func() { goCache(tspy) })
+
+		// --- Then ---
+		tspy.AssertExpectations()
+	})
 }
 
 func Test_findMakefiles(t *testing.T) {
@@ -153,6 +188,23 @@ func Test_JoinImpSpec(t *testing.T) {
 }
 
 func Test_rowColValue(t *testing.T) {
+	t.Run("error - empty header", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectError()
+		tspy.ExpectLogEqual("expected header to be non-empty")
+		tspy.Close()
+
+		header := ""
+		text := "header col1 col2"
+
+		// --- When ---
+		have := rowColValue(tspy, header, 1, text)
+
+		// --- Then ---
+		assert.Equal(t, "", have)
+	})
+
 	t.Run("error - column not positive", func(t *testing.T) {
 		tspy := tester.New(t)
 		tspy.ExpectError()

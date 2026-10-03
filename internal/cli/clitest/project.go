@@ -74,11 +74,20 @@ func (prj *Project) MakefilesFrom(src string) []string {
 		switch {
 		case bytes.HasPrefix(filData, tagLine):
 			filData = bytes.TrimLeft(filData[len(tagLine):], "\n")
+
 		default:
-			block := append([]byte{'\n'}, append(tagLine, '\n')...)
-			if i := bytes.Index(filData, block); i >= 0 {
-				filData = append(filData[:i+1], filData[i+len(block):]...)
+			// Drop the tag line. A following blank line is kept as one
+			// newline so the result matches a tag that already had one.
+			line := append([]byte{'\n'}, tagLine...)
+			i := bytes.Index(filData, line)
+			if i < 0 {
+				break
 			}
+			rest := filData[i+len(line):]
+			if len(rest) > 0 && rest[0] == '\n' {
+				rest = rest[1:]
+			}
+			filData = append(filData[:i+1], rest...)
 		}
 		dstPth := filepath.Join(prj.Root(), filepath.Base(srcPth))
 		if err = os.WriteFile(dstPth, filData, 0600); err != nil {

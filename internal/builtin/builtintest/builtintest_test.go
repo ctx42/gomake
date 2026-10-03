@@ -37,10 +37,11 @@ func Test_NewTstProvider(t *testing.T) {
 	// --- Then ---
 	assert.Len(t, 1, have.PreRuns())
 	assert.Same(t, pre[0], have.PreRuns()[0])
-	// PreRuns returns a clone so callers cannot mutate the provider.
+
+	// PreRuns returns a clone so a caller cannot replace a hook.
 	pr := have.PreRuns()
-	_ = append(pr, TestPreRun)
-	assert.Len(t, 1, have.PreRuns())
+	pr[0] = nil
+	assert.Same(t, TestPreRun, have.PreRuns()[0])
 }
 
 func Test_TestTargets(t *testing.T) {

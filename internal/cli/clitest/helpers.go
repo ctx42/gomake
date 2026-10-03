@@ -63,18 +63,24 @@ func fromEnv(key string, env []string) []string {
 }
 
 // goCache returns path to go cache. Uses "go env" with os.Environ.
+// Stdout is the path. A non-empty stderr fails the test so a warning
+// cannot become part of the path.
 func goCache(t tester.T) string {
 	t.Helper()
-	out := &bytes.Buffer{}
-	c := exec.Command("go", "env", "GOCACHE")
-	c.Env = os.Environ()
-	c.Stdout = out
-	c.Stderr = out
-	if err := c.Run(); err != nil {
+	var stdout, stderr bytes.Buffer
+	cmd := exec.Command("go", "env", "GOCACHE")
+	cmd.Env = os.Environ()
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
 		t.Fatal(err)
 		return ""
 	}
-	return strings.TrimSpace(out.String())
+	if stderr.Len() > 0 {
+		t.Fatal(stderr.String())
+		return ""
+	}
+	return strings.TrimSpace(stdout.String())
 }
 
 // findMakefiles returns the base names of "makefile*.go" files in dir only
@@ -125,6 +131,10 @@ func JoinImpSpec(t tester.T, base string, elem ...string) string {
 func rowColValue(t tester.T, header string, column int, text string) string {
 	t.Helper()
 
+	if header == "" {
+		t.Error("expected header to be non-empty")
+		return ""
+	}
 	if column < 1 {
 		t.Errorf("expected column to be positive, got: %d", column)
 		return ""
