@@ -40,6 +40,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return _vpkg9NS0.Hello(ctx, rng)
 		},
@@ -63,6 +64,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return _vpkg9NS1.Hello(ctx, rng)
 		},
@@ -86,6 +88,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return _vpkg9NS2.HelloHello(ctx, rng)
 		},
@@ -108,6 +111,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return Imported(ctx, rng)
 		},
@@ -130,6 +134,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return Local(ctx, rng)
 		},
@@ -152,6 +157,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg2.PanicString(ctx, rng)
 		},
@@ -174,6 +180,7 @@ func targetsUser() []*Target {
 		Synopsis:    "is a test target with help message",
 		Doc:         "is a test target with help message.",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg2.Print(ctx, rng)
 		},
@@ -196,6 +203,7 @@ func targetsUser() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg1.Pkg1(ctx, rng)
 		},
@@ -218,6 +226,7 @@ func targetsUser() []*Target {
 		Synopsis:    "is an example target",
 		Doc:         "is an example target. It prints its name along with the package name it belongs to. This sentence is only to have the documentation bit longer.",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg0.Pkg0(ctx, rng)
 		},

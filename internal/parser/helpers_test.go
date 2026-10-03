@@ -26,6 +26,8 @@ import (
 func Test_GenMakefileUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/showcase_imports/project"
@@ -41,7 +43,7 @@ func Test_GenMakefileUser(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(rng, root)
+		hCode, hTgs, err := genMakefileUser(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -70,6 +72,8 @@ func Test_GenMakefileUser(t *testing.T) {
 
 	t.Run("error - duplicated targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/dup_imported/project"
@@ -85,7 +89,7 @@ func Test_GenMakefileUser(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(rng, root)
+		hCode, hTgs, err := genMakefileUser(ctx, rng, root)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -97,6 +101,8 @@ func Test_GenMakefileUser(t *testing.T) {
 func Test_GenMakefileUserAndSave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/no_targets/project"
@@ -113,7 +119,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(rng, root, dst)
+		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -129,6 +135,8 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 	t.Run("error - generating code", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/dup_imported/project"
@@ -147,7 +155,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(rng, root, dst)
+		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -156,6 +164,8 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 	t.Run("error writing file", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/no_targets/project"
@@ -174,7 +184,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(rng, root, dst)
+		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
 
 		// --- Then ---
 		var e *os.PathError
@@ -235,10 +245,10 @@ func Test_toOneLine_tabular(t *testing.T) {
 func Test_removeNoLintComments_tabular(t *testing.T) {
 	t.Run("doc string with nolint", func(t *testing.T) {
 		// --- Given ---
-		doc := "abc\ndef\nnolint:xxx\nghi"
+		text := "abc\ndef\nnolint:xxx\nghi"
 
 		// --- When ---
-		have := removeNoLintComments(doc)
+		have := removeNoLintComments(text)
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", have)
@@ -246,10 +256,10 @@ func Test_removeNoLintComments_tabular(t *testing.T) {
 
 	t.Run("doc string without nolint", func(t *testing.T) {
 		// --- Given ---
-		doc := "abc\ndef\nghi"
+		text := "abc\ndef\nghi"
 
 		// --- When ---
-		have := removeNoLintComments(doc)
+		have := removeNoLintComments(text)
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", have)
@@ -259,10 +269,10 @@ func Test_removeNoLintComments_tabular(t *testing.T) {
 func Test_isHidden(t *testing.T) {
 	t.Run("hidden target", func(t *testing.T) {
 		// --- Given ---
-		doc := "abc\n\ngomake:hidden\ndef"
+		text := "abc\n\ngomake:hidden\ndef"
 
 		// --- When ---
-		hDoc, hHidden := isHidden(doc)
+		hDoc, hHidden := isHidden(text)
 
 		// --- Then ---
 		assert.Equal(t, "abc\n\ndef", hDoc)
@@ -271,10 +281,10 @@ func Test_isHidden(t *testing.T) {
 
 	t.Run("not hidden target", func(t *testing.T) {
 		// --- Given ---
-		doc := "abc\ndef\nghi"
+		text := "abc\ndef\nghi"
 
 		// --- When ---
-		hDoc, hHidden := isHidden(doc)
+		hDoc, hHidden := isHidden(text)
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", hDoc)
@@ -842,6 +852,8 @@ func Test_unquote_tabular(t *testing.T) {
 func Test_gmImpPackages(t *testing.T) {
 	t.Run("imports", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
@@ -859,7 +871,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(rng, blank, astFil.Decls...)
+		have, err := gmImpPackages(ctx, rng, blank, astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -943,6 +955,8 @@ func Test_gmImpPackages(t *testing.T) {
 
 	t.Run("imports GOOS windows", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
@@ -961,7 +975,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(rng, blank, astFil.Decls...)
+		have, err := gmImpPackages(ctx, rng, blank, astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1199,8 +1213,7 @@ func Test_codeRef_tabular(t *testing.T) {
 func Test_qIdent(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		// --- Given ---
-		var expr ast.Expr
-		expr = &ast.Ident{
+		expr := &ast.Ident{
 			NamePos: 0,
 			Name:    "string",
 			Obj:     nil,
@@ -1215,8 +1228,7 @@ func Test_qIdent(t *testing.T) {
 
 	t.Run("string array", func(t *testing.T) {
 		// --- Given ---
-		var expr ast.Expr
-		expr = &ast.ArrayType{
+		expr := &ast.ArrayType{
 			Elt: &ast.Ident{
 				NamePos: 0,
 				Name:    "string",
@@ -1233,8 +1245,7 @@ func Test_qIdent(t *testing.T) {
 
 	t.Run("time.Duration", func(t *testing.T) {
 		// --- Given ---
-		var expr ast.Expr
-		expr = &ast.SelectorExpr{
+		expr := &ast.SelectorExpr{
 			X:   ast.NewIdent("time"),
 			Sel: ast.NewIdent("Duration"),
 		}
@@ -1248,8 +1259,7 @@ func Test_qIdent(t *testing.T) {
 
 	t.Run("unknown", func(t *testing.T) {
 		// --- Given ---
-		var expr ast.Expr
-		expr = &ast.SelectorExpr{
+		expr := &ast.SelectorExpr{
 			X: &ast.SelectorExpr{
 				X:   ast.NewIdent("a"),
 				Sel: ast.NewIdent("b"),

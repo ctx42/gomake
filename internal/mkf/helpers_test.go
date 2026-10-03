@@ -440,11 +440,19 @@ func Test_runTarget(t *testing.T) {
 		}()
 
 		// --- Then ---
-		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			started,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		sig <- syscall.SIGINT
 
-		check.Wait("1s", exited, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			exited,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		<-have // Goroutine exited.
 
@@ -482,7 +490,11 @@ func Test_runTarget(t *testing.T) {
 		}()
 
 		// --- Then ---
-		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			started,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		sig <- syscall.SIGTERM
 
@@ -525,7 +537,11 @@ func Test_runTarget(t *testing.T) {
 		// goroutine's send did not block forever (no leak) and that Execute's
 		// cwd contract holds on the timeout path.
 		restored := func() bool { return must.Value(os.Getwd()) == wd }
-		check.Wait("1s", restored, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			restored,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		assert.Equal(t, wd, must.Value(os.Getwd()))
 
@@ -561,7 +577,11 @@ func Test_runTarget(t *testing.T) {
 		}()
 
 		// --- Then ---
-		check.Wait("1s", started, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			started,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		sig <- syscall.SIGINT
 
@@ -574,7 +594,11 @@ func Test_runTarget(t *testing.T) {
 		// deferred os.Chdir restores the working directory only after the send
 		// completes. Polling for it proves the goroutine did not leak.
 		restored := func() bool { return must.Value(os.Getwd()) == wd }
-		check.Wait("1s", restored, check.WithWaitThrottle(10*time.Millisecond))
+		must.Nil(check.Wait(
+			"1s",
+			restored,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 
 		assert.Equal(t, wd, must.Value(os.Getwd()))
 	})

@@ -19,6 +19,7 @@ tgt = &Target{
 	Synopsis:    "",
 	Doc:         "",
 	Hidden:      false,
+	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return _vmainNS0.Hello(ctx, rng)
 	},

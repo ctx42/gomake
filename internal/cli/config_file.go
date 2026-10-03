@@ -6,6 +6,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -136,7 +137,7 @@ func projectConfigPath(srcDir string) string {
 // YAML, an unknown gomake-owned key, or an unsupported schema version is
 // reported as an error.
 func loadConfigFile(pth string) (*fileConfig, error) {
-	data, err := os.ReadFile(pth)
+	data, err := os.ReadFile(pth) //nolint:gosec
 	if errors.Is(err, os.ErrNotExist) {
 		return &fileConfig{}, nil
 	}
@@ -204,14 +205,13 @@ func localImportPath(srcDir string) (string, error) {
 		return "", err
 	}
 	root, err := gomake.Root(srcDir)
-	if err != nil {
-		return modPath, nil
+	if err == nil {
+		rel, relErr := filepath.Rel(root, srcDir)
+		if relErr == nil && rel != "." && rel != "" {
+			return modPath + "/" + filepath.ToSlash(rel), nil
+		}
 	}
-	rel, err := filepath.Rel(root, srcDir)
-	if err != nil || rel == "." || rel == "" {
-		return modPath, nil
-	}
-	return modPath + "/" + filepath.ToSlash(rel), nil
+	return modPath, nil
 }
 
 // moduleImportPath returns the module path declared in the go.mod file found
@@ -226,7 +226,7 @@ func moduleImportPath(dir string) (string, error) {
 		}
 		return "", err
 	}
-	data, err := os.ReadFile(modFile)
+	data, err := os.ReadFile(modFile) //nolint:gosec
 	if err != nil {
 		return "", fmt.Errorf("read module path: %w", err)
 	}
@@ -528,12 +528,13 @@ func invokedTarget(cfg *config, tgs *parser.Targets) *mkf.Target {
 // targets, reloads the user-level and project-level gomake.yaml files, and
 // returns the report from checkConfigReport.
 func runCheckConfig(
+	ctx context.Context,
 	rng *ring.Ring,
 	cfg *config,
 	stock []*mkf.Target,
 ) (string, error) {
 
-	tgts, err := allTargets(rng, cfg, stock)
+	tgts, err := allTargets(ctx, rng, cfg, stock)
 	if err != nil {
 		return "", err
 	}

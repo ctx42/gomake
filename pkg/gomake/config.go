@@ -201,9 +201,9 @@ func GetCfg[T any](cfg *Config, path string) (T, error) {
 		// the JSON round-trip below, which decodes it into the int64 nanosecond
 		// count a Duration holds (the form encoding/json marshals it to).
 		if text, ok := raw.(string); ok {
-			val, err := time.ParseDuration(text)
-			if err != nil {
-				return out, fmt.Errorf("%w: %q: %w", ErrType, path, err)
+			val, perr := time.ParseDuration(text)
+			if perr != nil {
+				return out, fmt.Errorf("%w: %q: %w", ErrType, path, perr)
 			}
 			*dur = val
 			return out, nil

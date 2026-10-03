@@ -39,17 +39,14 @@ func NewTstProvider(pre ...mkf.PreRunFn) *TstProvider {
 	return &TstProvider{pre: slices.Clone(pre)}
 }
 
-// implements [builtin.Provider].
 func (tst *TstProvider) Targets() []*mkf.Target {
 	return targetsBuiltIn()
 }
 
-// implements [builtin.Provider].
 func (tst *TstProvider) Source() []byte {
 	return slices.Clone(tgsMainSrc)
 }
 
-// implements [builtin.Provider].
 func (tst *TstProvider) PreRuns() []mkf.PreRunFn {
 	return slices.Clone(tst.pre)
 }

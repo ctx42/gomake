@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +34,14 @@ import (
 //
 // It returns an error if GOBIN is empty and GOPATH is empty or unset.
 func GoBinPath(env ring.Environ) (string, error) {
-	cmd := exec.Command("go", "env", "-json", "GOBIN", "GOPATH")
+	cmd := exec.CommandContext(
+		context.Background(),
+		"go",
+		"env",
+		"-json",
+		"GOBIN",
+		"GOPATH",
+	)
 	cmd.Env = env.EnvAll()
 	out, err := cmd.Output()
 	if err != nil {

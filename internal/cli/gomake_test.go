@@ -62,10 +62,10 @@ func Test_newGoMake(t *testing.T) {
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		context := t.Context()
+		ctx := t.Context()
 
 		// --- When ---
-		have, err := newGoMake(context, rng, cfg)
+		have, err := newGoMake(ctx, rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -109,10 +109,10 @@ func Test_newGoMake(t *testing.T) {
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		context := t.Context()
+		ctx := t.Context()
 
 		// --- When ---
-		have, err := newGoMake(context, rng, cfg)
+		have, err := newGoMake(ctx, rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -142,10 +142,10 @@ func Test_newGoMake(t *testing.T) {
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		context := t.Context()
+		ctx := t.Context()
 
 		// --- When ---
-		have, err := newGoMake(context, rng, cfg)
+		have, err := newGoMake(ctx, rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrDupTarget, err)
@@ -175,10 +175,10 @@ func Test_newGoMake(t *testing.T) {
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		context := t.Context()
+		ctx := t.Context()
 
 		// --- When ---
-		have, err := newGoMake(context, rng, cfg)
+		have, err := newGoMake(ctx, rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrDupTarget, err)
@@ -212,10 +212,10 @@ func Test_newGoMake(t *testing.T) {
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		context := t.Context()
+		ctx := t.Context()
 
 		// --- When ---
-		have, err := newGoMake(context, rng, cfg)
+		have, err := newGoMake(ctx, rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -256,10 +256,10 @@ func Test_newGoMake(t *testing.T) {
 			cfg := must.Value(newConfig("1.2.3", rng))
 			rng = rng.SetArgs(cfg.args)
 
-			context := t.Context()
+			ctx := t.Context()
 
 			// --- When ---
-			have, err := newGoMake(context, rng, cfg)
+			have, err := newGoMake(ctx, rng, cfg)
 
 			// --- Then ---
 			assert.NoError(t, err)

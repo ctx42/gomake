@@ -317,7 +317,7 @@ func prepare(
 
 	// Get package with user-defined targets.
 	var pkg *parser.Package
-	if pkg, err = parser.NewPackage(rng, src); err != nil {
+	if pkg, err = parser.NewPackage(ctx, rng, src); err != nil {
 		return nil, err
 	}
 
@@ -347,7 +347,7 @@ func prepare(
 	for _, srcPth := range mkfFiles {
 		var filData []byte
 		srcPth = filepath.Join(src, srcPth)
-		if filData, err = os.ReadFile(srcPth); err != nil {
+		if filData, err = os.ReadFile(srcPth); err != nil { //nolint:gosec
 			return nil, err
 		}
 		filData = stripBuildTag(filData, tagLine)
@@ -373,7 +373,7 @@ func prepare(
 		return nil, err
 	}
 	goModDst := filepath.Join(buildDir, "go.mod")
-	if err = os.WriteFile(goModDst, content, 0600); err != nil {
+	if err = os.WriteFile(goModDst, content, 0600); err != nil { //nolint:gosec
 		return nil, err
 	}
 
@@ -384,11 +384,15 @@ func prepare(
 		return nil, err
 	}
 	if goWorkSrc != "" {
-		if content, err = os.ReadFile(goWorkSrc); err != nil {
+		if content, err = os.ReadFile(goWorkSrc); err != nil { //nolint:gosec
 			return nil, err
 		}
 		goWorkDst := filepath.Join(buildDir, "go.work")
-		if err = os.WriteFile(goWorkDst, content, 0600); err != nil {
+		if err = os.WriteFile( //nolint:gosec
+			goWorkDst,
+			content,
+			0600,
+		); err != nil {
 			return nil, err
 		}
 		if err = editGoWork(
@@ -400,11 +404,17 @@ func prepare(
 		// Sibling sum next to the discovered go.work, when present.
 		goWorkSumSrc := goWorkSrc + ".sum"
 		if gomake.FileExists(goWorkSumSrc) {
-			if content, err = os.ReadFile(goWorkSumSrc); err != nil {
+			if content, err = os.ReadFile( //nolint:gosec
+				goWorkSumSrc,
+			); err != nil {
 				return nil, err
 			}
 			sumDst := filepath.Join(buildDir, "go.work.sum")
-			if err = os.WriteFile(sumDst, content, 0600); err != nil {
+			if err = os.WriteFile( //nolint:gosec
+				sumDst,
+				content,
+				0600,
+			); err != nil {
 				return nil, err
 			}
 		}
@@ -413,13 +423,17 @@ func prepare(
 	// Copy "go.sum" file before editing go.mod: editGoMod records the xflag
 	// checksum by appending to this file, so it must exist first.
 	goSum := filepath.Join(filepath.Dir(mod.ModPath), "go.sum")
-	if content, err = os.ReadFile(goSum); err != nil {
+	if content, err = os.ReadFile(goSum); err != nil { //nolint:gosec
 		if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
 	} else {
 		goSumDst := filepath.Join(buildDir, "go.sum")
-		if err = os.WriteFile(goSumDst, content, 0600); err != nil {
+		if err = os.WriteFile( //nolint:gosec
+			goSumDst,
+			content,
+			0600,
+		); err != nil {
 			return nil, err
 		}
 	}
@@ -548,6 +562,8 @@ func findGoWorkValue(gowork, modRoot string) (string, error) {
 // "." so the build directory remains the workspace's main module; other
 // relative paths become absolute. GOWORK is pinned per command so ambient
 // GOWORK never mutates the caller's workfile.
+//
+//nolint:cyclop,gocognit
 func editGoWork(
 	ctx context.Context,
 	env ring.Environ,
@@ -975,6 +991,7 @@ func goFiles(rng *ring.Ring, impPath string) ([]string, error) {
 // For listing and help, targets are parsed directly from source without
 // creating a build directory.
 func allTargets(
+	ctx context.Context,
 	rng *ring.Ring,
 	cfg *config,
 	stock []*mkf.Target,
@@ -985,49 +1002,51 @@ func allTargets(
 		return combined, nil
 	}
 
-	// Inexpensive pre-checks before invoking go list.
-	if _, err := gomake.Root(cfg.src); err != nil {
-		return combined, nil
-	}
-	if _, err := os.Stat(filepath.Join(cfg.src, mkf.MakefileMain)); err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return combined, nil
+	// Inexpensive pre-checks before invoking go list. A missing module
+	// root leaves the built-in targets unchanged.
+	if _, rootErr := gomake.Root(cfg.src); rootErr == nil {
+		statPath := filepath.Join(cfg.src, mkf.MakefileMain)
+		if _, err := os.Stat(statPath); err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				return combined, nil
+			}
+			return nil, fmt.Errorf("stat %s: %w", mkf.MakefileMain, err)
 		}
-		return nil, fmt.Errorf("stat %s: %w", mkf.MakefileMain, err)
-	}
 
-	// Parse targets directly from source — no build dir, no `go mod` edit.
-	// Restrict package files to valid makefile names so list/help match
-	// what prepare compiles.
-	parser.SetBuildTag(rng)
-	var err error
-	var pmf *parser.Makefile
-	analyzeAct := func() error {
-		var pkg *parser.Package
-		pkg, err = parser.NewPackage(rng, cfg.src)
-		if err != nil {
+		// Parse targets directly from source — no build dir, no `go mod` edit.
+		// Restrict package files to valid makefile names so list/help match
+		// what prepare compiles.
+		parser.SetBuildTag(rng)
+		var err error
+		var pmf *parser.Makefile
+		analyzeAct := func() error {
+			var pkg *parser.Package
+			pkg, err = parser.NewPackage(ctx, rng, cfg.src)
+			if err != nil {
+				return err
+			}
+			keep, _ := selectMakefiles(pkg.Files)
+			pkg.Files = keep
+			pmf, err = parser.MakefileFromPackage(ctx, rng, pkg)
 			return err
 		}
-		keep, _ := selectMakefiles(pkg.Files)
-		pkg.Files = keep
-		pmf, err = parser.MakefileFromPackage(rng, pkg)
-		return err
-	}
-	err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)
-	if err != nil {
-		if errors.Is(err, parser.ErrAstEmpty) {
-			return combined, nil
+		err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)
+		if err != nil {
+			if errors.Is(err, parser.ErrAstEmpty) {
+				return combined, nil
+			}
+			return nil, err
 		}
-		return nil, err
-	}
 
-	return append(combined, pmf.Targets.List()...), nil
+		return append(combined, pmf.Targets.List()...), nil
+	}
+	return combined, nil
 }
 
 // fileContainsStr reports whether the file at the path contains substr.
 // Returns false (not true) when the file does not exist.
 func fileContainsStr(path, substr string) (bool, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return false, err
 	}

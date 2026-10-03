@@ -27,7 +27,7 @@ func listCacheDir() (string, error) {
 		return "", err
 	}
 	dir := filepath.Join(base, "gomake", "list")
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0o750); err != nil {
 		return "", err
 	}
 	return dir, nil
@@ -39,6 +39,8 @@ func listCacheDir() (string, error) {
 // change invalidates the key. It reports false when the project module
 // cannot be located, or when go.mod or an existing go.sum cannot be read.
 // A missing go.sum is ignored. A false result must not be cached.
+//
+//nolint:cyclop,gocognit
 func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	root, err := gomake.Root(dir)
 	if err != nil {
@@ -47,7 +49,7 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 
 	h := sha256.New()
 	for _, name := range []string{"go.mod", "go.sum"} {
-		data, rErr := os.ReadFile(filepath.Join(root, name))
+		data, rErr := os.ReadFile(filepath.Join(root, name)) //nolint:gosec
 		if rErr != nil {
 			if errors.Is(rErr, fs.ErrNotExist) && name == "go.sum" {
 				continue
@@ -135,7 +137,7 @@ func loadListCache(key string) ([]byte, bool) {
 	if err != nil {
 		return nil, false
 	}
-	data, err := os.ReadFile(filepath.Join(dir, key))
+	data, err := os.ReadFile(filepath.Join(dir, key)) //nolint:gosec
 	if err != nil {
 		return nil, false
 	}

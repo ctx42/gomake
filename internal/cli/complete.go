@@ -44,10 +44,10 @@ func setupBashCompletion(home string) (string, error) {
 	rcPath := filepath.Join(home, ".bashrc")
 
 	// Always write the latest script.
-	if err := os.MkdirAll(filepath.Dir(scriptPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0o750); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(scriptPath, bashCompleteScript, 0644); err != nil {
+	if err := os.WriteFile(scriptPath, bashCompleteScript, 0o600); err != nil {
 		return "", err
 	}
 
@@ -66,7 +66,11 @@ func setupBashCompletion(home string) (string, error) {
 	}
 
 	// Add source line to ~/.bashrc.
-	f, err := os.OpenFile(rcPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile( //nolint:gosec
+		rcPath,
+		os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+		0644,
+	)
 	if err != nil {
 		return "", err
 	}

@@ -10,6 +10,7 @@
 package install
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,7 +29,7 @@ const gomakeBinName = "gomake" // Installed binary name.
 // created, and a path component that is a file surfaces a clear error. The env
 // supplies the build subprocess environment.
 func build(env ring.Environ, src, dst, ldflags string) error {
-	if err := os.MkdirAll(dst, 0o755); err != nil {
+	if err := os.MkdirAll(dst, 0o750); err != nil {
 		return fmt.Errorf("create %q: %w", dst, err)
 	}
 	name := gomakeBinName
@@ -51,7 +52,7 @@ func buildMain(env ring.Environ, dir, out, mainPkg, ldflags string) error {
 		args = append(args, "-ldflags", ldflags)
 	}
 	args = append(args, mainPkg)
-	cmd := exec.Command("go", args...)
+	cmd := exec.CommandContext(context.Background(), "go", args...)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	outBytes, err := cmd.CombinedOutput()

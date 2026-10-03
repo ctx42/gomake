@@ -87,7 +87,7 @@ func newGoMake(
 		Files:   gmk.cu.MkfNames,
 	}
 	var pmf *parser.Makefile
-	if pmf, err = parser.MakefileFromPackage(rng, buildPkg); err != nil {
+	if pmf, err = parser.MakefileFromPackage(ctx, rng, buildPkg); err != nil {
 		return nil, err
 	}
 	gen := parser.NewGenerator(pmf.Targets)

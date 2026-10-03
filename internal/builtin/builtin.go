@@ -9,6 +9,7 @@
 package builtin
 
 import (
+	"context"
 	_ "embed"
 	"fmt"
 	"go/token"
@@ -213,6 +214,7 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	// Generate every file before writing any of them, so a later failure
 	// does not replace an earlier file.
 	tgs, err := parser.TargetsFromImports(
+		context.Background(),
 		opts.rng,
 		opts.dir,
 		imports,
@@ -254,7 +256,7 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	}
 
 	// Create the destination tree; dst/data covers both dst and dst/data.
-	if err = os.MkdirAll(filepath.Join(opts.dst, "data"), 0o755); err != nil {
+	if err = os.MkdirAll(filepath.Join(opts.dst, "data"), 0o750); err != nil {
 		return fmt.Errorf("creating destination tree: %w", err)
 	}
 	return writeGenerated(files)

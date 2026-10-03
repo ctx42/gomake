@@ -5,6 +5,7 @@ package parser
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -100,11 +101,18 @@ type Package struct {
 
 // NewPackage runs "go list" to get information about a package identified by
 // either import spec or absolute path.
+//
+//nolint:cyclop,gocognit
 func NewPackage(
+	ctx context.Context,
 	rng *ring.Ring,
 	impPath string,
 	opts ...PackageOpt,
 ) (*Package, error) {
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	pkg := &Package{
 		ImpPath: impPath,
@@ -119,7 +127,7 @@ func NewPackage(
 
 	// A local absolute directory can be resolved in-process, avoiding the
 	// `go list` subprocess. Fall back to `go list` on any ambiguity.
-	if pkg.ImpSpec == "" && newLocalPackage(rng, pkg) {
+	if pkg.ImpSpec == "" && newLocalPackage(ctx, rng, pkg) {
 		return pkg, nil
 	}
 
@@ -167,7 +175,7 @@ func NewPackage(
 	}
 
 	sout, eout := &bytes.Buffer{}, &bytes.Buffer{}
-	cmd := exec.Command("go", args...)
+	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Env = rng.EnvAll()
 	cmd.Dir = pkg.ImpPath
 	cmd.Stdout, cmd.Stderr = sout, eout

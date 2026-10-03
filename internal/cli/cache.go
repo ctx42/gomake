@@ -38,7 +38,7 @@ func binaryCacheDir(rng *ring.Ring) (string, error) {
 		}
 	}
 	dir := filepath.Join(base, "gomake", "bin")
-	if err = os.MkdirAll(dir, 0755); err != nil {
+	if err = os.MkdirAll(dir, 0o750); err != nil {
 		return "", err
 	}
 	return dir, nil
@@ -55,6 +55,8 @@ func binaryCacheDir(rng *ring.Ring) (string, error) {
 // key. gowork is the raw GOWORK env value. Toolchain variables
 // (GOFLAGS, CGO_*, GOTOOLCHAIN) are read from rng, not the process
 // environment.
+//
+//nolint:cyclop,gocognit
 func binaryCacheKey(
 	rng *ring.Ring,
 	srcDir string,
@@ -68,7 +70,7 @@ func binaryCacheKey(
 	names := append([]string(nil), mkfNames...)
 	sort.Strings(names)
 	for _, name := range names {
-		data, err := os.ReadFile(filepath.Join(srcDir, name))
+		data, err := os.ReadFile(filepath.Join(srcDir, name)) //nolint:gosec
 		if err != nil {
 			return "", err
 		}
@@ -141,34 +143,18 @@ func hashExternalModuleTrees(
 	modRoot, goWorkPath string,
 ) error {
 
-	var workRels []string
-	if goWorkPath != "" {
-		// use and replace from go.work; resolve relatives against workDir.
-		workDir := filepath.Dir(goWorkPath)
-		raw := append(
-			localPathsFromGoWork(goWorkPath),
-			localPathsFromGoWorkReplace(goWorkPath)...,
-		)
-		workRels = make([]string, 0, len(raw))
-		for _, rel := range raw {
-			if filepath.IsAbs(rel) {
-				workRels = append(workRels, rel)
-				continue
-			}
-			workRels = append(workRels, filepath.Join(workDir, rel))
-		}
-	}
-	rels := append(
+	workRels := absWorkPaths(goWorkPath)
+	workRels = append(
 		workRels,
 		localPathsFromGoMod(filepath.Join(modRoot, "go.mod"))...,
 	)
-	if len(rels) == 0 {
+	if len(workRels) == 0 {
 		return nil
 	}
 
 	seen := map[string]struct{}{filepath.Clean(modRoot): {}}
 	var roots []string
-	for _, rel := range rels {
+	for _, rel := range workRels {
 		abs := rel
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(modRoot, rel)
@@ -214,10 +200,36 @@ func isSubpath(parent, child string) bool {
 	return strings.HasPrefix(child, parent+sep)
 }
 
+// absWorkPaths returns the use and replace paths from the go.work file at
+// goWorkPath, with relative paths joined to that file's directory. An empty
+// path, a missing file, or a file with no local paths yields a nil slice.
+func absWorkPaths(goWorkPath string) []string {
+	if goWorkPath == "" {
+		return nil
+	}
+	workDir := filepath.Dir(goWorkPath)
+	raw := append(
+		localPathsFromGoWork(goWorkPath),
+		localPathsFromGoWorkReplace(goWorkPath)...,
+	)
+	if len(raw) == 0 {
+		return nil
+	}
+	paths := make([]string, 0, len(raw))
+	for _, rel := range raw {
+		if filepath.IsAbs(rel) {
+			paths = append(paths, rel)
+			continue
+		}
+		paths = append(paths, filepath.Join(workDir, rel))
+	}
+	return paths
+}
+
 // localPathsFromGoWork returns relative or absolute use paths from a go.work
 // file. Missing or unreadable files yield a nil slice.
 func localPathsFromGoWork(path string) []string {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil
 	}
@@ -227,7 +239,7 @@ func localPathsFromGoWork(path string) []string {
 // localPathsFromGoWorkReplace returns local replace targets from a go.work
 // file (same grammar as go.mod replace).
 func localPathsFromGoWorkReplace(path string) []string {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil
 	}
@@ -238,7 +250,7 @@ func localPathsFromGoWorkReplace(path string) []string {
 // file (paths that start with "." or are absolute). Versioned module replaces
 // are ignored.
 func localPathsFromGoMod(path string) []string {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec
 	if err != nil {
 		return nil
 	}
@@ -410,7 +422,7 @@ func hashFile(
 	label, pth string,
 ) error {
 
-	data, err := os.ReadFile(pth)
+	data, err := os.ReadFile(pth) //nolint:gosec
 	if err != nil {
 		return err
 	}
@@ -480,7 +492,7 @@ func hashGoEmbeds(
 	goFile string,
 ) error {
 
-	data, err := os.ReadFile(goFile)
+	data, err := os.ReadFile(goFile) //nolint:gosec
 	if err != nil {
 		return err
 	}

@@ -171,7 +171,12 @@ func fetchExternalTargets(
 
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		url,
+		http.NoBody,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +203,7 @@ func fetchExternalTargets(
 // readExternalTargets reads the file at pth, parses it as targets.yaml, and
 // returns the config with Raw set to the file content.
 func readExternalTargets(pth string) (*ImportsConfig, error) {
-	data, err := os.ReadFile(pth)
+	data, err := os.ReadFile(pth) //nolint:gosec
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", pth, err)
 	}

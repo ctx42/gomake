@@ -1020,6 +1020,8 @@ func Test_invokedTarget(t *testing.T) {
 
 func Test_runCheckConfig(t *testing.T) {
 	// --- Given ---
+	ctx := t.Context()
+
 	tst := ringtest.New(t)
 
 	absPath := modkit.Path("testdata/projects/config_target/project")
@@ -1049,7 +1051,7 @@ func Test_runCheckConfig(t *testing.T) {
 	targets := builtintest.NewTstProvider().Targets()
 
 	// --- When ---
-	have, err := runCheckConfig(rng, cfg, targets)
+	have, err := runCheckConfig(ctx, rng, cfg, targets)
 
 	// --- Then ---
 	assert.NoError(t, err)

@@ -38,6 +38,7 @@ func targetsMain() []*Target {
 		Synopsis:    "is an example target",
 		Doc:         "is an example target. It prints its name along with the package name it belongs to. This sentence is only to have the documentation bit longer.",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg0.Pkg0(ctx, rng)
 		},
@@ -60,6 +61,7 @@ func targetsMain() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg1.Pkg1(ctx, rng)
 		},
@@ -82,6 +84,7 @@ func targetsMain() []*Target {
 		Synopsis:    "",
 		Doc:         "",
 		Hidden:      false,
+		//nolint:gocritic
 		Run: func(ctx context.Context, rng *ring.Ring) error {
 			return pkg7.Print(ctx, rng)
 		},

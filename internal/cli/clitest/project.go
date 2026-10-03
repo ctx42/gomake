@@ -66,7 +66,7 @@ func (prj *Project) MakefilesFrom(src string) []string {
 	for _, srcPth := range findMakefiles(prj.t, prj.mkfFrom) {
 		var filData []byte
 		srcPth = filepath.Join(prj.mkfFrom, srcPth)
-		if filData, err = os.ReadFile(srcPth); err != nil {
+		if filData, err = os.ReadFile(srcPth); err != nil { //nolint:gosec
 			prj.t.Fatal(err)
 		}
 		// Normalize CRLF so LF-only tag matching works on Windows sources.
@@ -90,7 +90,11 @@ func (prj *Project) MakefilesFrom(src string) []string {
 			filData = append(filData[:i+1], rest...)
 		}
 		dstPth := filepath.Join(prj.Root(), filepath.Base(srcPth))
-		if err = os.WriteFile(dstPth, filData, 0600); err != nil {
+		if err = os.WriteFile( //nolint:gosec
+			dstPth,
+			filData,
+			0600,
+		); err != nil {
 			prj.t.Fatal(err)
 		}
 		copied = append(copied, dstPth)

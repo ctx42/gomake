@@ -127,6 +127,8 @@ func pickTarget(tgs []*Target, args *[]string) (*Target, error) {
 }
 
 // runTarget runs function in working directory "wd" with arguments.
+//
+//nolint:cyclop,gocognit
 func runTarget(
 	ctx context.Context,
 	sig chan os.Signal,

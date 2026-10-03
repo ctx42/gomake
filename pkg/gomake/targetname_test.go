@@ -12,9 +12,9 @@ import (
 
 func Test_TargetName_tabular(t *testing.T) {
 	// A string key is required so the value matches the inlined runtime.
-	badType := context.WithValue( //nolint:staticcheck
+	badType := context.WithValue(
 		t.Context(),
-		targetNameKey,
+		targetNameKey, //nolint:staticcheck
 		42,
 	)
 

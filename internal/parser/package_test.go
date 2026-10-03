@@ -45,6 +45,8 @@ func Test_withPkgNS(t *testing.T) {
 func Test_NewPackage(t *testing.T) {
 	t.Run("by path", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
@@ -57,7 +59,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -70,6 +72,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("with namespace", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
@@ -84,7 +88,7 @@ func Test_NewPackage(t *testing.T) {
 		withPkgNS2 := withPkgNS("ns")
 
 		// --- When ---
-		have, err := NewPackage(rng, root, withPkgNS2)
+		have, err := NewPackage(ctx, rng, root, withPkgNS2)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -93,6 +97,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not tagged files no build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
@@ -107,7 +113,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -124,6 +130,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
@@ -139,7 +147,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -156,6 +164,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("tagged files no build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
@@ -170,7 +180,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -183,6 +193,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
@@ -198,7 +210,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -215,12 +227,14 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("error - not existing import path", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		pth := pathkit.AbsPath(t, "testing/not/existing")
 
 		// --- When ---
-		have, err := NewPackage(rng, pth)
+		have, err := NewPackage(ctx, rng, pth)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -229,12 +243,14 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("error - empty import path", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
 
 		// --- When ---
-		have, err := NewPackage(rng, blank)
+		have, err := NewPackage(ctx, rng, blank)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -243,6 +259,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("hyphened package name", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/imports/xx-pkg"
@@ -255,7 +273,7 @@ func Test_NewPackage(t *testing.T) {
 		root := prj.Root()
 
 		// --- When ---
-		have, err := NewPackage(rng, root)
+		have, err := NewPackage(ctx, rng, root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -268,6 +286,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("by spec with build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/imports/pkg0"
@@ -281,7 +301,7 @@ func Test_NewPackage(t *testing.T) {
 		impSpec := prj.ImpSpec()
 
 		// --- When ---
-		have, err := NewPackage(rng, impSpec, withPkgSpec)
+		have, err := NewPackage(ctx, rng, impSpec, withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -294,12 +314,14 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("import path not absolute error", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "../../testdata/imports/pkg2"
 
 		// --- When ---
-		have, err := NewPackage(rng, relPath)
+		have, err := NewPackage(ctx, rng, relPath)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -308,6 +330,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
@@ -323,7 +347,7 @@ func Test_NewPackage(t *testing.T) {
 		impSpec := prj.ImpSpec()
 
 		// --- When ---
-		have, err := NewPackage(rng, impSpec, withPkgSpec)
+		have, err := NewPackage(ctx, rng, impSpec, withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -336,6 +360,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec with namespace", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
@@ -352,6 +378,7 @@ func Test_NewPackage(t *testing.T) {
 
 		// --- When ---
 		have, err := NewPackage(
+			ctx,
 			rng,
 			impSpec,
 			withPkgSpec,
@@ -369,12 +396,14 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not existing import spec", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		imp := "example.com/not/existing"
 
 		// --- When ---
-		have, err := NewPackage(rng, imp, withPkgSpec)
+		have, err := NewPackage(ctx, rng, imp, withPkgSpec)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -383,6 +412,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("served from cache without go list", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
 		proj := modkit.Root()
@@ -397,7 +428,7 @@ func Test_NewPackage(t *testing.T) {
 		storeListCache(key, []byte(`{"Name":"cached"}`))
 
 		// --- When ---
-		have, err := NewPackage(rng, spec, withPkgSpec)
+		have, err := NewPackage(ctx, rng, spec, withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)

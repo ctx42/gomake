@@ -19,6 +19,8 @@ import (
 func Test_newLocalPackage(t *testing.T) {
 	t.Run("tagged package with build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
@@ -26,7 +28,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(rng, pkg)
+		have := newLocalPackage(ctx, rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
@@ -46,6 +48,8 @@ func Test_newLocalPackage(t *testing.T) {
 
 	t.Run("resolves an untagged package", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		dir := modkit.Path("testdata/projects/simple_untagged/project")
@@ -53,7 +57,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(rng, pkg)
+		have := newLocalPackage(ctx, rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
@@ -65,6 +69,8 @@ func Test_newLocalPackage(t *testing.T) {
 
 	t.Run("tagged file excluded without build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
@@ -72,7 +78,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(rng, pkg)
+		have := newLocalPackage(ctx, rng, pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -80,6 +86,8 @@ func Test_newLocalPackage(t *testing.T) {
 
 	t.Run("no Go files falls back", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		dir := modkit.Path("testdata/projects/empty")
@@ -87,7 +95,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(rng, pkg)
+		have := newLocalPackage(ctx, rng, pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -97,12 +105,14 @@ func Test_newLocalPackage(t *testing.T) {
 func Test_importDir(t *testing.T) {
 	t.Run("includes tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		have, err := importDir(rng, dir)
+		have, err := importDir(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -111,13 +121,15 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("cgo disabled drops cgo files", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "0")
 
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(rng, dir)
+		have, err := importDir(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -126,13 +138,15 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("cgo enabled keeps cgo files", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "1")
 
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(rng, dir)
+		have, err := importDir(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -142,12 +156,14 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("error - tagged files excluded without tag", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		_, err := importDir(rng, dir)
+		_, err := importDir(ctx, rng, dir)
 
 		// --- Then ---
 		assert.ErrorContain(t, "no buildable Go source files", err)

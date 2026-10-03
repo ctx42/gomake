@@ -18,6 +18,7 @@ tgt = &mkf.Target{
 	Synopsis:    "prints its name to stdout",
 	Doc:         "prints its name to stdout. Some more detailed documentation here. Even more detailed documentation.",
 	Hidden:      false,
+	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return Basic(ctx, rng)
 	},

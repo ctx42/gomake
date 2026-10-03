@@ -71,6 +71,8 @@ func Test_TargetsFromList(t *testing.T) {
 func Test_TargetsFromSpecs(t *testing.T) {
 	t.Run("as regular targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		impSpecs := []string{
@@ -80,7 +82,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(ctx, rng, impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -94,6 +96,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("as built-in targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		impSpecs := []string{
@@ -103,7 +107,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -117,6 +121,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("build environment applied", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
@@ -127,7 +133,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(ctx, rng, impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -142,6 +148,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("error - duplicated target", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := SetBuildTag(ring.New())
 
 		// Both packages expose hello/bye; the tagged one needs the gomake
@@ -152,7 +160,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(rng, impSpecs)
+		have, err := TargetsFromSpecs(ctx, rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -161,6 +169,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("invalid import", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		impSpecs := []string{
@@ -168,7 +178,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(rng, impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -177,6 +187,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("not existing import spec", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		impSpecs := []string{
@@ -184,7 +196,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		hTgs, err := TargetsFromSpecs(rng, impSpecs)
+		hTgs, err := TargetsFromSpecs(ctx, rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -193,6 +205,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("error creating makefile instance", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		impSpecs := []string{
@@ -200,7 +214,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		hTgs, err := TargetsFromSpecs(rng, impSpecs)
+		hTgs, err := TargetsFromSpecs(ctx, rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -211,6 +225,8 @@ func Test_TargetsFromSpecs(t *testing.T) {
 func Test_TargetsFromImports(t *testing.T) {
 	t.Run("namespace on root targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
@@ -223,7 +239,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(rng, blank, imports)
+		have, err := TargetsFromImports(ctx, rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -232,6 +248,8 @@ func Test_TargetsFromImports(t *testing.T) {
 
 	t.Run("namespace prefixes type-based targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
@@ -244,7 +262,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(rng, blank, imports)
+		have, err := TargetsFromImports(ctx, rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -253,6 +271,8 @@ func Test_TargetsFromImports(t *testing.T) {
 
 	t.Run("empty namespace leaves targets unprefixed", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
@@ -262,7 +282,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(rng, blank, imports)
+		have, err := TargetsFromImports(ctx, rng, blank, imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -271,6 +291,8 @@ func Test_TargetsFromImports(t *testing.T) {
 
 	t.Run("namespace applied to built-in targets", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		blank := ""
@@ -283,7 +305,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(rng, blank, imports, BuiltInCB)
+		have, err := TargetsFromImports(ctx, rng, blank, imports, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1138,13 +1160,15 @@ func Test_Targets_GoImports(t *testing.T) {
 
 	t.Run("imports from showcase example", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		relPath := "testdata/projects/showcase_imports/project"
 
 		absPath := modkit.Path(relPath)
 
-		pmf := must.Value(NewMakefile(rng, absPath))
+		pmf := must.Value(NewMakefile(ctx, rng, absPath))
 
 		// --- When ---
 		have := pmf.Targets.GoImports()
@@ -1160,6 +1184,8 @@ func Test_Targets_GoImports(t *testing.T) {
 
 	t.Run("imports from showcase example GOOS windows", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
@@ -1167,7 +1193,7 @@ func Test_Targets_GoImports(t *testing.T) {
 
 		absPath := modkit.Path(relPath)
 
-		pmf := must.Value(NewMakefile(rng, absPath))
+		pmf := must.Value(NewMakefile(ctx, rng, absPath))
 
 		// --- When ---
 		have := pmf.Targets.GoImports()

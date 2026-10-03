@@ -1674,7 +1674,10 @@ func mainPreRun(t *testing.T) {
 
 		ver := "1.2.3"
 
-		bip := builtintest.NewTstProvider(preAddEnv, preAddEnv)
+		bip := builtintest.NewTstProvider(
+			preAddEnv,
+			preAddEnv, //nolint:gocritic
+		)
 
 		// --- When ---
 		have := Main(ctx, rng, ver, bip)
@@ -1713,7 +1716,11 @@ func mainPreRun(t *testing.T) {
 
 		ver := "1.2.3"
 
-		bip := builtintest.NewTstProvider(preAddEnv, preErr, preAddEnv)
+		bip := builtintest.NewTstProvider(
+			preAddEnv,
+			preErr,
+			preAddEnv, //nolint:gocritic
+		)
 
 		// --- When ---
 		have := Main(ctx, rng, ver, bip)
@@ -2383,6 +2390,8 @@ func Test_watchBuildDir(t *testing.T) {
 func Test_applyExternalTargetMeta(t *testing.T) {
 	t.Run("config injected under the namespace key", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
@@ -2395,7 +2404,7 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -2408,6 +2417,8 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 	t.Run("config injected under the path base key", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
@@ -2419,7 +2430,7 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -2432,6 +2443,8 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 	t.Run("import without config sets no meta", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
@@ -2440,7 +2453,7 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -2451,12 +2464,14 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 	t.Run("absent targets file is a no-op", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -2467,13 +2482,15 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 	t.Run("malformed targets file is a no-op", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
 		oskit.Write(t, "{bad yaml}", dir, TargetsFile)
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -2484,6 +2501,8 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 
 	t.Run("error - two configs share a meta key", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
+
 		rng := ring.New()
 
 		dir := t.TempDir()
@@ -2499,7 +2518,7 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := applyExternalTargetMeta(rng, dir)
+		err := applyExternalTargetMeta(ctx, rng, dir)
 
 		// --- Then ---
 		assert.ErrorIs(t, errDupMetaKey, err)

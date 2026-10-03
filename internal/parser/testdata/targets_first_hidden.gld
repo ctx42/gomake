@@ -18,6 +18,7 @@ tgt = &Target{
 	Synopsis:    "",
 	Doc:         "",
 	Hidden:      true,
+	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return pkg1.Target(ctx, rng)
 	},
@@ -40,6 +41,7 @@ tgt = &Target{
 	Synopsis:    "",
 	Doc:         "",
 	Hidden:      false,
+	//nolint:gocritic
 	Run: func(ctx context.Context, rng *ring.Ring) error {
 		return pkg2.Target(ctx, rng)
 	},

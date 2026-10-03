@@ -120,7 +120,7 @@ func Test_generateVersions(t *testing.T) {
 
 	t.Run("error - version endpoint", func(t *testing.T) {
 		// --- Given ---
-		srv := httptest.NewServer(http.HandlerFunc(http.NotFound))
+		srv := httptest.NewServer(http.NotFoundHandler())
 		t.Cleanup(srv.Close)
 
 		before := oskit.ReadFileStr(t, "versions_gen.go")

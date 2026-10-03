@@ -296,10 +296,10 @@ func Test_GetCfg(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"dry_run":true}`)
 
-		dry_run := "dry_run"
+		dryRun := "dry_run"
 
 		// --- When ---
-		have, err := GetCfg[bool](cfg, dry_run)
+		have, err := GetCfg[bool](cfg, dryRun)
 
 		// --- Then ---
 		assert.NoError(t, err)

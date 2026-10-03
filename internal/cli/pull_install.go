@@ -65,13 +65,17 @@ func replaceInstall(built, installPath string) error {
 
 // copyFile copies src to dst, creating or truncating dst with mode 0700.
 func copyFile(src, dst string) error {
-	in, err := os.Open(src)
+	in, err := os.Open(src) //nolint:gosec
 	if err != nil {
 		return err
 	}
 	defer func() { _ = in.Close() }()
 
-	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	out, err := os.OpenFile( //nolint:gosec
+		dst,
+		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+		0700,
+	)
 	if err != nil {
 		return err
 	}

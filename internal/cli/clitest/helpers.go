@@ -35,11 +35,14 @@ func TestEnv(t tester.T) []string {
 	t.Helper()
 
 	env := make([]string, 0, 10)
-	env = append(env, "GOCACHE="+goCache(t))
 
 	// Point user config at an empty dir; HOME stays real for git, but a real
 	// $HOME/.config/gomake/gomake.yaml must not leak into config resolution.
-	env = append(env, "XDG_CONFIG_HOME="+t.TempDir())
+	env = append(
+		env,
+		"GOCACHE="+goCache(t),
+		"XDG_CONFIG_HOME="+t.TempDir(),
+	)
 
 	env = fromEnv("GOROOT", env)
 	env = fromEnv("GO111MODULE", env)
@@ -68,7 +71,7 @@ func fromEnv(key string, env []string) []string {
 func goCache(t tester.T) string {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	cmd := exec.Command("go", "env", "GOCACHE")
+	cmd := exec.CommandContext(t.Context(), "go", "env", "GOCACHE")
 	cmd.Env = os.Environ()
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

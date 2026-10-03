@@ -29,6 +29,7 @@ func Test_genMain(t *testing.T) {
 	// instance for the created project.
 	setup := func(t tester.T, src string) *gmt.Project {
 		t.Helper()
+		ctx := t.Context()
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -40,6 +41,7 @@ func Test_genMain(t *testing.T) {
 
 		rng := parser.SetBuildTag(ring.New())
 		_, err := parser.GenMakefileUserAndSave(
+			ctx,
 			rng,
 			prj.Root(),
 			prj.Path(mkf.MakefileUser),

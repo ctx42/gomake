@@ -1094,7 +1094,7 @@ func Test_copyDir(t *testing.T) {
 
 		assert.FileContain(t, "world", filepath.Join(dst, "sub", "b.txt"))
 
-		assert.Equal(t, os.FileMode(0o644), oskit.Stat(t, dst, "a.txt").Mode())
+		assert.Equal(t, os.FileMode(0o600), oskit.Stat(t, dst, "a.txt").Mode())
 	})
 
 	t.Run("error - missing source", func(t *testing.T) {

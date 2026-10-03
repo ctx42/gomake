@@ -91,7 +91,8 @@ func Main(
 	}
 
 	if cfg.showComplete {
-		msg, err := runComplete(rng)
+		var msg string
+		msg, err = runComplete(rng)
 		if msg != "" {
 			_, _ = fmt.Fprint(rng.Stderr(), msg)
 		}
@@ -121,7 +122,7 @@ func Main(
 			writeErr(err)
 			return mkf.ExitCode(err)
 		}
-		if err = os.MkdirAll(cfg.tmp, 0755); err != nil {
+		if err = os.MkdirAll(cfg.tmp, 0o750); err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
 		}
@@ -131,7 +132,8 @@ func Main(
 	}
 
 	if cfg.showCheckConfig {
-		report, err := runCheckConfig(rng, cfg, tgs)
+		var report string
+		report, err = runCheckConfig(ctx, rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -141,7 +143,8 @@ func Main(
 	}
 
 	if cfg.showList {
-		all, err := allTargets(rng, cfg, tgs)
+		var all []*mkf.Target
+		all, err = allTargets(ctx, rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -151,7 +154,8 @@ func Main(
 	}
 
 	if cfg.showHelp {
-		all, err := allTargets(rng, cfg, tgs)
+		var all []*mkf.Target
+		all, err = allTargets(ctx, rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -163,7 +167,8 @@ func Main(
 		if cfg.target != "" {
 			helpArgs = []string{cfg.target}
 		}
-		out, err := mkf.HelpUsage(binName, helpArgs, cfg.fs, all)
+		var out string
+		out, err = mkf.HelpUsage(binName, helpArgs, cfg.fs, all)
 		if err != nil {
 			writeErr(err)
 			return 1
@@ -192,7 +197,7 @@ func Main(
 			if code := runPreRuns(); code != 0 {
 				return code
 			}
-			if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
+			if err = applyExternalTargetMeta(ctx, rng, cfg.src); err != nil {
 				writeErr(err)
 				return 1
 			}
@@ -273,7 +278,7 @@ func Main(
 		return code
 	}
 
-	if err = applyExternalTargetMeta(rng, cfg.src); err != nil {
+	if err = applyExternalTargetMeta(ctx, rng, cfg.src); err != nil {
 		writeErr(err)
 		return 1
 	}
@@ -332,11 +337,17 @@ func compileExit(err error) int {
 //
 // A load error is intentionally ignored: applying external-target metadata is
 // best-effort, and a missing or malformed targets file must not abort the run.
-func applyExternalTargetMeta(rng *ring.Ring, srcDir string) error {
+func applyExternalTargetMeta(
+	ctx context.Context,
+	rng *ring.Ring,
+	srcDir string,
+) error {
+
 	pth := filepath.Join(srcDir, TargetsFile)
-	cfg, err := LoadExternalTargets(context.Background(), rng, pth)
+	cfg, err := LoadExternalTargets(ctx, rng, pth)
 	if err != nil {
-		return nil
+		// A missing or malformed targets file must not abort the run.
+		return nil //nolint:nilerr
 	}
 	pending := make([]ImportEntry, 0, len(cfg.imports))
 	seen := make(map[string]string, len(cfg.imports))

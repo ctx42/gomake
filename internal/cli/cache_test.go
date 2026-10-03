@@ -576,6 +576,48 @@ func Test_isSubpath_tabular(t *testing.T) {
 	}
 }
 
+func Test_absWorkPaths(t *testing.T) {
+	t.Run("empty path", func(t *testing.T) {
+		// --- When ---
+		have := absWorkPaths("")
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
+
+	t.Run("missing file", func(t *testing.T) {
+		// --- Given ---
+		path := filepath.Join(t.TempDir(), "go.work")
+
+		// --- When ---
+		have := absWorkPaths(path)
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
+
+	t.Run("resolves relative and keeps absolute", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+
+		content := "" +
+			"go 1.22\n" +
+			"use ../other\n" +
+			"replace example.com/abs => \"/tmp/my lib\"\n"
+		path := oskit.Write(t, content, root, "go.work")
+
+		// --- When ---
+		have := absWorkPaths(path)
+
+		// --- Then ---
+		want := []string{
+			filepath.Join(root, "../other"),
+			"/tmp/my lib",
+		}
+		assert.Equal(t, want, have)
+	})
+}
+
 func Test_localPathsFromGoWork(t *testing.T) {
 	// --- Given ---
 	root := t.TempDir()

@@ -55,6 +55,8 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 // disk through a temporary Go workspace (see [setupWorkspace]) rather than
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
+//
+//nolint:cyclop,gocognit
 func installTo(
 	rng *ring.Ring,
 	info *debug.BuildInfo,
@@ -173,7 +175,7 @@ func installTo(
 
 	if tgs != "" {
 		out := filepath.Join(buildDir, cli.TargetsFile)
-		if err = os.WriteFile(out, cfg.Raw(), 0o644); err != nil {
+		if err = os.WriteFile(out, cfg.Raw(), 0o600); err != nil {
 			return fmt.Errorf("gomake: write targets: %w", err)
 		}
 	}
@@ -219,7 +221,7 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	args := []string{"mod", "download", "-json", module}
-	cmd := exec.Command("go", args...)
+	cmd := exec.CommandContext(context.Background(), "go", args...)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	out, err := cmd.Output()
@@ -315,7 +317,14 @@ func moduleAt(
 
 	// GOWORK=off so a multi-module ambient workspace does not emit multiple
 	// Path::Dir lines that break Cut parsing.
-	cmd := exec.Command("go", "list", "-m", "-f", "{{.Path}}::{{.Dir}}")
+	cmd := exec.CommandContext(
+		context.Background(),
+		"go",
+		"list",
+		"-m",
+		"-f",
+		"{{.Path}}::{{.Dir}}",
+	)
 	cmd.Env = ring.EnvSet(env.EnvAll(), "GOWORK", "off")
 	cmd.Dir = dir
 	out, err := cmd.Output()
@@ -355,7 +364,14 @@ func notModule(err error) bool {
 // goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the
 // workspace file that lists both modules.
 func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
-	cmd := exec.Command("go", "work", "init", buildDir, modRoot)
+	cmd := exec.CommandContext(
+		context.Background(),
+		"go",
+		"work",
+		"init",
+		buildDir,
+		modRoot,
+	)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = wsDir
 	out, err := cmd.CombinedOutput()
@@ -401,7 +417,7 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 		if err != nil {
 			return nil, err
 		}
-		data, err := os.ReadFile(pth)
+		data, err := os.ReadFile(pth) //nolint:gosec
 		if err != nil {
 			return nil, err
 		}
@@ -447,7 +463,7 @@ func copyToTemp(src string) (string, func(), error) {
 	return tempDir, cleanup, nil
 }
 
-// copyDir recursively copies src into dst. Files are written with mode 0o644
+// copyDir recursively copies src into dst. Files are written with mode 0o600
 // so that module-cache read-only permissions do not carry over.
 func copyDir(src, dst string) error {
 	fn := func(path string, d fs.DirEntry, err error) error {
@@ -460,13 +476,13 @@ func copyDir(src, dst string) error {
 		}
 		target := filepath.Join(dst, rel)
 		if d.IsDir() {
-			return os.MkdirAll(target, 0o755)
+			return os.MkdirAll(target, 0o750)
 		}
-		data, err := os.ReadFile(path)
+		data, err := os.ReadFile(path) //nolint:gosec
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(target, data, 0o644)
+		return os.WriteFile(target, data, 0o600) //nolint:gosec
 	}
 	return filepath.WalkDir(src, fn)
 }
