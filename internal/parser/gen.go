@@ -66,8 +66,8 @@ type Generator struct {
 
 // NewGenerator returns a new instance of [Generator] for provided targets.
 //
-// By default, destination package name will be set to "main", generated method
-// name will have no suffix and "init" function code will not be generated.
+// By default, the destination package name is "main", the generated method
+// name suffix is "Main", and init code is not generated.
 func NewGenerator(tgs *Targets) *Generator {
 	return &Generator{tgs: tgs}
 }

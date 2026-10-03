@@ -87,7 +87,7 @@ type Makefile struct {
 	wd string
 
 	// Controls how much time a target has to finish. By default, it's set to
-	// zero (no deadline), but its value can be set by the "-- timeout" option.
+	// zero (no deadline), but its value can be set by the "--timeout" option.
 	timeout time.Duration
 
 	// List of targets.

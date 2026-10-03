@@ -73,7 +73,7 @@ func SetBuildTag(rng *ring.Ring) *ring.Ring {
 	return rng
 }
 
-// RemBuildTag removes [metaBuildTag] from `rng` metadata.
+// RemBuildTag removes [metaBuildTag] from the ring metadata.
 func RemBuildTag(rng *ring.Ring) *ring.Ring {
 	rng.MetaDelete(metaBuildTag)
 	return rng

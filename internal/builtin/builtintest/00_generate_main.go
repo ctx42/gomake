@@ -3,6 +3,7 @@
 
 //go:build ignore
 
+// Command 00_generate_main writes the builtintest target sources.
 package main
 
 import (

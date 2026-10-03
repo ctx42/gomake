@@ -4,9 +4,10 @@
 // Package mkf provides the makefile target model and execution runtime. Its
 // source (after the CODE MARK in makefile.go, target.go and helpers.go) is
 // inlined into generated makefile binaries, so the code there must stay
-// self-contained except for the public [github.com/ctx42/gomake/pkg/gomake]
-// and [github.com/ctx42/xflag/pkg/xflag] packages, whose imports the generator
-// guarantees (xflag is injected into the build "go.mod" during compilation).
+// self-contained except for [github.com/ctx42/gomake/pkg/gomake],
+// [github.com/ctx42/ring/pkg/ring], and [github.com/ctx42/xflag/pkg/xflag].
+// The generator guarantees those imports, and injects xflag into the build
+// "go.mod" during compilation.
 package mkf
 
 import _ "embed"

@@ -8,7 +8,7 @@
 // When run from the local source (go run ./cmd/install) it builds from the
 // current working directory.
 //
-// Typical usage:
+// These are typical invocations.
 //
 //	go run github.com/ctx42/gomake/cmd/install@latest
 //	go run ./cmd/install

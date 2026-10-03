@@ -42,9 +42,14 @@ var (
 
 // ImportEntry is one import from [TargetsFile].
 type ImportEntry struct {
-	Path      string
+	// Path is the import path, with an optional "@version" suffix.
+	Path string
+
+	// Namespace, when set, is the ring meta-key for Config.
 	Namespace string
-	Config    json.RawMessage
+
+	// Config is the entry's configuration as JSON. Empty means none.
+	Config json.RawMessage
 }
 
 // MetaKey returns the ring meta-key for the entry. When Namespace is set, it's

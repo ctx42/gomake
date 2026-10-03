@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: (c) 2026 Rafal Zajac
 // SPDX-License-Identifier: MIT
 
-// Package parser is responsible for parsing go code to extract gomake targets.
+// Package parser is responsible for parsing Go code to extract gomake targets.
 package parser
 
 import (

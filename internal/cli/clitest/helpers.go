@@ -15,13 +15,13 @@ import (
 	"github.com/ctx42/testing/pkg/tester"
 )
 
-// TestEnv returns environment with minimum number of variables.
+// TestEnv returns an environment with the minimum number of variables.
 //
 // GOCACHE is derived from `go env`, and XDG_CONFIG_HOME is set to an isolated
 // empty temp directory so user-level gomake.yaml resolution never reads the
 // developer's real $HOME/.config/gomake/gomake.yaml.
 //
-// Variables set form the current environment (if they are set):
+// Variables copied from the current environment, when they are set:
 //   - GOROOT
 //   - GO111MODULE
 //   - GOPATH

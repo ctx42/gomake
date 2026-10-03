@@ -357,7 +357,7 @@ func runWithoutCompile(
 // for the targets, given the completion args. It returns an empty string when
 // args do not describe a completion request or the word is already completed.
 func complete(args []string, ts []*mkf.Target) string {
-	// Get the current partial word to be completed
+	// Get the current partial word to be completed.
 	if len(args) != 3 {
 		return ""
 	}

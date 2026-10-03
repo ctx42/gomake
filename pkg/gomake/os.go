@@ -83,7 +83,8 @@ func GetGOARCH(env []string) string {
 // LookupEnv retrieves the value of the environment variable named by the key.
 // If the variable is present in the environment, the value (which may be empty)
 // is returned and the boolean is true. Otherwise, the returned value will be
-// empty and the boolean will be false.
+// empty and the boolean will be false. When the key appears more than once,
+// the last value wins.
 func LookupEnv(env []string, key string) (string, bool) {
 	var exists bool
 	var value string
@@ -101,6 +102,7 @@ func LookupEnv(env []string, key string) (string, bool) {
 // Getenv retrieves the value of the environment variable named by the key.
 // It returns the value, which will be empty if the variable is not present.
 // To distinguish between an empty value and an unset value, use [LookupEnv].
+// When the key appears more than once, the last value wins.
 func Getenv(env []string, key string) string {
 	val, _ := LookupEnv(env, key)
 	return val

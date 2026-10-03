@@ -54,7 +54,7 @@ var tgsMainSrc []byte
 
 // Provider provides built-in targets and their code.
 type Provider interface {
-	// Targets returns array of built-in targets.
+	// Targets returns the built-in targets.
 	Targets() []*mkf.Target
 
 	// Source returns Go source code defining the built-in targets.
@@ -167,10 +167,9 @@ func WithGenWorkDir(dir string) GenOption {
 // [mainEmptyFN] file.
 func WithoutGenEmptySrc(opts *genOpts) { opts.empty = false }
 
-// GenMain is an entry point for the program called by "go generate".
-// It takes an import spec list and generates code describing built-in targets,
-// registering every target in the root namespace. Use [GenImports] to compile
-// in targets under a namespace.
+// GenMain generates built-in target code from import specs and registers
+// every target in the root namespace. Use [GenImports] to compile in targets
+// under a namespace. go generate runs main, which calls GenImports.
 func GenMain(specs []string, opts ...GenOption) error {
 	imports := make([]parser.Import, len(specs))
 	for i, spec := range specs {

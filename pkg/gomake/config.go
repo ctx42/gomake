@@ -84,7 +84,7 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
 	if cfg.data == nil {
-		// Root null / non-object leaves data nil; treat as empty object.
+		// A JSON null root leaves data nil; treat it as an empty object.
 		cfg.data = map[string]any{}
 	}
 	return cfg, nil

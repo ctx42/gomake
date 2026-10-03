@@ -34,7 +34,7 @@ var tgsMainSrc []byte
 // TstProvider is a built-in target provider for use in tests.
 type TstProvider struct{ pre []mkf.PreRunFn }
 
-// NewTstProvider returns test built-in targets provider.
+// NewTstProvider stores a clone of pre.
 func NewTstProvider(pre ...mkf.PreRunFn) *TstProvider {
 	return &TstProvider{pre: slices.Clone(pre)}
 }
