@@ -16,12 +16,9 @@ import (
 func Test_NewMakefile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/showcase_imports/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -30,10 +27,8 @@ func Test_NewMakefile(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewMakefile(ctx, rng, root)
+		have, err := NewMakefile(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -55,14 +50,10 @@ func Test_NewMakefile(t *testing.T) {
 
 	t.Run("error - import path not absolute", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		relPath := "../../testdata/projects/showcase_imports/project"
 
 		// --- When ---
-		have, err := NewMakefile(ctx, rng, relPath)
+		have, err := NewMakefile(t.Context(), ring.New(), relPath)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -71,16 +62,10 @@ func Test_NewMakefile(t *testing.T) {
 
 	t.Run("import path to empty directory", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		relPath := "testdata/projects/empty"
 
-		absPath := modkit.Path(relPath)
-
 		// --- When ---
-		have, err := NewMakefile(ctx, rng, absPath)
+		have, err := NewMakefile(t.Context(), ring.New(), modkit.Path(relPath))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -93,13 +78,10 @@ func Test_NewMakefile(t *testing.T) {
 func Test_MakefileFromPackage(t *testing.T) {
 	t.Run("basic with requested GOOS", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
 		relPath := "testdata/projects/showcase_targets/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -108,7 +90,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -137,12 +119,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("default as local function", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/default_local/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -151,7 +130,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -164,12 +143,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("default as local namespace method", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/default_from_ns/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -178,7 +154,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -190,12 +166,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("error - duplicated imported target", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/dup_imported/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -206,7 +179,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -216,12 +189,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("error - duplicated imported namespace", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/dup_imported_ns/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -232,7 +202,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -242,12 +212,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("error - duplicated local target", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/dup_local/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -256,7 +223,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -266,12 +233,9 @@ func Test_MakefileFromPackage(t *testing.T) {
 
 	t.Run("error - duplicated namespaced targets", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/projects/dup_ns/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -280,7 +244,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(ctx, rng, pkg)
+		have, err := MakefileFromPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)

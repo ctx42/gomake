@@ -18,7 +18,6 @@ func Test_binaryCacheDir(t *testing.T) {
 	t.Run("ring XDG_CACHE_HOME", func(t *testing.T) {
 		// --- Given ---
 		cache := t.TempDir()
-
 		rng := ring.New()
 		rng.EnvSet("XDG_CACHE_HOME", cache)
 
@@ -27,8 +26,7 @@ func Test_binaryCacheDir(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		want := filepath.Join(cache, "gomake", "bin")
-		assert.Equal(t, want, have)
+		assert.Equal(t, filepath.Join(cache, "gomake", "bin"), have)
 	})
 }
 
@@ -41,24 +39,12 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hA := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 		hB := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -80,20 +66,12 @@ func Test_binaryCacheKey(t *testing.T) {
 		alt := ring.New()
 		alt.EnvSet("GOFLAGS", "-tags=extra")
 
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
 		// --- When ---
 		hWithout := must.Value(binaryCacheKey(
-			base, root, mkf, ver, linux, amd64, blank,
+			base, root, mkf, "1.0", "linux", "amd64", "",
 		))
 		hWith := must.Value(binaryCacheKey(
-			alt, root, mkf, ver, linux, amd64, blank,
+			alt, root, mkf, "1.0", "linux", "amd64", "",
 		))
 
 		// --- Then ---
@@ -105,25 +83,14 @@ func Test_binaryCacheKey(t *testing.T) {
 		root := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
 		oskit.Write(t, "package main\n", root, "makefile.go")
-
 		sum := filepath.Join(root, "go.sum")
 		must.Nil(os.Symlink("go.sum", sum))
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
 		// --- When ---
 		_, err := binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank,
+			ring.New(), root, mkf, "1.0", "linux", "amd64", "",
 		)
 
 		// --- Then ---
@@ -135,33 +102,19 @@ func Test_binaryCacheKey(t *testing.T) {
 		root := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
 		oskit.Write(t, "package main\n", root, "makefile.go")
-
 		pkgDir := oskit.MkdirAll(t, root, "lib")
-
 		libPath := filepath.Join(pkgDir, "lib.go")
 		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
 		hAfter := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -174,7 +127,6 @@ func Test_binaryCacheKey(t *testing.T) {
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
 		oskit.Write(t, "package main\n", root, "makefile.go")
 		oskit.MkdirAll(t, root, "lib")
-
 		src := "" +
 			"package lib\n" +
 			"\n" +
@@ -183,36 +135,16 @@ func Test_binaryCacheKey(t *testing.T) {
 			"//go:embed data.txt\n" +
 			"var data embed.FS\n"
 		oskit.Write(t, src, root, "lib", "lib.go")
-
 		oskit.Write(t, "one\n", root, "lib", "data.txt")
-
 		mkf := []string{"makefile.go"}
-
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		text := "two\n"
-
-		lib := "lib"
-
-		text2 := "data.txt"
-
-		rng2 := ring.New()
 
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
-		oskit.Create(t, text, root, lib, text2)
+		oskit.Create(t, "two\n", root, "lib", "data.txt")
 		hAfter := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -227,7 +159,6 @@ func Test_binaryCacheKey(t *testing.T) {
 			oskit.Write(t, "module example.com/m\n", root, "go.mod")
 			oskit.Write(t, "package main\n", root, "makefile.go")
 			oskit.MkdirAll(t, root, "lib")
-
 			src := "" +
 				"package lib\n" +
 				"\n" +
@@ -236,38 +167,18 @@ func Test_binaryCacheKey(t *testing.T) {
 				"//go:embed data.txt\n" +
 				"var data embed.FS\n"
 			oskit.Write(t, src, root, "lib", "lib.go")
-
 			oskit.Write(t, "one\n", root, "lib", "data.txt")
-
 			oskit.Write(t, "other\n", root, "lib", "other.txt")
 
 			mkf := []string{"makefile.go"}
 
-			rng := ring.New()
-
-			ver := "1.0"
-
-			linux := "linux"
-
-			amd64 := "amd64"
-
-			blank := ""
-
-			text := "changed\n"
-
-			lib := "lib"
-
-			text2 := "other.txt"
-
-			rng2 := ring.New()
-
 			// --- When ---
 			hBefore := must.Value(binaryCacheKey(
-				rng, root, mkf, ver, linux, amd64, blank),
+				ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 			)
-			oskit.Create(t, text, root, lib, text2)
+			oskit.Create(t, "changed\n", root, "lib", "other.txt")
 			hAfter := must.Value(binaryCacheKey(
-				rng2, root, mkf, ver, linux, amd64, blank),
+				ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 			)
 
 			// --- Then ---
@@ -277,33 +188,19 @@ func Test_binaryCacheKey(t *testing.T) {
 	t.Run("changes when go.mod changes", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
-
 		modPath := filepath.Join(root, "go.mod")
 		must.Nil(os.WriteFile(modPath, []byte("module example.com/m\n"), 0o600))
 
 		oskit.Write(t, "package main\n", root, "makefile.go")
-
 		mkf := []string{"makefile.go"}
-
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
 
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 		must.Nil(os.WriteFile(modPath, []byte("module example.com/m\ngo 1.22\n"), 0o600))
 		hAfter := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -318,29 +215,13 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		text := "go 1.22\nuse .\n"
-
-		text2 := "go.work"
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
-		oskit.Write(t, text, root, text2)
+		oskit.Write(t, "go 1.22\nuse .\n", root, "go.work")
 		hAfter := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -350,43 +231,24 @@ func Test_binaryCacheKey(t *testing.T) {
 	t.Run("changes when workspace sibling go file changes", func(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
-
 		proj := oskit.MkdirAll(t, base, "project")
-
 		other := oskit.MkdirAll(t, base, "other")
-
 		oskit.Write(t, "module example.com/m\n", proj, "go.mod")
-
 		oskit.Write(t, "package main\n", proj, "makefile.go")
-
 		oskit.Write(t, "go 1.22\nuse .\nuse ../other\n", proj, "go.work")
-
 		oskit.Write(t, "module example.com/other\n", other, "go.mod")
-
 		libPath := filepath.Join(other, "lib.go")
 		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 1\n"), 0o600))
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 2\n"), 0o600))
 		hAfter := must.Value(binaryCacheKey(
-			rng2, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -396,18 +258,14 @@ func Test_binaryCacheKey(t *testing.T) {
 	t.Run("changes when local replace go file changes", func(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
-
 		proj := oskit.MkdirAll(t, base, "project")
-
 		lib := oskit.MkdirAll(t, base, "lib")
 
 		mod := "" +
 			"module example.com/m\n" +
 			"replace example.com/lib => ../lib\n"
 		oskit.Write(t, mod, proj, "go.mod")
-
 		oskit.Write(t, "package main\n", proj, "makefile.go")
-
 		oskit.Write(t, "module example.com/lib\n", lib, "go.mod")
 
 		libPath := filepath.Join(lib, "lib.go")
@@ -415,25 +273,13 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
 		hAfter := must.Value(binaryCacheKey(
-			rng2, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -443,15 +289,10 @@ func Test_binaryCacheKey(t *testing.T) {
 	t.Run("changes when go.work replace tree changes", func(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
-
 		proj := oskit.MkdirAll(t, base, "project")
-
 		lib := oskit.MkdirAll(t, base, "lib")
-
 		oskit.Write(t, "module example.com/m\n", proj, "go.mod")
-
 		oskit.Write(t, "package main\n", proj, "makefile.go")
-
 		work := "" +
 			"go 1.22\n" +
 			"use .\n" +
@@ -465,25 +306,13 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
 		// --- When ---
 		hBefore := must.Value(binaryCacheKey(
-			rng, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
 		hAfter := must.Value(binaryCacheKey(
-			rng2, proj, mkf, ver, linux, amd64, blank),
+			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
 
 		// --- Then ---
@@ -497,19 +326,9 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
 		// --- When ---
 		_, err := binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank,
+			ring.New(), root, mkf, "1.0", "linux", "amd64", "",
 		)
 
 		// --- Then ---
@@ -525,26 +344,12 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		mkf := []string{"makefile.go"}
 
-		rng := ring.New()
-
-		ver := "1.0"
-
-		linux := "linux"
-
-		amd64 := "amd64"
-
-		blank := ""
-
-		rng2 := ring.New()
-
-		off := "off"
-
 		// --- When ---
 		hWithWS := must.Value(binaryCacheKey(
-			rng, root, mkf, ver, linux, amd64, blank),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
 		hOff := must.Value(binaryCacheKey(
-			rng2, root, mkf, ver, linux, amd64, off),
+			ring.New(), root, mkf, "1.0", "linux", "amd64", "off"),
 		)
 
 		// --- Then ---
@@ -599,7 +404,6 @@ func Test_absWorkPaths(t *testing.T) {
 	t.Run("resolves relative and keeps absolute", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
-
 		content := "" +
 			"go 1.22\n" +
 			"use ../other\n" +
@@ -621,7 +425,6 @@ func Test_absWorkPaths(t *testing.T) {
 func Test_localPathsFromGoWork(t *testing.T) {
 	// --- Given ---
 	root := t.TempDir()
-
 	content := "" +
 		"go 1.22\n" +
 		"use .\n" +
@@ -632,7 +435,6 @@ func Test_localPathsFromGoWork(t *testing.T) {
 		"  ./b // comment\n" +
 		"  \"./c d\" // comment\n" +
 		")\n"
-
 	path := oskit.Write(t, content, root, "go.work")
 
 	// --- When ---
@@ -646,7 +448,6 @@ func Test_localPathsFromGoWork(t *testing.T) {
 func Test_localPathsFromGoMod(t *testing.T) {
 	// --- Given ---
 	root := t.TempDir()
-
 	content := "" +
 		"module example.com/m\n" +
 		"replace example.com/lib => ../lib\n" +
@@ -658,7 +459,6 @@ func Test_localPathsFromGoMod(t *testing.T) {
 		"  example.com/a => ./a\n" +
 		"  example.com/b => \"./dir with space\"\n" +
 		")\n"
-
 	path := oskit.Write(t, content, root, "go.mod")
 
 	// --- When ---
@@ -728,9 +528,7 @@ func Test_findModuleRoot(t *testing.T) {
 	t.Run("found", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
-
 		sub := oskit.MkdirAll(t, root, "pkg", "sub")
-
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
 
 		// --- When ---
@@ -741,11 +539,8 @@ func Test_findModuleRoot(t *testing.T) {
 	})
 
 	t.Run("missing", func(t *testing.T) {
-		// --- Given ---
-		dir := t.TempDir()
-
 		// --- When ---
-		have := findModuleRoot(dir)
+		have := findModuleRoot(t.TempDir())
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -758,21 +553,11 @@ func Test_lookupBinaryCache_miss(t *testing.T) {
 	oskit.Write(t, "module example.com/m\n", root, "go.mod")
 	oskit.Write(t, "package main\n", root, "makefile.go")
 
-	rng := ring.New()
-
 	items := []string{"makefile.go"}
 
-	ver := "1.0"
-
-	linux := "linux"
-
-	amd64 := "amd64"
-
-	blank := ""
-
 	// --- When ---
-	hPth, hOk := lookupBinaryCache(rng,
-		root, items, ver, linux, amd64, blank,
+	hPth, hOk := lookupBinaryCache(ring.New(),
+		root, items, "1.0", "linux", "amd64", "",
 	)
 
 	// --- Then ---
@@ -788,29 +573,14 @@ func Test_storeBinaryCache_and_lookup(t *testing.T) {
 	root := t.TempDir()
 	oskit.Write(t, "module example.com/m\n", root, "go.mod")
 	oskit.Write(t, "package main\n", root, "makefile.go")
-
 	bin := oskit.Write(t, "fake-binary", root, "makefile")
 
 	mkf := []string{"makefile.go"}
 
-	rng := ring.New()
-
-	ver := "1.0"
-
-	linux := "linux"
-
-	amd64 := "amd64"
-
-	blank := ""
-
-	rng2 := ring.New()
-
 	// --- When ---
-	storeBinaryCache(
-		rng, bin, root, mkf, ver, linux, amd64, blank,
-	)
+	storeBinaryCache(ring.New(), bin, root, mkf, "1.0", "linux", "amd64", "")
 	hPth, hOk := lookupBinaryCache(
-		rng2, root, mkf, ver, linux, amd64, blank,
+		ring.New(), root, mkf, "1.0", "linux", "amd64", "",
 	)
 
 	// --- Then ---

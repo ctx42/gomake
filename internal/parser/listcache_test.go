@@ -16,14 +16,11 @@ func Test_listCacheKey(t *testing.T) {
 	t.Run("stable and cacheable inside a module", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
-		path := "example.com/x"
-
 		// --- When ---
-		hKey1, hOk1 := listCacheKey(rng, dir, path)
-		hKey2, hOk2 := listCacheKey(rng, dir, path)
+		hKey1, hOk1 := listCacheKey(rng, dir, "example.com/x")
+		hKey2, hOk2 := listCacheKey(rng, dir, "example.com/x")
 
 		// --- Then ---
 		assert.True(t, hOk1)
@@ -34,16 +31,11 @@ func Test_listCacheKey(t *testing.T) {
 	t.Run("different spec", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
-		path := "example.com/a"
-
-		path2 := "example.com/b"
-
 		// --- When ---
-		hKey1, _ := listCacheKey(rng, dir, path)
-		hKey2, _ := listCacheKey(rng, dir, path2)
+		hKey1, _ := listCacheKey(rng, dir, "example.com/a")
+		hKey2, _ := listCacheKey(rng, dir, "example.com/b")
 
 		// --- Then ---
 		assert.NotEqual(t, hKey1, hKey2)
@@ -59,11 +51,9 @@ func Test_listCacheKey(t *testing.T) {
 		alt := SetBuildTag(ring.New())
 		alt.EnvSet("CGO_ENABLED", "1")
 
-		path := "example.com/x"
-
 		// --- When ---
-		hKey1, hOk1 := listCacheKey(base, dir, path)
-		hKey2, hOk2 := listCacheKey(alt, dir, path)
+		hKey1, hOk1 := listCacheKey(base, dir, "example.com/x")
+		hKey2, hOk2 := listCacheKey(alt, dir, "example.com/x")
 
 		// --- Then ---
 		assert.True(t, hOk1)
@@ -78,10 +68,8 @@ func Test_listCacheKey(t *testing.T) {
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "go.mod")
 
-		path := "example.com/x"
-
 		// --- When ---
-		hKey, hOk := listCacheKey(rng, dir, path)
+		hKey, hOk := listCacheKey(rng, dir, "example.com/x")
 
 		// --- Then ---
 		assert.False(t, hOk)
@@ -96,10 +84,8 @@ func Test_listCacheKey(t *testing.T) {
 		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
 		oskit.MkdirAll(t, dir, "go.sum")
 
-		path := "example.com/x"
-
 		// --- When ---
-		hKey, hOk := listCacheKey(rng, dir, path)
+		hKey, hOk := listCacheKey(rng, dir, "example.com/x")
 
 		// --- Then ---
 		assert.False(t, hOk)
@@ -107,15 +93,8 @@ func Test_listCacheKey(t *testing.T) {
 	})
 
 	t.Run("not cacheable outside a module", func(t *testing.T) {
-		// --- Given ---
-		rng := ring.New()
-
-		dir := t.TempDir()
-
-		path := "example.com/x"
-
 		// --- When ---
-		hKey, hOk := listCacheKey(rng, dir, path)
+		hKey, hOk := listCacheKey(ring.New(), t.TempDir(), "example.com/x")
 
 		// --- Then ---
 		assert.False(t, hOk)
@@ -154,9 +133,7 @@ func Test_listCache_roundtrip(t *testing.T) {
 	t.Run("store then load", func(t *testing.T) {
 		// --- Given ---
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
-
 		key := "deadbeef"
-
 		want := []byte(`{"Name":"x"}`)
 
 		// --- When ---
@@ -172,10 +149,8 @@ func Test_listCache_roundtrip(t *testing.T) {
 		// --- Given ---
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
 
-		missing := "missing"
-
 		// --- When ---
-		have, hOk := loadListCache(missing)
+		have, hOk := loadListCache("missing")
 
 		// --- Then ---
 		assert.False(t, hOk)

@@ -22,12 +22,8 @@ func Test_getFile(t *testing.T) {
 			"dir/file1.go": {FileStart: 1},
 		}
 
-		dir := "dir"
-
-		path := "file1.go"
-
 		// --- When ---
-		have := getFile(tspy, fls, dir, path)
+		have := getFile(tspy, fls, "dir", "file1.go")
 
 		// --- Then ---
 		assert.Equal(t, 1, int(have.FileStart))
@@ -41,8 +37,8 @@ func Test_getFile(t *testing.T) {
 		wMsg := "" +
 			"expected map to have a file:\n" +
 			"  path: dir/file2.go"
-		tspy.ExpectLogContain(wMsg)
 
+		tspy.ExpectLogContain(wMsg)
 		tspy.Close()
 
 		fls := map[string]*ast.File{
@@ -50,12 +46,8 @@ func Test_getFile(t *testing.T) {
 			"dir/file1.go": {FileStart: 1},
 		}
 
-		dir := "dir"
-
-		path := "file2.go"
-
 		// --- When ---
-		have := getFile(tspy, fls, dir, path)
+		have := getFile(tspy, fls, "dir", "file2.go")
 
 		// --- Then ---
 		assert.Nil(t, have)

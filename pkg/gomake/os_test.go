@@ -40,7 +40,6 @@ func Test_ExitStatus(t *testing.T) {
 	t.Run("is ExitError instance", func(t *testing.T) {
 		// --- Given ---
 		cmd := exec.Command(os.Args[0], "--exitCode", "99")
-
 		err := cmd.Run()
 
 		// --- When ---
@@ -66,7 +65,6 @@ func Test_ExitStatus(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 0, have)
-
 		assert.Equal(t, "|sout: abc|", sout.String())
 	})
 
@@ -86,7 +84,6 @@ func Test_ExitStatus(t *testing.T) {
 		cmd := exec.Command("sleep", "60")
 		assert.NoError(t, cmd.Start())
 		assert.NoError(t, cmd.Process.Kill())
-
 		err := cmd.Wait()
 
 		// --- When ---
@@ -122,10 +119,8 @@ func Test_HasRun(t *testing.T) {
 		c.Stderr = io.Discard
 		c.Stdin = os.Stdin
 
-		run := c.Run()
-
 		// --- When ---
-		have := HasRun(run)
+		have := HasRun(c.Run())
 
 		// --- Then ---
 		assert.False(t, have)
@@ -142,10 +137,8 @@ func Test_HasRun(t *testing.T) {
 		c.Stderr = io.Discard
 		c.Stdin = os.Stdin
 
-		run := c.Run()
-
 		// --- When ---
-		have := HasRun(run)
+		have := HasRun(c.Run())
 
 		// --- Then ---
 		assert.True(t, have)
@@ -157,10 +150,8 @@ func Test_HasRun(t *testing.T) {
 		c.Stdout = io.Discard
 		c.Stderr = io.Discard
 
-		run := c.Run()
-
 		// --- When ---
-		have := HasRun(run)
+		have := HasRun(c.Run())
 
 		// --- Then ---
 		assert.True(t, have)
@@ -171,7 +162,6 @@ func Test_GetGOOS(t *testing.T) {
 	t.Run("GOOS from runtime", func(t *testing.T) {
 		// --- Given ---
 		want := runtime.GOOS
-
 		var env []string
 
 		// --- When ---
@@ -197,7 +187,6 @@ func Test_GetGOARCH(t *testing.T) {
 	t.Run("GOARCH from runtime", func(t *testing.T) {
 		// --- Given ---
 		want := runtime.GOARCH
-
 		env := make([]string, 0)
 
 		// --- When ---

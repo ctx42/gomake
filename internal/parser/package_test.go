@@ -27,7 +27,6 @@ func Test_withPkgSpec(t *testing.T) {
 
 	// --- Then ---
 	assert.Empty(t, pkg.ImpPath)
-
 	assert.Equal(t, "example.com/spec/repo/pkg", pkg.ImpSpec)
 }
 
@@ -45,21 +44,16 @@ func Test_withPkgNS(t *testing.T) {
 func Test_NewPackage(t *testing.T) {
 	t.Run("by path", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -72,23 +66,16 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("with namespace", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
-		withPkgNS2 := withPkgNS("ns")
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root, withPkgNS2)
+		have, err := NewPackage(t.Context(), rng, prj.Root(), withPkgNS("ns"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -97,23 +84,18 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not tagged files no build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
 
 		relPath := "testdata/projects/arch_os/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -130,24 +112,19 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
 		rng = SetBuildTag(rng)
 
 		relPath := "testdata/projects/arch_os/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -164,23 +141,18 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("tagged files no build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
 
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -193,24 +165,19 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
 		rng = SetBuildTag(rng)
 
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -227,14 +194,10 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("error - not existing import path", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		pth := pathkit.AbsPath(t, "testing/not/existing")
 
 		// --- When ---
-		have, err := NewPackage(ctx, rng, pth)
+		have, err := NewPackage(t.Context(), ring.New(), pth)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -242,15 +205,8 @@ func Test_NewPackage(t *testing.T) {
 	})
 
 	t.Run("error - empty import path", func(t *testing.T) {
-		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
-		blank := ""
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, blank)
+		have, err := NewPackage(t.Context(), ring.New(), "")
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -259,21 +215,16 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("hyphened package name", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/imports/xx-pkg"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, root)
+		have, err := NewPackage(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -286,22 +237,17 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("by spec with build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/imports/pkg0"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 		prj.Chdir()
 
-		impSpec := prj.ImpSpec()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, impSpec, withPkgSpec)
+		have, err := NewPackage(t.Context(), rng, prj.ImpSpec(), withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -314,14 +260,10 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("import path not absolute error", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		relPath := "../../testdata/imports/pkg2"
 
 		// --- When ---
-		have, err := NewPackage(ctx, rng, relPath)
+		have, err := NewPackage(t.Context(), ring.New(), relPath)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -330,12 +272,9 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -344,10 +283,8 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		impSpec := prj.ImpSpec()
-
 		// --- When ---
-		have, err := NewPackage(ctx, rng, impSpec, withPkgSpec)
+		have, err := NewPackage(t.Context(), rng, prj.ImpSpec(), withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -360,29 +297,22 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec with namespace", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		relPath := "testdata/imports/pkg2"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
 		prj.Close()
 		prj.Chdir()
 
-		impSpec := prj.ImpSpec()
-
-		withPkgNS2 := withPkgNS("ns")
-
 		// --- When ---
 		have, err := NewPackage(
-			ctx,
+			t.Context(),
 			rng,
-			impSpec,
+			prj.ImpSpec(),
 			withPkgSpec,
-			withPkgNS2,
+			withPkgNS("ns"),
 		)
 
 		// --- Then ---
@@ -396,14 +326,10 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("not existing import spec", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		imp := "example.com/not/existing"
 
 		// --- When ---
-		have, err := NewPackage(ctx, rng, imp, withPkgSpec)
+		have, err := NewPackage(t.Context(), ring.New(), imp, withPkgSpec)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -412,10 +338,7 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("served from cache without go list", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		t.Setenv("XDG_CACHE_HOME", t.TempDir())
-
 		proj := modkit.Root()
 
 		rng := ring.New()
@@ -428,7 +351,7 @@ func Test_NewPackage(t *testing.T) {
 		storeListCache(key, []byte(`{"Name":"cached"}`))
 
 		// --- When ---
-		have, err := NewPackage(ctx, rng, spec, withPkgSpec)
+		have, err := NewPackage(t.Context(), rng, spec, withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)

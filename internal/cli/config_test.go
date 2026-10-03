@@ -30,15 +30,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("no args", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		var args []string
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -67,15 +62,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option work dir absolute", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--wd", "/dir/path"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -86,15 +76,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option work dir relative", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--wd", "dir"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -106,17 +91,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option work dir equal to current working dir", func(t *testing.T) {
 		// --- Given ---
 		wd := must.Value(os.Getwd())
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--wd", wd, "--timeout", "1s"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -144,19 +123,14 @@ func Test_newConfig(t *testing.T) {
 
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		var args []string
 
 		dir := t.TempDir()
 		assert.NoError(t, os.Chdir(dir))
 		assert.NoError(t, os.Remove(dir))
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorContain(t, "config: getwd: no such file or directory", err)
@@ -166,17 +140,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("tmp dir set from environment", func(t *testing.T) {
 		// --- Given ---
 		env := []string{envKeyTmpDir + "=/dir"}
-
 		tst := ringtest.New(t, ring.WithEnv(env))
-
 		var args []string
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -187,17 +155,11 @@ func Test_newConfig(t *testing.T) {
 		func(t *testing.T) {
 			// --- Given ---
 			env := []string{envKeyTmpDir + "=dir"}
-
 			tst := ringtest.New(t, ring.WithEnv(env))
-
 			var args []string
 
-			ver := "1.2.3"
-
-			rng := tst.Ring(args...)
-
 			// --- When ---
-			have, err := newConfig(ver, rng)
+			have, err := newConfig("1.2.3", tst.Ring(args...))
 
 			// --- Then ---
 			assert.ErrorIs(t, parser.ErrAbsPath, err)
@@ -208,17 +170,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("empty tmp dir from environment not considered", func(t *testing.T) {
 		// --- Given ---
 		env := []string{envKeyTmpDir + "="}
-
 		tst := ringtest.New(t, ring.WithEnv(env))
-
 		var args []string
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -228,17 +184,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("tmp dir set from option", func(t *testing.T) {
 		// --- Given ---
 		env := make([]string, 0)
-
 		tst := ringtest.New(t, ring.WithEnv(env))
-
 		args := []string{"--tmp", "/dir"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -248,17 +198,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("tmp dir set from option must be absolute path", func(t *testing.T) {
 		// --- Given ---
 		env := make([]string, 0, 1)
-
 		tst := ringtest.New(t, ring.WithEnv(env))
-
 		args := []string{"--tmp", "dir"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrAbsPath, err)
@@ -269,17 +213,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("tmp dir set from option and environment", func(t *testing.T) {
 		// --- Given ---
 		env := []string{envKeyTmpDir + "=/dir-env"}
-
 		tst := ringtest.New(t, ring.WithEnv(env))
-
 		args := []string{"--tmp", "/dir-arg"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -289,15 +227,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option src absolute", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--src", "/dir/path"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -307,34 +240,23 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option src must be absolute", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--src", "dir"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
-		expSrc := filepath.Join(must.Value(os.Getwd()), "dir")
-		assert.Equal(t, expSrc, have.src)
+		assert.Equal(t, filepath.Join(must.Value(os.Getwd()), "dir"), have.src)
 	})
 
 	t.Run("set option bin", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--bin", "/dir/makefile"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -345,15 +267,10 @@ func Test_newConfig(t *testing.T) {
 		func(t *testing.T) {
 			// --- Given ---
 			tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 			args := []string{"--bin", "testdata/my-gomake-makefile"}
 
-			ver := "1.2.3"
-
-			rng := tst.Ring(args...)
-
 			// --- When ---
-			have, err := newConfig(ver, rng)
+			have, err := newConfig("1.2.3", tst.Ring(args...))
 
 			// --- Then ---
 			assert.NoError(t, err)
@@ -364,17 +281,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option wd does not impact option bin ", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		pth := "/dir/my-gomake-makefile"
-
 		args := []string{"--wd", "/tmp", "--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -384,17 +295,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin must point to not existing file", func(t *testing.T) {
 		// --- Given ---
 		pth := pathkit.AbsPath(t, "testdata/makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorIs(t, errBinExists, err)
@@ -405,17 +310,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin cannot be used with -h", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"-h", "--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "-h, --help cannot be used with --bin", err)
@@ -425,17 +324,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin cannot be used with --help", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--help", "--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "-h, --help cannot be used with --bin", err)
@@ -445,17 +338,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin cannot be used with --version", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--version", "--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "--version cannot be used with --bin", err)
@@ -465,17 +352,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin cannot be used with --list", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--list", "--bin", pth}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "--list cannot be used with --bin", err)
@@ -485,17 +366,11 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option bin cannot be used with target name", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
-
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--bin", pth, "target"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "--bin cannot be used with targets", err)
@@ -505,15 +380,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option timeout", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--timeout", "1m"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -523,15 +393,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option timeout invalid", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--timeout", "abc"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorIs(t, mkf.ErrInvTimeout, err)
@@ -541,15 +406,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option help long", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--help"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -559,15 +419,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option help short", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"-h"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -577,15 +432,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option version", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--version"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -595,15 +445,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("option list", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--list"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -613,15 +458,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("gomake options and target name with options", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--timeout", "1s", "target", "--arg0", "--arg1"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -640,15 +480,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("unknown option before target name", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--unknown", "target", "--arg0"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.ErrorContain(t, "flag provided but not defined: -unknown", err)
@@ -658,15 +493,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("target field set after options", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--help", "target"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -678,15 +508,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("default target with options", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		args := []string{"--wd", "/dir"}
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -697,15 +522,10 @@ func Test_newConfig(t *testing.T) {
 	t.Run("default target without options", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		var args []string
 
-		ver := "1.2.3"
-
-		rng := tst.Ring(args...)
-
 		// --- When ---
-		have, err := newConfig(ver, rng)
+		have, err := newConfig("1.2.3", tst.Ring(args...))
 
 		// --- Then ---
 		assert.NoError(t, err)

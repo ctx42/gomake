@@ -160,14 +160,14 @@ func runTarget(
 		var tgtErr error
 		defer func() {
 			if v := recover(); v != nil {
-				rerr := RecoverError(v)
-				tgtErr = fmt.Errorf("target panicked with: %w", rerr)
+				err = RecoverError(v)
+				tgtErr = fmt.Errorf("target panicked with: %w", err)
 			}
-			if rerr := os.Chdir(cwd); rerr != nil {
+			if err = os.Chdir(cwd); err != nil {
 				if tgtErr != nil {
-					done <- fmt.Errorf("%w (restore cwd: %w)", tgtErr, rerr)
+					done <- fmt.Errorf("%w (restore cwd: %w)", tgtErr, err)
 				} else {
-					done <- rerr
+					done <- err
 				}
 			} else {
 				done <- tgtErr

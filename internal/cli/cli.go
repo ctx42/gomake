@@ -50,7 +50,7 @@ type goMake struct {
 	targets *parser.Targets // User targets.
 }
 
-// newGoMake returns new instance of [goMake].
+// newGoMake returns a new goMake.
 func newGoMake(
 	ctx context.Context,
 	rng *ring.Ring,

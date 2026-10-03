@@ -19,66 +19,46 @@ import (
 func Test_newLocalPackage(t *testing.T) {
 	t.Run("tagged package with build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
-
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(ctx, rng, pkg)
+		have := newLocalPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
-
 		assert.Equal(t, "main", pkg.Name)
-
 		assert.Equal(t, []string{"makefile.go"}, pkg.Files)
-
 		assert.Equal(t, "github.com/ctx42/gomake", pkg.Module.ImpSpec)
-
 		want := pkg.Module.ImpSpec +
 			"/testdata/projects/simple_tagged/project"
 		assert.Equal(t, want, pkg.ImpSpec)
-
 		assert.Equal(t, filepath.Dir(pkg.Module.ModPath), pkg.Module.ImpPath)
 	})
 
 	t.Run("resolves an untagged package", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/simple_untagged/project")
-
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(ctx, rng, pkg)
+		have := newLocalPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
-
 		assert.Equal(t, "main", pkg.Name)
-
 		assert.Equal(t, []string{"makefile.go"}, pkg.Files)
 	})
 
 	t.Run("tagged file excluded without build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
-
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(ctx, rng, pkg)
+		have := newLocalPackage(t.Context(), ring.New(), pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -86,16 +66,12 @@ func Test_newLocalPackage(t *testing.T) {
 
 	t.Run("no Go files falls back", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/empty")
-
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(ctx, rng, pkg)
+		have := newLocalPackage(t.Context(), rng, pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -105,14 +81,11 @@ func Test_newLocalPackage(t *testing.T) {
 func Test_importDir(t *testing.T) {
 	t.Run("includes tagged files with build tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		have, err := importDir(ctx, rng, dir)
+		have, err := importDir(t.Context(), rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -121,15 +94,13 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("cgo disabled drops cgo files", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "0")
 
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(ctx, rng, dir)
+		have, err := importDir(t.Context(), rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -138,15 +109,13 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("cgo enabled keeps cgo files", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("CGO_ENABLED", "1")
 
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(ctx, rng, dir)
+		have, err := importDir(t.Context(), rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -156,14 +125,10 @@ func Test_importDir(t *testing.T) {
 
 	t.Run("error - tagged files excluded without tag", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
-		rng := ring.New()
-
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		_, err := importDir(ctx, rng, dir)
+		_, err := importDir(t.Context(), ring.New(), dir)
 
 		// --- Then ---
 		assert.ErrorContain(t, "no buildable Go source files", err)
@@ -233,8 +198,7 @@ func Test_buildTags(t *testing.T) {
 		have := buildTags(rng)
 
 		// --- Then ---
-		want := []string{"extra", "other", BuildTag}
-		assert.Equal(t, want, have)
+		assert.Equal(t, []string{"extra", "other", BuildTag}, have)
 	})
 
 	t.Run("goflags without a meta tag", func(t *testing.T) {
@@ -272,8 +236,7 @@ func Test_listTagArgs(t *testing.T) {
 		have := listTagArgs(rng)
 
 		// --- Then ---
-		want := []string{"-tags", "extra," + BuildTag}
-		assert.Equal(t, want, have)
+		assert.Equal(t, []string{"-tags", "extra," + BuildTag}, have)
 	})
 }
 

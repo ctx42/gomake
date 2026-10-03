@@ -21,14 +21,11 @@ func Test_CreateFile(t *testing.T) {
 		// --- Given ---
 		dst := filepath.Join(t.TempDir(), "src.go")
 
-		val := []byte("content")
-
 		// --- When ---
-		err := CreateFile(dst, val)
+		err := CreateFile(dst, []byte("content"))
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "content", oskit.ReadFileStr(t, dst))
 	})
 
@@ -36,14 +33,11 @@ func Test_CreateFile(t *testing.T) {
 		// --- Given ---
 		dst := filepath.Join(t.TempDir(), "not_existing", "src.go")
 
-		val := []byte("content")
-
 		// --- When ---
-		err := CreateFile(dst, val)
+		err := CreateFile(dst, []byte("content"))
 
 		// --- Then ---
 		assert.ErrorIs(t, fs.ErrNotExist, err)
-
 		assert.NoFileExist(t, dst)
 	})
 }
@@ -57,7 +51,6 @@ func Test_WithGenNames(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, "pkg", opts.pkg)
-
 	assert.Equal(t, "method", opts.suffix)
 }
 
@@ -97,27 +90,20 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("builtin targets for abc package", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
-
 		gfp := "testdata/gen_builtin_targets_abc.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB))
 
-		withGenNames := WithGenNames("abc", "Abc")
-
 		// --- When ---
-		have, err := NewGenerator(tgs).Generate(withGenNames)
+		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -125,11 +111,8 @@ func Test_Generator_Generate(t *testing.T) {
 	})
 
 	t.Run("error - empty suffix", func(t *testing.T) {
-		// --- Given ---
-		withGenNames := WithGenNames("abc", "")
-
 		// --- When ---
-		have, err := NewGenerator(nil).Generate(withGenNames)
+		have, err := NewGenerator(nil).Generate(WithGenNames("abc", ""))
 
 		// --- Then ---
 		assert.ErrorEqual(t, "generated method suffix cannot be empty", err)
@@ -139,7 +122,6 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("nil targets", func(t *testing.T) {
 		// --- Given ---
 		gen := NewGenerator(nil)
-
 		empty := NewGenerator(NewTargets())
 		want := must.Value(empty.Generate())
 
@@ -154,21 +136,16 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("builtin targets for the main package", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
-
 		gfp := "testdata/gen_builtin_targets_main.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB))
 
 		// --- When ---
@@ -182,21 +159,16 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("register targets", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
 			"github.com/ctx42/gomake/testdata/imports/pkg7",
 		}
-
 		gfp := "testdata/gen_builtin_targets_main_registered.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB))
 
 		// --- When ---
@@ -210,21 +182,15 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("no targets abc", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		gfp := "testdata/gen_no_targets_abc.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, nil))
 
-		withGenNames := WithGenNames("abc", "Abc")
-
 		// --- When ---
-		have, err := NewGenerator(tgs).Generate(withGenNames)
+		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -234,15 +200,11 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("no targets main", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		gfp := "testdata/gen_no_targets_main.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, nil))
 
 		// --- When ---
@@ -256,25 +218,19 @@ func Test_Generator_Generate(t *testing.T) {
 	t.Run("import without targets", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/projects/no_targets/project",
 		}
 
 		gfp := "testdata/gen_no_targets_abc.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
 		rng := ring.New()
-
 		tgs := must.Value(TargetsFromSpecs(ctx, rng, impSpecs, BuiltInCB))
 
-		withGenNames := WithGenNames("abc", "Abc")
-
 		// --- When ---
-		have, err := NewGenerator(tgs).Generate(withGenNames)
+		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))
 
 		// --- Then ---
 		assert.NoError(t, err)

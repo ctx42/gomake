@@ -17,22 +17,16 @@ import (
 )
 
 func Test_interruptedError_Error(t *testing.T) {
-	// --- Given ---
-	n := 123
-
 	// --- When ---
-	err := interruptedError(n)
+	err := interruptedError(123)
 
 	// --- Then ---
 	assert.Equal(t, "target interrupted", err.Error())
 }
 
 func Test_interruptedError_Signal(t *testing.T) {
-	// --- Given ---
-	n := 123
-
 	// --- When ---
-	err := interruptedError(n)
+	err := interruptedError(123)
 
 	// --- Then ---
 	assert.Equal(t, 123, err.Signal())
@@ -65,7 +59,6 @@ func Test_WithMakefileArgs(t *testing.T) {
 	t.Run("args", func(t *testing.T) {
 		// --- Given ---
 		args := []string{"a", "b", "c"}
-
 		cmf := &Makefile{rng: ring.New()}
 
 		// --- When ---
@@ -79,7 +72,6 @@ func Test_WithMakefileArgs(t *testing.T) {
 func Test_WithMakefileRing(t *testing.T) {
 	// --- Given ---
 	rng := ring.New()
-
 	cmf := &Makefile{}
 
 	// --- When ---
@@ -93,15 +85,11 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("nil option", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{}
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring())
 
-		withMakefileVersion := WithMakefileVersion("v")
-
 		// --- When ---
-		have, err := NewMakefile(tgs, nil, rngOF, withMakefileVersion)
+		have, err := NewMakefile(tgs, nil, rngOF, WithMakefileVersion("v"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -112,10 +100,8 @@ func Test_NewMakefile(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{}
 
-		withMakefileRing := WithMakefileRing(nil)
-
 		// --- When ---
-		have, err := NewMakefile(tgs, withMakefileRing)
+		have, err := NewMakefile(tgs, WithMakefileRing(nil))
 
 		// --- Then ---
 		assert.ErrorIs(t, errNilRing, err)
@@ -125,21 +111,16 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("no arguments", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring())
 
 		// Option function which designed to extract a slice of arguments
 		// before it is overwritten by WithMakefileArgs option.
 		var origArgs []string
-
 		extractArgs := func(cmf *Makefile) { origArgs = cmf.rng.Args() }
 
-		withMakefileArgs := WithMakefileArgs()
-
 		// --- When ---
-		have, err := NewMakefile(tgs, extractArgs, rngOF, withMakefileArgs)
+		have, err := NewMakefile(tgs, extractArgs, rngOF, WithMakefileArgs())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -147,9 +128,7 @@ func Test_NewMakefile(t *testing.T) {
 		assert.Equal(t, time.Duration(0), have.timeout)
 		assert.NotNil(t, have.targets)
 		assert.NotNil(t, have.fs)
-
 		assert.Equal(t, os.Args[1:], origArgs)
-
 		assert.Equal(t, "unknown version", have.version)
 		assert.False(t, have.showHelp)
 		assert.Nil(t, have.optionTgt)
@@ -158,9 +137,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("set a working directory", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--wd", "/wd/path", "target"))
 
 		// --- When ---
@@ -175,9 +152,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("set timeout", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--timeout", "7s", "target"))
 
 		// --- When ---
@@ -192,9 +167,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("error - negative timeout", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--timeout", "-1s", "target"))
 
 		// --- When ---
@@ -208,9 +181,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("error - invalid timeout argument", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--timeout", "abc", "target"))
 
 		// --- When ---
@@ -225,9 +196,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("short help option", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("-h", "target"))
 
 		// --- When ---
@@ -243,9 +212,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("help long", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--help", "target"))
 
 		// --- When ---
@@ -261,7 +228,6 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("both short and long help options", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		argsOF := WithMakefileArgs("-h", "--help", "target")
 
 		// --- When ---
@@ -276,14 +242,10 @@ func Test_NewMakefile(t *testing.T) {
 
 	t.Run("version option", func(t *testing.T) {
 		// --- Given ---
-		tgs := make([]*Target, 0)
-
 		ctx := t.Context()
-
+		tgs := make([]*Target, 0)
 		tst := ringtest.New(t).WetStderr()
-
 		rngOF := WithMakefileRing(tst.Ring("--version"))
-
 		verOF := WithMakefileVersion("1.2.3")
 
 		// --- When ---
@@ -294,21 +256,17 @@ func Test_NewMakefile(t *testing.T) {
 		assert.Equal(t, "1.2.3", have.version)
 		assert.Equal(t, []string{}, have.rng.Args())
 		assert.NoError(t, have.Execute(ctx))
-
 		assert.Equal(t, "1.2.3\n", tst.Stderr())
 	})
 
 	t.Run("list option", func(t *testing.T) {
 		// --- Given ---
+		ctx := t.Context()
 		tgs := []*Target{
 			{Name: "first", Synopsis: "doc for first", Default: false},
 			{Name: "second", Synopsis: "doc for second", Default: true},
 		}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
-
 		rngOF := WithMakefileRing(tst.Ring("--list"))
 
 		// --- When ---
@@ -318,7 +276,6 @@ func Test_NewMakefile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []string{}, have.rng.Args())
 		assert.NoError(t, have.Execute(ctx))
-
 		want := "" +
 			"first      doc for first\n" +
 			"second*    doc for second\n"
@@ -328,9 +285,7 @@ func Test_NewMakefile(t *testing.T) {
 	t.Run("error - unknown option", func(t *testing.T) {
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--unknown", "target"))
 
 		// --- When ---
@@ -348,13 +303,9 @@ func Test_NewMakefile(t *testing.T) {
 
 		// --- Given ---
 		tgs := make([]*Target, 0)
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring())
-
 		argsOF := WithMakefileArgs()
-
 		wd := must.Value(os.Getwd())
 		t.Cleanup(func() { _ = os.Chdir(wd) })
 
@@ -374,12 +325,10 @@ func Test_NewMakefile(t *testing.T) {
 func Test_Makefile_Execute(t *testing.T) {
 	t.Run("error - zero value", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		var cmf Makefile
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNilRing, err)
@@ -387,12 +336,10 @@ func Test_Makefile_Execute(t *testing.T) {
 
 	t.Run("error - nil makefile", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		var cmf *Makefile
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNilRing, err)
@@ -401,38 +348,27 @@ func Test_Makefile_Execute(t *testing.T) {
 	t.Run("show target help", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
-
 		rngOF := WithMakefileRing(tst.Ring("-h", "tgt-a"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "tgt-a\tdoc tgt-a\n", tst.Stderr())
 	})
 
 	t.Run("error - help for unknown target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("-h", "unknown"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
@@ -441,61 +377,43 @@ func Test_Makefile_Execute(t *testing.T) {
 	t.Run("show the version", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
-
 		rngOF := WithMakefileRing(tst.Ring("--version"))
-
 		verOF := WithMakefileVersion("1.2.3")
-
 		cmf := must.Value(NewMakefile(tgs, rngOF, verOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "1.2.3\n", tst.Stderr())
 	})
 
 	t.Run("execute target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtPrintArgs()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStdout()
-
 		rngOF := WithMakefileRing(tst.Ring("tgt-print-args", "arg0"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "[arg0]", tst.Stdout())
 	})
 
 	t.Run("error - unknown target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtB()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("unknown"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrUnkTarget, err)
@@ -504,17 +422,12 @@ func Test_Makefile_Execute(t *testing.T) {
 	t.Run("error - target returning", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtError()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("tgt-error"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorEqual(t, "always error", err)
@@ -523,17 +436,12 @@ func Test_Makefile_Execute(t *testing.T) {
 	t.Run("error - target execution timeout applied", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtLong()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t)
-
 		rngOF := WithMakefileRing(tst.Ring("--timeout", "50ms", "tgt-long"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.ErrorIs(t, context.DeadlineExceeded, err)
@@ -542,42 +450,30 @@ func Test_Makefile_Execute(t *testing.T) {
 	t.Run("target execution time not limited", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtLong()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStdout()
-
 		rngOF := WithMakefileRing(tst.Ring("tgt-long"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "done after 100ms", tst.Stdout())
 	})
 
 	t.Run("target knows its name", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtPrintName()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStdout()
-
 		rngOF := WithMakefileRing(tst.Ring("tgt-print-name"))
-
 		cmf := must.Value(NewMakefile(tgs, rngOF))
 
 		// --- When ---
-		err := cmf.Execute(ctx)
+		err := cmf.Execute(t.Context())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "tgt-print-name", tst.Stdout())
 	})
 }
@@ -585,35 +481,25 @@ func Test_Makefile_Execute(t *testing.T) {
 func Test_fTgtVersion(t *testing.T) {
 	t.Run("no empty version", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
 
-		rng := tst.Ring()
-
 		// --- When ---
-		err := fTgtVersion("1.2.3")(ctx, rng)
+		err := fTgtVersion("1.2.3")(t.Context(), tst.Ring())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "1.2.3\n", tst.Stderr())
 	})
 
 	t.Run("empty version", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
 
-		rng := tst.Ring()
-
 		// --- When ---
-		err := fTgtVersion("")(ctx, rng)
+		err := fTgtVersion("")(t.Context(), tst.Ring())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "\n", tst.Stderr())
 	})
 }
@@ -622,19 +508,13 @@ func Test_fTgtList(t *testing.T) {
 	t.Run("list", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
-
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
 
-		rng := tst.Ring()
-
 		// --- When ---
-		err := fTgtList(tgs)(ctx, rng)
+		err := fTgtList(tgs)(t.Context(), tst.Ring())
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		want := "" +
 			":tgt-core    syn tgt-core\n" +
 			"\n" +

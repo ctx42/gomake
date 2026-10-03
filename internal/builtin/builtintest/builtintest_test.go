@@ -45,12 +45,10 @@ func Test_NewTstProvider(t *testing.T) {
 		// --- Then ---
 		assert.Len(t, 1, have.PreRuns())
 		assert.Same(t, pre[0], have.PreRuns()[0])
-
 		// PreRuns returns a clone so a caller cannot replace a hook.
 		pr := have.PreRuns()
 		pr[0] = nil
 		assert.Same(t, TestPreRun, have.PreRuns()[0])
-
 		// The input slice is cloned too.
 		pre[0] = nil
 		assert.Same(t, TestPreRun, have.PreRuns()[0])
@@ -78,12 +76,10 @@ func Test_TestTargetsSrc(t *testing.T) {
 func Test_TestPreRun(t *testing.T) {
 	t.Run("first call", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
 		// --- When ---
-		hCtx, hRng, err := TestPreRun(ctx, rng)
+		hCtx, hRng, err := TestPreRun(t.Context(), rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -95,7 +91,6 @@ func Test_TestPreRun(t *testing.T) {
 	t.Run("second call increments counter and appends env", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		rng := ring.New()
 
 		// --- When ---

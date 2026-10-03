@@ -60,15 +60,11 @@ func Test_emptyTargetsNote_tabular(t *testing.T) {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
 			fs := xflag.NewFlagSet("install", flag.ContinueOnError)
-
 			tgs := fs.String("targets", "", "")
-
 			must.Nil(fs.Parse(tc.args))
 
-			deref := *tgs
-
 			// --- When ---
-			have := emptyTargetsNote(fs, deref)
+			have := emptyTargetsNote(fs, *tgs)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)

@@ -21,7 +21,6 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, dst)
 	})
 
@@ -34,7 +33,6 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, fs.ErrNotExist, err)
-
 		assert.NoFileExist(t, dst)
 	})
 }

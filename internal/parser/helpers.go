@@ -59,7 +59,7 @@ func GenMakefileUserAndSave(
 	return tgs, nil
 }
 
-// GetBuildTag returns [metaBuildTag] from the [ring.Ring] or empty string if
+// GetBuildTag returns metaBuildTag from the [ring.Ring] or empty string if
 // the key does not exist.
 func GetBuildTag(rng *ring.Ring) string {
 	if v, ok := rng.MetaLookup(metaBuildTag); ok {
@@ -70,13 +70,13 @@ func GetBuildTag(rng *ring.Ring) string {
 	return ""
 }
 
-// SetBuildTag sets [metaBuildTag] on [ring.Ring] to [BuildTag].
+// SetBuildTag sets metaBuildTag on [ring.Ring] to [BuildTag].
 func SetBuildTag(rng *ring.Ring) *ring.Ring {
 	rng.MetaSet(metaBuildTag, BuildTag)
 	return rng
 }
 
-// RemBuildTag removes [metaBuildTag] from the ring metadata.
+// RemBuildTag removes metaBuildTag from the ring metadata.
 func RemBuildTag(rng *ring.Ring) *ring.Ring {
 	rng.MetaDelete(metaBuildTag)
 	return rng

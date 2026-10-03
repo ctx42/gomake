@@ -42,9 +42,7 @@ func Test_newTargets(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		want := builtintest.TestTargets()
-
 		src := builtintest.TestTargetsSrc()
-
 		pre := []mkf.PreRunFn{builtintest.TestPreRun}
 
 		// --- When ---
@@ -63,10 +61,8 @@ func Test_newTargets(t *testing.T) {
 		// --- Given ---
 		src := builtintest.TestTargetsSrc()
 
-		items := []*mkf.Target{}
-
 		// --- When ---
-		have := newTargets(items, src, nil)
+		have := newTargets(make([]*mkf.Target, 0), src, nil)
 
 		// --- Then ---
 		assert.Len(t, 0, have.Targets())
@@ -86,9 +82,7 @@ func Test_newTargets(t *testing.T) {
 func Test_targets_Targets(t *testing.T) {
 	// --- Given ---
 	want := builtintest.TestTargets()
-
 	src := builtintest.TestTargetsSrc()
-
 	tgs := newTargets(want, src, nil)
 
 	// --- When ---
@@ -102,7 +96,6 @@ func Test_targets_Targets(t *testing.T) {
 func Test_targets_PreRuns(t *testing.T) {
 	// --- Given ---
 	pre := []mkf.PreRunFn{builtintest.TestPreRun}
-
 	tgs := newTargets(nil, nil, pre)
 
 	// --- When ---
@@ -116,9 +109,7 @@ func Test_targets_Source(t *testing.T) {
 	t.Run("returns the source", func(t *testing.T) {
 		// --- Given ---
 		want := builtintest.TestTargets()
-
 		src := builtintest.TestTargetsSrc()
-
 		tgs := newTargets(want, src, nil)
 
 		// --- When ---
@@ -131,9 +122,7 @@ func Test_targets_Source(t *testing.T) {
 	t.Run("returns a clone the caller cannot mutate", func(t *testing.T) {
 		// --- Given ---
 		want := builtintest.TestTargets()
-
 		src := builtintest.TestTargetsSrc()
-
 		tgs := newTargets(want, src, nil)
 
 		// --- When ---
@@ -184,7 +173,6 @@ func Test_validGoIdent_tabular(t *testing.T) {
 func Test_WithGenEnv(t *testing.T) {
 	// --- Given ---
 	rng := ring.New()
-
 	opts := &genOpts{}
 
 	// --- When ---
@@ -229,21 +217,15 @@ func Test_GenMain(t *testing.T) {
 		}
 
 		gfpB := "testdata/pkg0_builtin_targets.gld"
-
 		gfdB := map[string]any{"prj_root": modkit.Root()}
-
 		gldB := goldy.Open(t, gfpB, goldy.WithData(gfdB))
 
 		gfpM := "testdata/pkg0_main_targets.gld"
-
 		gfdM := map[string]any{"prj_root": modkit.Root()}
-
 		gldM := goldy.Open(t, gfpM, goldy.WithData(gfdM))
 
 		gfpE := "testdata/pkg0_main_targets_empty.gld"
-
 		gfdE := map[string]any{"prj_root": modkit.Root()}
-
 		gldE := goldy.Open(t, gfpE, goldy.WithData(gfdE))
 
 		opts := []GenOption{
@@ -255,16 +237,13 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
 		assert.Equal(t, gldB.String(), text)
 
 		text = oskit.ReadFileStr(t, prj.Path("data", mainFN))
-
 		assert.Equal(t, gldM.String(), text)
 
 		text = oskit.ReadFileStr(t, prj.Path("data", mainEmptyFN))
-
 		assert.Equal(t, gldE.String(), text)
 	})
 
@@ -276,7 +255,6 @@ func Test_GenMain(t *testing.T) {
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 		}
-
 		opts := []GenOption{
 			WithoutGenEmptySrc,
 			WithGenDst(prj.Root()),
@@ -287,11 +265,8 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, prj.Path(targetsFN))
-
 		assert.FileExist(t, prj.Path("data", mainFN))
-
 		assert.NoFileExist(t, prj.Path("data", mainEmptyFN))
 	})
 
@@ -303,7 +278,6 @@ func Test_GenMain(t *testing.T) {
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 		}
-
 		opts := []GenOption{
 			WithGenDst(prj.Root()),
 			WithGenName("abc"),
@@ -314,13 +288,10 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
 		assert.True(t, strings.HasPrefix(text, "package abc\n"))
-
 		populated := oskit.ReadFileStr(t, prj.Path("data", mainFN))
 		assert.Contain(t, "pkg0.Pkg0", populated)
-
 		empty := oskit.ReadFileStr(t, prj.Path("data", mainEmptyFN))
 		assert.Contain(t, "make([]*Target, 0)\n", empty)
 		assert.NotContain(t, "pkg0.Pkg0", empty)
@@ -334,7 +305,6 @@ func Test_GenMain(t *testing.T) {
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/projects/empty",
 		}
-
 		opts := []GenOption{
 			WithGenDst(prj.Root()),
 		}
@@ -344,11 +314,8 @@ func Test_GenMain(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrGoList, err)
-
 		assert.NoFileExist(t, prj.Path(targetsFN))
-
 		assert.NoFileExist(t, prj.Path("data", mainFN))
-
 		assert.NoFileExist(t, prj.Path("data", mainEmptyFN))
 	})
 }
@@ -365,7 +332,6 @@ func Test_GenImports(t *testing.T) {
 				Namespace: "myns",
 			},
 		}
-
 		opts := []GenOption{
 			WithoutGenEmptySrc,
 			WithGenDst(prj.Root()),
@@ -376,7 +342,6 @@ func Test_GenImports(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
 		assert.Contain(t, `PkgNS:       "myns",`, text)
 		assert.Contain(t, `Name:        ":myns:pkg0",`, text)
@@ -389,16 +354,11 @@ func Test_GenImports(t *testing.T) {
 
 		name := "not-a-name"
 
-		withGenName := WithGenName(name)
-
-		withGenDst := WithGenDst(prj.Root())
-
 		// --- When ---
-		err := GenImports(nil, withGenName, withGenDst)
+		err := GenImports(nil, WithGenName(name), WithGenDst(prj.Root()))
 
 		// --- Then ---
 		assert.ErrorContain(t, name, err)
-
 		assert.NoFileExist(t, prj.Path(targetsFN))
 	})
 
@@ -406,7 +366,6 @@ func Test_GenImports(t *testing.T) {
 		// --- Given ---
 		prj := clitest.NewProject(t)
 		prj.Close()
-
 		original := "package original\n"
 		oskit.Write(t, original, prj.Root(), targetsFN)
 
@@ -418,15 +377,11 @@ func Test_GenImports(t *testing.T) {
 			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
 		}
 
-		withGenDst := WithGenDst(prj.Root())
-
 		// --- When ---
-		err := GenImports(imports, withGenDst)
+		err := GenImports(imports, WithGenDst(prj.Root()))
 
 		// --- Then ---
 		assert.ErrorContain(t, mainFN, err)
-
-		text := oskit.ReadFileStr(t, prj.Path(targetsFN))
-		assert.Equal(t, original, text)
+		assert.Equal(t, original, oskit.ReadFileStr(t, prj.Path(targetsFN)))
 	})
 }

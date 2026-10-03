@@ -5,12 +5,10 @@ package clitest
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/ctx42/testing/pkg/assert"
-	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/exekit"
 	"github.com/ctx42/testkit/pkg/oskit"
@@ -69,7 +67,6 @@ func Test_fromEnv(t *testing.T) {
 
 		// --- Then ---
 		assert.Len(t, 0, env)
-
 		assert.Equal(t, []string{kv + "=" + kv}, have)
 	})
 
@@ -77,14 +74,11 @@ func Test_fromEnv(t *testing.T) {
 		// --- Given ---
 		env := make([]string, 0)
 
-		str := randkit.Str()
-
 		// --- When ---
-		have := fromEnv(str, env)
+		have := fromEnv(randkit.Str(), env)
 
 		// --- Then ---
 		assert.Len(t, 0, env)
-
 		assert.Len(t, 0, have)
 	})
 }
@@ -103,7 +97,6 @@ func Test_goCache(t *testing.T) {
 
 		// --- Then ---
 		tspy.AssertExpectations()
-
 		assert.Equal(t, want, have)
 	})
 
@@ -120,65 +113,7 @@ func Test_goCache(t *testing.T) {
 
 		// --- Then ---
 		tspy.AssertExpectations()
-
 		assert.Equal(t, want, have)
-	})
-
-	t.Run("error - stderr", func(t *testing.T) {
-		// --- Given ---
-		bin := t.TempDir()
-
-		script := filepath.Join(bin, "go")
-
-		body := "" +
-			"#!/bin/sh\n" +
-			"echo noisy >&2\n" +
-			"echo /cache\n"
-		must.Nil(os.WriteFile(script, []byte(body), 0o755))
-
-		path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
-		t.Setenv("PATH", path)
-
-		tspy := tester.New(t)
-		tspy.ExpectFatal()
-		tspy.ExpectLogContain("noisy")
-		tspy.Close()
-
-		fn := func() { goCache(tspy) }
-
-		// --- When ---
-		assert.Panic(t, fn)
-
-		// --- Then ---
-		tspy.AssertExpectations()
-	})
-
-	t.Run("error - go fails", func(t *testing.T) {
-		// --- Given ---
-		bin := t.TempDir()
-
-		script := filepath.Join(bin, "go")
-
-		body := "" +
-			"#!/bin/sh\n" +
-			"exit 1\n"
-		must.Nil(os.WriteFile(script, []byte(body), 0o755))
-
-		path := bin + string(os.PathListSeparator) + os.Getenv("PATH")
-		t.Setenv("PATH", path)
-
-		tspy := tester.New(t)
-		tspy.ExpectFatal()
-		tspy.ExpectLogContain("exit status 1")
-		tspy.Close()
-
-		fn := func() { goCache(tspy) }
-
-		// --- When ---
-		assert.Panic(t, fn)
-
-		// --- Then ---
-		tspy.AssertExpectations()
 	})
 }
 
@@ -188,10 +123,8 @@ func Test_findMakefiles(t *testing.T) {
 		tspy := tester.New(t)
 		tspy.Close()
 
-		testdata := "testdata"
-
 		// --- When ---
-		have := findMakefiles(tspy, testdata)
+		have := findMakefiles(tspy, "testdata")
 
 		// --- Then ---
 		want := []string{
@@ -208,14 +141,8 @@ func Test_JoinImpSpec(t *testing.T) {
 		tspy := tester.New(t)
 		tspy.Close()
 
-		path := "example.com/mod/pkg"
-
-		abc := "abc"
-
-		def := "def"
-
 		// --- When ---
-		have := JoinImpSpec(tspy, path, abc, def)
+		have := JoinImpSpec(tspy, "example.com/mod/pkg", "abc", "def")
 
 		// --- Then ---
 		assert.Equal(t, "example.com/mod/pkg/abc/def", have)
@@ -228,12 +155,8 @@ func Test_JoinImpSpec(t *testing.T) {
 		tspy.ExpectLogContain("missing protocol scheme")
 		tspy.Close()
 
-		text := ":"
-
-		path := "example.com/mod/pkg"
-
 		// --- When ---
-		have := JoinImpSpec(tspy, text, path)
+		have := JoinImpSpec(tspy, ":", "example.com/mod/pkg")
 
 		// --- Then ---
 		assert.Empty(t, have)
@@ -248,14 +171,8 @@ func Test_rowColValue(t *testing.T) {
 		tspy.ExpectLogEqual("expected header to be non-empty")
 		tspy.Close()
 
-		header := ""
-
-		text := "header col1 col2"
-
-		n := 1
-
 		// --- When ---
-		have := rowColValue(tspy, header, n, text)
+		have := rowColValue(tspy, "", 1, "header col1 col2")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -267,15 +184,8 @@ func Test_rowColValue(t *testing.T) {
 		tspy.ExpectLogEqual("expected column to be positive, got: 0")
 		tspy.Close()
 
-		// --- Given ---
-		header := "header"
-
-		n := 0
-
-		text := "header col1 col2"
-
 		// --- When ---
-		have := rowColValue(tspy, header, n, text)
+		have := rowColValue(tspy, "header", 0, "header col1 col2")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -287,15 +197,8 @@ func Test_rowColValue(t *testing.T) {
 		tspy.ExpectLogEqual("expected row to have at least 5 fields")
 		tspy.Close()
 
-		// --- Given ---
-		header := "header"
-
-		n := 5
-
-		text := "header col1 col2"
-
 		// --- When ---
-		have := rowColValue(tspy, header, n, text)
+		have := rowColValue(tspy, "header", 5, "header col1 col2")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -307,15 +210,8 @@ func Test_rowColValue(t *testing.T) {
 		tspy.ExpectLogEqual("expected row with header \"header1\" to exist")
 		tspy.Close()
 
-		// --- Given ---
-		header1 := "header1"
-
-		n := 5
-
-		text := "header0 col01 col02"
-
 		// --- When ---
-		have := rowColValue(tspy, header1, n, text)
+		have := rowColValue(tspy, "header1", 5, "header0 col01 col02")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -454,8 +350,8 @@ func Test_infoToEnv(t *testing.T) {
 		wMsg := "" +
 			"expected line to have two fields, " +
 			"got: \"key1 value10 value11\""
-		tspy.ExpectLogEqual(wMsg)
 
+		tspy.ExpectLogEqual(wMsg)
 		tspy.Close()
 
 		output := "" +

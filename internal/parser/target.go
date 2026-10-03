@@ -57,7 +57,7 @@ func newTarget(
 	tgt.PkgName = pkg.Name
 	tgt.PkgNS = pkg.PkgNS
 	tgt.Breadcrumbs = crumbs
-	tgt.Receiver = stripRecvStar(df.Recv)
+	tgt.Receiver = strings.TrimPrefix(df.Recv, "*")
 	tgt.FuncName = df.Name
 
 	ft := df.Decl.Type
@@ -92,12 +92,6 @@ func selName(expr ast.Expr) string {
 	default:
 		return ""
 	}
-}
-
-// stripRecvStar removes a leading "*" from a go/doc receiver string so
-// pointer methods generate valid identifiers (VarName, var decls).
-func stripRecvStar(recv string) string {
-	return strings.TrimPrefix(recv, "*")
 }
 
 // setDerivedFields sets target's calculated fields.

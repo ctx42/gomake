@@ -13,16 +13,12 @@ import (
 
 func Test_Root(t *testing.T) {
 	t.Run("ok", func(t *testing.T) {
-		// --- Given ---
-		dir := "."
-
 		// --- When ---
-		have, err := Root(dir)
+		have, err := Root(".")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		want := must.Value(filepath.Abs("../.."))
-		assert.Equal(t, want, have)
+		assert.Equal(t, must.Value(filepath.Abs("../..")), have)
 	})
 
 	t.Run("error - project root not found", func(t *testing.T) {
@@ -39,19 +35,11 @@ func Test_Root(t *testing.T) {
 	})
 
 	t.Run("path", func(t *testing.T) {
-		// --- Given ---
-		dir := "."
-
-		internal := "internal"
-
-		vtst := "vtst"
-
 		// --- When ---
-		have, err := Root(dir, internal, vtst)
+		have, err := Root(".", "internal", "vtst")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		want := must.Value(filepath.Abs("../../internal/vtst"))
-		assert.Equal(t, want, have)
+		assert.Equal(t, must.Value(filepath.Abs("../../internal/vtst")), have)
 	})
 }

@@ -26,12 +26,9 @@ import (
 func Test_GenMakefileUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/showcase_imports/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -40,10 +37,8 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		root := prj.Root()
-
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(ctx, rng, root)
+		hCode, hTgs, err := genMakefileUser(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -61,23 +56,17 @@ func Test_GenMakefileUser(t *testing.T) {
 		assert.Equal(t, wantNames, hTgs.Names())
 
 		prj.ChdirBack()
-
 		gfp := "testdata/mkf_user_main.gld"
-
 		gfd := map[string]any{"gmk_root": modkit.Root(), "prj_root": prj.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 		assert.Equal(t, gld.String(), string(hCode))
 	})
 
 	t.Run("error - duplicated targets", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
 
 		relPath := "testdata/projects/dup_imported/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -86,10 +75,8 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		root := prj.Root()
-
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(ctx, rng, root)
+		hCode, hTgs, err := genMakefileUser(t.Context(), rng, prj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -101,10 +88,7 @@ func Test_GenMakefileUser(t *testing.T) {
 func Test_GenMakefileUserAndSave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		relPath := "testdata/projects/no_targets/project"
 
 		prj := gmt.NewProject(t)
@@ -116,31 +100,22 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 		dst := prj.Path(mkf.MakefileUser)
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
+		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, 0, have.Len())
-
 		gfp := "testdata/gen_no_targets_main_init.gld"
-
 		gfd := map[string]any{"prj_root": modkit.Root()}
-
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 		assert.Equal(t, gld.String(), oskit.ReadFileStr(t, dst))
 	})
 
 	t.Run("error - generating code", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		relPath := "testdata/projects/dup_imported/project"
-
 		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
@@ -152,10 +127,8 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 		dst := prj.Path(mkf.MakefileUser)
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
+		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -164,12 +137,8 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 	t.Run("error writing file", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := SetBuildTag(ring.New())
-
 		relPath := "testdata/projects/no_targets/project"
-
 		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
@@ -181,10 +150,8 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 
 		dst := t.TempDir()
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := GenMakefileUserAndSave(ctx, rng, root, dst)
+		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
 
 		// --- Then ---
 		var e *os.PathError
@@ -206,7 +173,6 @@ func Test_SetBuildTag_GetBuildTag_RemBuildTag(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, rng0.MetaAll(), hRng1.MetaAll())
-
 	// --- Then ---
 	assert.Equal(t, BuildTag, GetBuildTag(hRng1))
 
@@ -215,7 +181,6 @@ func Test_SetBuildTag_GetBuildTag_RemBuildTag(t *testing.T) {
 
 	// --- Then ---
 	assert.Empty(t, GetBuildTag(hRng1))
-
 	assert.Empty(t, GetBuildTag(hRng2))
 }
 
@@ -244,22 +209,16 @@ func Test_toOneLine_tabular(t *testing.T) {
 
 func Test_removeNoLintComments_tabular(t *testing.T) {
 	t.Run("doc string with nolint", func(t *testing.T) {
-		// --- Given ---
-		text := "abc\ndef\nnolint:xxx\nghi"
-
 		// --- When ---
-		have := removeNoLintComments(text)
+		have := removeNoLintComments("abc\ndef\nnolint:xxx\nghi")
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", have)
 	})
 
 	t.Run("doc string without nolint", func(t *testing.T) {
-		// --- Given ---
-		text := "abc\ndef\nghi"
-
 		// --- When ---
-		have := removeNoLintComments(text)
+		have := removeNoLintComments("abc\ndef\nghi")
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", have)
@@ -268,11 +227,8 @@ func Test_removeNoLintComments_tabular(t *testing.T) {
 
 func Test_isHidden(t *testing.T) {
 	t.Run("hidden target", func(t *testing.T) {
-		// --- Given ---
-		text := "abc\n\ngomake:hidden\ndef"
-
 		// --- When ---
-		hDoc, hHidden := isHidden(text)
+		hDoc, hHidden := isHidden("abc\n\ngomake:hidden\ndef")
 
 		// --- Then ---
 		assert.Equal(t, "abc\n\ndef", hDoc)
@@ -280,11 +236,8 @@ func Test_isHidden(t *testing.T) {
 	})
 
 	t.Run("not hidden target", func(t *testing.T) {
-		// --- Given ---
-		text := "abc\ndef\nghi"
-
 		// --- When ---
-		hDoc, hHidden := isHidden(text)
+		hDoc, hHidden := isHidden("abc\ndef\nghi")
 
 		// --- Then ---
 		assert.Equal(t, "abc\ndef\nghi", hDoc)
@@ -388,11 +341,8 @@ func Test_breadcrumbs(t *testing.T) {
 	t.Run("invalid type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		relPath := "testdata/projects/ns_crossfile/project"
-
 		absPath := modkit.Path(relPath)
-
 		tst := NewTestHelper(t, rng, absPath)
 
 		typ := tst.Types()[0]
@@ -484,13 +434,10 @@ func Test_isNS(t *testing.T) {
 
 		// --- Given ---
 		exe := os.Args[0]
-
 		env := append(os.Environ(), "GOMAKE_ISNS_CYCLE=1")
 
-		text := "-test.run=^Test_isNS$"
-
 		// --- When ---
-		hCmd := exec.Command(exe, text)
+		hCmd := exec.Command(exe, "-test.run=^Test_isNS$")
 		hCmd.Env = env
 		hOut, err := hCmd.CombinedOutput()
 
@@ -498,7 +445,6 @@ func Test_isNS(t *testing.T) {
 		if err != nil {
 			t.Log(string(hOut))
 		}
-
 		assert.NoError(t, err)
 	})
 }
@@ -565,18 +511,14 @@ func Test_isNSRoot(t *testing.T) {
 	t.Run("doc comment", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
-
 		src := "" +
 			"package p\n" +
 			"\n" +
 			"// Foo groups targets.\n" +
 			"//gomake:ns_root\n" +
 			"type Foo struct{}\n"
-
 		pth := oskit.Write(t, src, dir, "p.go")
-
 		_, fls := must.Values(astFiles(dir, []string{pth}))
-
 		spc := fls[pth].Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)
 
 		// --- When ---
@@ -620,12 +562,10 @@ func Test_importLocalNames(t *testing.T) {
 		"\ta \"example.com/one/git\"\n" +
 		"\t\"example.com/pkg\"\n" +
 		")\n"
-
 	set := token.NewFileSet()
-
-	fil, err := goparser.ParseFile(set, "x.go", src, goparser.ImportsOnly)
-	assert.NoError(t, err)
-
+	fil := must.Value(goparser.ParseFile(
+		set, "x.go", src, goparser.ImportsOnly,
+	))
 	files := map[string]*ast.File{"x.go": fil}
 
 	// --- When ---
@@ -726,11 +666,8 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-			elem := iss[tc.index]
-
 			// --- When ---
-			hNS, hSpec := gmImpSpec(elem)
+			hNS, hSpec := gmImpSpec(iss[tc.index])
 
 			// --- Then ---
 			assert.Equal(t, tc.wantSpec, hSpec)
@@ -748,17 +685,13 @@ func Test_gmImpSpec_doc(t *testing.T) {
 			"\t//gomake:import ns\n" +
 			"\t_ \"example.com/bar\"\n" +
 			")\n"
-
 		set := token.NewFileSet()
-
 		fil := must.Value(goparser.ParseFile(
 			set, "x.go", src, goparser.ParseComments,
 		))
 
-		elem := fil.Imports[0]
-
 		// --- When ---
-		hNS, hSpec := gmImpSpec(elem)
+		hNS, hSpec := gmImpSpec(fil.Imports[0])
 
 		// --- Then ---
 		assert.Equal(t, "ns", hNS)
@@ -788,23 +721,16 @@ func Test_gmImpSpec_doc(t *testing.T) {
 	t.Run("above a single import", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
-
 		src := "" +
 			"package p\n" +
 			"\n" +
 			"//gomake:import ns\n" +
 			"import _ \"example.com/bar\"\n"
-
 		pth := oskit.Write(t, src, dir, "p.go")
-
 		_, fls := must.Values(astFiles(dir, []string{pth}))
 
-		fil := fls[pth]
-
-		elem := fil.Imports[0]
-
 		// --- When ---
-		hNS, hSpec := gmImpSpec(elem)
+		hNS, hSpec := gmImpSpec(fls[pth].Imports[0])
 
 		// --- Then ---
 		assert.Equal(t, "ns", hNS)
@@ -852,14 +778,9 @@ func Test_unquote_tabular(t *testing.T) {
 func Test_gmImpPackages(t *testing.T) {
 	t.Run("imports", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 
-		blank := ""
-
 		relPath := "testdata/projects/showcase_imports/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -871,99 +792,60 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(ctx, rng, blank, astFil.Decls...)
+		have, err := gmImpPackages(t.Context(), rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
 
 		prj.ChdirBack()
-
 		pkg := have[0]
-
 		assert.Equal(t, "", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg0"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg0", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
 		pkg = have[1]
-
 		assert.Equal(t, "ns", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg1"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg1", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
 		pkg = have[2]
-
 		assert.Equal(t, "mx", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg2"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg2", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go", "file1.go"}, pkg.Files)
 
 		pkg = have[3]
-
 		assert.Equal(t, "abc", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg9"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg9", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
-
 		assert.Len(t, 4, have)
 	})
 
 	t.Run("imports GOOS windows", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
-		blank := ""
-
 		relPath := "testdata/projects/showcase_imports/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -975,85 +857,51 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(ctx, rng, blank, astFil.Decls...)
+		have, err := gmImpPackages(t.Context(), rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
 
 		prj.ChdirBack()
-
 		pkg := have[0]
-
 		assert.Equal(t, "", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg0"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg0", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
 		pkg = have[1]
-
 		assert.Equal(t, "ns", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg1"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg1", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go"}, pkg.Files)
 
 		pkg = have[2]
-
 		assert.Equal(t, "mx", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg2"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg2", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go", "file1.go"}, pkg.Files)
 
 		pkg = have[3]
-
 		assert.Equal(t, "abc", pkg.PkgNS)
-
 		relPath = "testdata/imports/pkg9"
-
 		absPath = modkit.Path(relPath)
-
 		impSpec = gmt.JoinImpSpec(t, gmt.GmModName, relPath)
-
 		assert.Equal(t, absPath, pkg.ImpPath)
-
 		assert.Equal(t, impSpec, pkg.ImpSpec)
-
 		assert.Equal(t, "pkg9", pkg.Name)
-
 		assert.Equal(t, []string{"file0.go", "file1_windows.go"}, pkg.Files)
-
 		assert.Len(t, 4, have)
 	})
 }
@@ -1062,7 +910,6 @@ func Test_findDefault(t *testing.T) {
 	t.Run("no default target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/showcase_imports/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -1072,7 +919,6 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
-
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
@@ -1085,7 +931,6 @@ func Test_findDefault(t *testing.T) {
 	t.Run("default target from local package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_local/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -1095,7 +940,6 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
-
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
@@ -1108,7 +952,6 @@ func Test_findDefault(t *testing.T) {
 	t.Run("target from imported package", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_from_imp/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -1118,7 +961,6 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
-
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
@@ -1131,7 +973,6 @@ func Test_findDefault(t *testing.T) {
 	t.Run("target from local namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/default_from_ns/project"
-
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
 		prj.GoModInit()
@@ -1141,7 +982,6 @@ func Test_findDefault(t *testing.T) {
 		prj.Chdir()
 
 		rng := ring.New()
-
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
@@ -1158,7 +998,6 @@ func Test_findDefault(t *testing.T) {
 			Names: []*ast.Ident{{Name: "Default"}},
 			Type:  &ast.Ident{Name: "Target"},
 		}
-
 		val := &doc.Value{
 			Names: []string{"Default"},
 			Decl:  &ast.GenDecl{Specs: []ast.Spec{spec}},

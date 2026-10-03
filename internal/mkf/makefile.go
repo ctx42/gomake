@@ -52,6 +52,8 @@ var errNilRing = errors.New("nil ring")
 // been interrupted by an OS signal.
 type interruptedError int
 
+var _ error = interruptedError(0)
+
 func (ier interruptedError) Error() string { return "target interrupted" }
 
 // Signal returns signal code.

@@ -42,9 +42,7 @@ func Test_Target_GoCode(t *testing.T) {
 	t.Run("all fields set", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_all_fields.gld"
-
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
-
 		tgt := &Target{
 			ImpSpec:     "ImpSpec",
 			ImpPath:     "ImpPath",
@@ -84,9 +82,7 @@ func Test_Target_GoCode(t *testing.T) {
 	t.Run("target without args", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_without_args.gld"
-
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
-
 		tgt := &Target{
 			Name:    "Name",
 			CodeRef: "CodeRef",
@@ -102,9 +98,7 @@ func Test_Target_GoCode(t *testing.T) {
 	t.Run("Doc and Synopsis with quotes", func(t *testing.T) {
 		// --- Given ---
 		gfp := "testdata/target_with_quotes_in_docs.gld"
-
 		gld := goldy.Open(t, pathkit.AbsPath(t, gfp))
-
 		tgt := &Target{
 			Name:     "Name",
 			CodeRef:  "CodeRef",
@@ -128,14 +122,11 @@ func Test_Target_genRunCode(t *testing.T) {
 			CodeRef: "pkt.Hello",
 		}
 
-		n := 0
-
 		// --- When ---
-		have := tgt.genRunCode(n)
+		have := tgt.genRunCode(0)
 
 		// --- Then ---
-		want := "return pkt.Hello(ctx, rng)"
-		assert.Equal(t, want, have)
+		assert.Equal(t, "return pkt.Hello(ctx, rng)", have)
 	})
 
 	t.Run("indented", func(t *testing.T) {
@@ -145,14 +136,11 @@ func Test_Target_genRunCode(t *testing.T) {
 			CodeRef: "pkt.Hello",
 		}
 
-		n := 3
-
 		// --- When ---
-		have := tgt.genRunCode(n)
+		have := tgt.genRunCode(3)
 
 		// --- Then ---
-		want := "\t\t\treturn pkt.Hello(ctx, rng)"
-		assert.Equal(t, want, have)
+		assert.Equal(t, "\t\t\treturn pkt.Hello(ctx, rng)", have)
 	})
 }
 

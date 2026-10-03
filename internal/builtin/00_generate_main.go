@@ -63,16 +63,18 @@ func findGomakeRoot() (string, error) {
 	start := dir
 	for {
 		gomod := filepath.Join(dir, "go.mod")
-		f, err2 := os.Open(gomod)
-		if err2 != nil {
-			if !errors.Is(err2, os.ErrNotExist) {
-				return "", fmt.Errorf("open %s: %w", gomod, err2)
+		var f *os.File
+		f, err = os.Open(gomod)
+		if err != nil {
+			if !errors.Is(err, os.ErrNotExist) {
+				return "", fmt.Errorf("open %s: %w", gomod, err)
 			}
 		} else {
-			mod, readErr := readModuleLine(f)
+			var mod string
+			mod, err = readModuleLine(f)
 			_ = f.Close()
-			if readErr != nil {
-				return "", fmt.Errorf("read %s: %w", gomod, readErr)
+			if err != nil {
+				return "", fmt.Errorf("read %s: %w", gomod, err)
 			}
 			if mod == "github.com/ctx42/gomake" {
 				return dir, nil

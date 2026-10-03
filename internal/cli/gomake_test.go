@@ -28,12 +28,10 @@ func Test_newGoMake(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		rng := ring.New()
-
 		cfg := &config{}
 
 		// --- When ---
-		_, err := newGoMake(ctx, rng, cfg)
+		_, err := newGoMake(ctx, ring.New(), cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -44,7 +42,6 @@ func Test_newGoMake(t *testing.T) {
 		tst := ringtest.New(t)
 
 		relPth := "testdata/projects/showcase_imports/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -58,14 +55,11 @@ func Test_newGoMake(t *testing.T) {
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		ctx := t.Context()
-
 		// --- When ---
-		have, err := newGoMake(ctx, rng, cfg)
+		have, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -91,7 +85,6 @@ func Test_newGoMake(t *testing.T) {
 		tst := ringtest.New(t)
 
 		relPth := "testdata/projects/no_makefile/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -105,14 +98,11 @@ func Test_newGoMake(t *testing.T) {
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		ctx := t.Context()
-
 		// --- When ---
-		have, err := newGoMake(ctx, rng, cfg)
+		have, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -124,7 +114,6 @@ func Test_newGoMake(t *testing.T) {
 		tst := ringtest.New(t)
 
 		relPth := "testdata/projects/dup_imported/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -138,14 +127,11 @@ func Test_newGoMake(t *testing.T) {
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		ctx := t.Context()
-
 		// --- When ---
-		have, err := newGoMake(ctx, rng, cfg)
+		have, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrDupTarget, err)
@@ -157,7 +143,6 @@ func Test_newGoMake(t *testing.T) {
 		tst := ringtest.New(t)
 
 		relPth := "testdata/projects/dup_imported/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -171,19 +156,15 @@ func Test_newGoMake(t *testing.T) {
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		ctx := t.Context()
-
 		// --- When ---
-		have, err := newGoMake(ctx, rng, cfg)
+		have, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrDupTarget, err)
 		assert.Nil(t, have)
-
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -192,7 +173,6 @@ func Test_newGoMake(t *testing.T) {
 		tst := ringtest.New(t)
 
 		relPth := "testdata/projects/arch_os_build_tag/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -208,14 +188,11 @@ func Test_newGoMake(t *testing.T) {
 		)
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
 
-		ctx := t.Context()
-
 		// --- When ---
-		have, err := newGoMake(ctx, rng, cfg)
+		have, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -235,7 +212,6 @@ func Test_newGoMake(t *testing.T) {
 			tst := ringtest.New(t)
 
 			relPth := "testdata/projects/showcase_targets/project"
-
 			absPth := modkit.Path(relPth)
 
 			prj := gmt.NewProject(t)
@@ -246,20 +222,16 @@ func Test_newGoMake(t *testing.T) {
 			prj.Close()
 
 			bin := filepath.Join(t.TempDir(), "my-bin")
-
 			rng := tst.Ring(
 				"--tmp", prj.TempDir(),
 				"--src", prj.Root(),
 				"--bin", bin,
 			)
-
 			cfg := must.Value(newConfig("1.2.3", rng))
 			rng = rng.SetArgs(cfg.args)
 
-			ctx := t.Context()
-
 			// --- When ---
-			have, err := newGoMake(ctx, rng, cfg)
+			have, err := newGoMake(t.Context(), rng, cfg)
 
 			// --- Then ---
 			assert.NoError(t, err)
@@ -270,8 +242,6 @@ func Test_newGoMake(t *testing.T) {
 
 func Test_goMake_Compile(t *testing.T) {
 	// --- Given ---
-	ctx := t.Context()
-
 	tst := ringtest.New(t)
 
 	absPth := modkit.Path("testdata/projects/showcase_targets/project")
@@ -286,33 +256,25 @@ func Test_goMake_Compile(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "my-bin")
 
 	rng := tst.Ring("--tmp", prj.TempDir(), "--src", prj.Root())
-
 	cfg := must.Value(newConfig("1.2.3", rng))
 	rng = rng.SetArgs(cfg.args)
-
 	gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
-	envAll := rng.EnvAll()
-
 	// --- When ---
-	have, err := gmk.Compile(ctx, envAll, bin)
+	have, err := gmk.Compile(t.Context(), rng.EnvAll(), bin)
 
 	// --- Then ---
 	assert.NoError(t, err)
 	assert.Equal(t, bin, have)
-
 	assert.FileExist(t, bin)
 }
 
 func Test_goMake_Execute(t *testing.T) {
 	t.Run("show version", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
 
 		relPth := "testdata/projects/showcase_imports/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -327,29 +289,23 @@ func Test_goMake_Execute(t *testing.T) {
 			"--src", prj.Root(),
 			"--version",
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-
 		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
-		err := gmk.Execute(ctx, rng)
+		err := gmk.Execute(t.Context(), rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "1.2.3\n", tst.Stderr())
 	})
 
 	t.Run("show env", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStdout()
 
 		relPth := "testdata/projects/showcase_targets/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -360,37 +316,29 @@ func Test_goMake_Execute(t *testing.T) {
 		prj.Close()
 
 		kv := randkit.Str()
-
 		rng := tst.Ring(
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 			"basic-env", kv,
 		)
 		rng.EnvSet(kv, kv)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-
 		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
-		err := gmk.Execute(ctx, rng)
+		err := gmk.Execute(t.Context(), rng)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
-		want := fmt.Sprintf("BasicEnv %s=%s", kv, kv)
-		assert.Equal(t, want, tst.Stdout())
+		assert.Equal(t, fmt.Sprintf("BasicEnv %s=%s", kv, kv), tst.Stdout())
 	})
 
 	t.Run("run error", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		tst := ringtest.New(t).WetStderr()
 
 		relPth := "testdata/projects/no_targets/project"
-
 		absPth := modkit.Path(relPth)
 
 		prj := gmt.NewProject(t)
@@ -404,18 +352,15 @@ func Test_goMake_Execute(t *testing.T) {
 			"--tmp", prj.TempDir(),
 			"--src", prj.Root(),
 		)
-
 		cfg := must.Value(newConfig("1.2.3", rng))
 		rng = rng.SetArgs(cfg.args)
-
 		gmk := must.Value(newGoMake(t.Context(), rng, cfg))
 
 		// --- When ---
-		err := gmk.Execute(ctx, rng)
+		err := gmk.Execute(t.Context(), rng)
 
 		// --- Then ---
 		assert.ExitCode(t, mkf.ExitCodePickTarget, err)
-
 		assert.Equal(t, mkf.ErrPickTarget.Error()+"\n", tst.Stderr())
 	})
 }

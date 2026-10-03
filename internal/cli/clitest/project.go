@@ -53,7 +53,7 @@ func NewProject(t tester.T, opts ...func(*prjkit.Project)) *Project {
 // called only once.
 func (prj *Project) MakefilesFrom(src string) []string {
 	prj.t.Helper()
-	prj.CheckOpen()
+	_ = prj.CheckOpen()
 
 	if prj.mkfFrom != "" {
 		prj.t.Fatal("the MakefilesFrom method can be used only once")
@@ -106,13 +106,13 @@ func (prj *Project) MakefilesFrom(src string) []string {
 // "github.com/ctx42/gomake" imports with the source on the disk at src.
 func (prj *Project) UseGomakeSrc(src string) {
 	prj.t.Helper()
-	prj.CheckOpen()
+	_ = prj.CheckOpen()
 
 	gmPth := "github.com/ctx42/gomake@v0.0.0"
 	ringPth := "github.com/ctx42/ring@" + prj.ringVer
-	prj.Exe("go", "mod", "edit", "-require="+ringPth)
-	prj.Exe("go", "mod", "edit", "-require="+gmPth)
-	prj.Exe("go", "mod", "edit", "-replace="+gmPth+"="+src)
+	_, _ = prj.Exe("go", "mod", "edit", "-require="+ringPth)
+	_, _ = prj.Exe("go", "mod", "edit", "-require="+gmPth)
+	_, _ = prj.Exe("go", "mod", "edit", "-replace="+gmPth+"="+src)
 }
 
 // RequireXflag adds the xflag module requirement and records its checksum so
@@ -122,9 +122,9 @@ func (prj *Project) UseGomakeSrc(src string) {
 // requirement.
 func (prj *Project) RequireXflag() {
 	prj.t.Helper()
-	prj.CheckOpen()
+	_ = prj.CheckOpen()
 
 	xflagPth := "github.com/ctx42/xflag@" + prj.xflagVer
-	prj.Exe("go", "mod", "edit", "-require="+xflagPth)
-	prj.Exe("go", "mod", "download", xflagPth)
+	_, _ = prj.Exe("go", "mod", "edit", "-require="+xflagPth)
+	_, _ = prj.Exe("go", "mod", "download", xflagPth)
 }

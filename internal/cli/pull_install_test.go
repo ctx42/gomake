@@ -19,7 +19,6 @@ func Test_installPath_envOverride(t *testing.T) {
 	// --- Given ---
 	want := filepath.Join(t.TempDir(), "gomake")
 	oskit.Write(t, "x", want)
-
 	rng := ring.New()
 	rng.EnvSet(envKeyInstallPath, want)
 
@@ -38,7 +37,6 @@ func Test_installPath_executableLookup(t *testing.T) {
 	rng.EnvSet(envKeyInstallPath, "")
 
 	execPath := must.Value(os.Executable())
-
 	want := must.Value(filepath.EvalSymlinks(execPath))
 	want = must.Value(filepath.Abs(want))
 
@@ -58,7 +56,6 @@ func Test_installPathFallback(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		name += ".exe"
 	}
-
 	want := filepath.Join(must.Value(GoBinPath(env)), name)
 
 	// --- When ---
@@ -72,13 +69,9 @@ func Test_installPathFallback(t *testing.T) {
 func Test_replaceInstall(t *testing.T) {
 	// --- Given ---
 	dir := t.TempDir()
-
 	built := filepath.Join(dir, "built")
-
 	installBin := filepath.Join(dir, "gomake")
-
 	oskit.Write(t, "new-binary", built)
-
 	oskit.Write(t, "old", installBin)
 
 	// --- When ---
@@ -86,9 +79,7 @@ func Test_replaceInstall(t *testing.T) {
 
 	// --- Then ---
 	assert.NoError(t, err)
-
-	data := oskit.ReadFileStr(t, installBin)
-	assert.Equal(t, "new-binary", data)
+	assert.Equal(t, "new-binary", oskit.ReadFileStr(t, installBin))
 }
 
 func Test_replaceInstall_error_tabular(t *testing.T) {
@@ -123,7 +114,6 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
 			dir := t.TempDir()
-
 			built, installPath := tc.setup(t, dir)
 
 			// --- When ---
@@ -138,11 +128,8 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 func Test_copyFile(t *testing.T) {
 	// --- Given ---
 	dir := t.TempDir()
-
 	src := filepath.Join(dir, "src")
-
 	dst := filepath.Join(dir, "dst")
-
 	oskit.Write(t, "data", src)
 
 	// --- When ---
@@ -150,9 +137,7 @@ func Test_copyFile(t *testing.T) {
 
 	// --- Then ---
 	assert.NoError(t, err)
-
-	data := oskit.ReadFileStr(t, dst)
-	assert.Equal(t, "data", data)
+	assert.Equal(t, "data", oskit.ReadFileStr(t, dst))
 }
 
 func Test_copyFile_error_tabular(t *testing.T) {
@@ -169,15 +154,10 @@ func Test_copyFile_error_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-			join := filepath.Join(t.TempDir(), tc.src)
-
-			join2 := filepath.Join(t.TempDir(), "dst")
-
 			// --- When ---
 			err := copyFile(
-				join,
-				join2,
+				filepath.Join(t.TempDir(), tc.src),
+				filepath.Join(t.TempDir(), "dst"),
 			)
 
 			// --- Then ---

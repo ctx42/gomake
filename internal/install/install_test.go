@@ -28,55 +28,41 @@ func Test_build(t *testing.T) {
 	t.Run("creates dstDir and builds cmd/gomake", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		root, cmdDir := setup(t)
 		oskit.Write(t, mainSrc, cmdDir, "main.go")
-
 		dst := filepath.Join(t.TempDir(), "out")
 
-		blank := ""
-
 		// --- When ---
-		err := build(env, root, dst, blank)
+		err := build(env, root, dst, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, filepath.Join(dst, gomakeBinName))
 	})
 
 	t.Run("builds into an existing dstDir", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		root, cmdDir := setup(t)
 		oskit.Write(t, mainSrc, cmdDir, "main.go")
-
 		dst := t.TempDir() // already exists
 
-		blank := ""
-
 		// --- When ---
-		err := build(env, root, dst, blank)
+		err := build(env, root, dst, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, filepath.Join(dst, gomakeBinName))
 	})
 
 	t.Run("error - cmd/gomake is missing", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		root, _ := setup(t)
-
 		dst := t.TempDir()
 
-		blank := ""
-
 		// --- When ---
-		err := build(env, root, dst, blank)
+		err := build(env, root, dst, "")
 
 		// --- Then ---
 		var ee *exec.ExitError
@@ -90,64 +76,46 @@ func Test_buildMain(t *testing.T) {
 	t.Run("builds a main package", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		dir := t.TempDir()
-
 		out := filepath.Join(dir, "bin")
-
 		mainGo := oskit.Write(t, src, dir, "main.go")
 
-		blank := ""
-
 		// --- When ---
-		err := buildMain(env, dir, out, mainGo, blank)
+		err := buildMain(env, dir, out, mainGo, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, out)
 	})
 
 	t.Run("passes ldflags", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		dir := t.TempDir()
-
 		out := filepath.Join(dir, "bin")
-
 		mainGo := oskit.Write(t, src, dir, "main.go")
 
-		text := "-s -w"
-
 		// --- When ---
-		err := buildMain(env, dir, out, mainGo, text)
+		err := buildMain(env, dir, out, mainGo, "-s -w")
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.FileExist(t, out)
 	})
 
 	t.Run("error - build fails", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		dir := t.TempDir()
-
 		out := filepath.Join(dir, "bin")
-
 		missing := filepath.Join(dir, "does-not-exist.go")
 
-		blank := ""
-
 		// --- When ---
-		err := buildMain(env, dir, out, missing, blank)
+		err := buildMain(env, dir, out, missing, "")
 
 		// --- Then ---
 		var ee *exec.ExitError
 		assert.ErrorAs(t, &ee, err)
-
 		assert.NoFileExist(t, out)
 	})
 }

@@ -127,7 +127,7 @@ type genOpts struct {
 	// the current working directory is used.
 	dir string
 
-	// Generate [mainEmptyFN] file. Default: true.
+	// Generate mainEmptyFN file. Default: true.
 	empty bool
 }
 
@@ -165,7 +165,7 @@ func WithGenWorkDir(dir string) GenOption {
 }
 
 // WithoutGenEmptySrc is option for [GenMain] turning off generating
-// [mainEmptyFN] file.
+// mainEmptyFN file.
 func WithoutGenEmptySrc(opts *genOpts) { opts.empty = false }
 
 // GenMain generates built-in target code from import specs and registers
@@ -190,9 +190,9 @@ func GenMain(specs []string, opts ...GenOption) error {
 //
 // Depending on options it generates files in paths:
 //
-//   - dst/[targetsFN]
-//   - dst/data/[mainFN]
-//   - dst/data/[mainEmptyFN]
+//   - dst/targetsFN
+//   - dst/data/mainFN
+//   - dst/data/mainEmptyFN
 func GenImports(imports []parser.Import, options ...GenOption) error {
 	opts := genOpts{
 		name:  "builtin",

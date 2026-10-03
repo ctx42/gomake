@@ -27,10 +27,6 @@ import (
 	"github.com/ctx42/gomake/pkg/gomake"
 )
 
-// isCoreCmd returns true if the target name is a core target (":"-prefixed),
-// mirroring [mkf.Target.IsCore].
-func isCoreCmd(tgtName string) bool { return strings.HasPrefix(tgtName, ":") }
-
 // expandHome replaces a leading "~" or "~/" in pth with home. A bare "~"
 // becomes home; "~/rest" becomes home joined with rest. Any other path,
 // including a "~user" form or a tilde not at the start, is returned unchanged.

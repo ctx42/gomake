@@ -18,13 +18,10 @@ func Test_GoBinPath(t *testing.T) {
 		raw := exekit.New(t).ExeStdout(
 			"go", "env", "-json", "GOBIN", "GOPATH",
 		)
-
 		want := must.Value(goBinPath(raw))
 
-		env := ring.New()
-
 		// --- When ---
-		have, err := GoBinPath(env)
+		have, err := GoBinPath(ring.New())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -34,7 +31,6 @@ func Test_GoBinPath(t *testing.T) {
 	t.Run("honors GOBIN from the passed environment", func(t *testing.T) {
 		// --- Given ---
 		want := t.TempDir()
-
 		env := ring.New()
 		env.EnvSet("GOBIN", want)
 

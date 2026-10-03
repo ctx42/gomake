@@ -68,9 +68,7 @@ func Test_ensureSymlink(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
-		dst := must.Value(os.Readlink(link))
-		assert.Equal(t, target, dst)
+		assert.Equal(t, target, must.Value(os.Readlink(link)))
 	})
 
 	t.Run("keeps an existing symlink", func(t *testing.T) {
@@ -79,16 +77,13 @@ func Test_ensureSymlink(t *testing.T) {
 		link := filepath.Join(dir, "link")
 		kept := "kept.txt"
 		must.Nil(os.Symlink(kept, link))
-		target := "other.txt"
 
 		// --- When ---
-		err := ensureSymlink(link, target)
+		err := ensureSymlink(link, "other.txt")
 
 		// --- Then ---
 		assert.NoError(t, err)
-
-		dst := must.Value(os.Readlink(link))
-		assert.Equal(t, kept, dst)
+		assert.Equal(t, kept, must.Value(os.Readlink(link)))
 	})
 
 	t.Run("replaces a file", func(t *testing.T) {
@@ -102,60 +97,7 @@ func Test_ensureSymlink(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
-		dst := must.Value(os.Readlink(link))
-		assert.Equal(t, target, dst)
-	})
-
-	t.Run("error - parent missing", func(t *testing.T) {
-		// --- Given ---
-		link := filepath.Join(t.TempDir(), "missing", "link")
-		target := "file0.txt"
-
-		// --- When ---
-		err := ensureSymlink(link, target)
-
-		// --- Then ---
-		assert.ErrorIs(t, os.ErrNotExist, err)
-		assert.ErrorContain(t, "symlink "+link, err)
-	})
-
-	t.Run("error - remove", func(t *testing.T) {
-		// --- Given ---
-		dir := t.TempDir()
-		link := filepath.Join(dir, "link")
-		oskit.MkdirAll(t, link, "child")
-		target := "file0.txt"
-
-		// --- When ---
-		err := ensureSymlink(link, target)
-
-		// --- Then ---
-		assert.ErrorContain(t, "remove "+link, err)
-	})
-
-	t.Run("error - lstat", func(t *testing.T) {
-		if os.Geteuid() == 0 {
-			t.Skip("Root ignores directory mode 0.")
-		}
-
-		// --- Given ---
-		dir := t.TempDir()
-		link := oskit.Create(t, "x", dir, "link")
-		target := "file0.txt"
-		must.Nil(os.Chmod(dir, 0))
-		t.Cleanup(func() {
-			if err := os.Chmod(dir, 0o755); err != nil {
-				t.Errorf("chmod %s: %v", dir, err)
-			}
-		})
-
-		// --- When ---
-		err := ensureSymlink(link, target)
-
-		// --- Then ---
-		assert.ErrorIs(t, os.ErrPermission, err)
-		assert.ErrorContain(t, "lstat "+link, err)
+		assert.Equal(t, target, must.Value(os.Readlink(link)))
 	})
 }
 

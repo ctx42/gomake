@@ -130,32 +130,26 @@ func toolchainFor(mm, localVer, localFull string) string {
 }
 
 // latestGo fetches the latest published Go version, returning the full version
-// (e.g. "go1.26.3") and its major.minor (e.g. "1.26"). GOMAKE_VERSION_URL,
-// when set, replaces the default endpoint.
+// (e.g. "go1.26.3") and its major.minor (e.g. "1.26").
 func latestGo() (full, mm string, err error) {
-	endpoint := versionURL
-	override := strings.TrimSpace(os.Getenv("GOMAKE_VERSION_URL"))
-	if override != "" {
-		endpoint = override
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
 	if err != nil {
 		return "", "", err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", "", fmt.Errorf("fetch %s: %w", endpoint, err)
+		return "", "", fmt.Errorf("fetch %s: %w", versionURL, err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		format := "fetch %s: HTTP %d"
-		return "", "", fmt.Errorf(format, endpoint, resp.StatusCode)
+		return "", "", fmt.Errorf(format, versionURL, resp.StatusCode)
 	}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", "", fmt.Errorf("read %s: %w", endpoint, err)
+		return "", "", fmt.Errorf("read %s: %w", versionURL, err)
 	}
 	full = strings.TrimSpace(strings.SplitN(string(body), "\n", 2)[0])
 	mm = majorMinor(full)
@@ -255,7 +249,7 @@ func moduleRoot() (string, error) {
 	}
 	for {
 		gomod := filepath.Join(dir, "go.mod")
-		mod, err := modulePath(gomod)
+		mod, err := directive(gomod, "module ")
 		if err != nil {
 			return "", fmt.Errorf("read %s: %w", gomod, err)
 		}
@@ -268,12 +262,6 @@ func moduleRoot() (string, error) {
 		}
 		dir = parent
 	}
-}
-
-// modulePath returns the module path declared in the go.mod at pth. A missing
-// file returns "", nil. Any other read error is returned.
-func modulePath(pth string) (string, error) {
-	return directive(pth, "module ")
 }
 
 // goModVersion returns the go directive of the go.mod at pth as major.minor.

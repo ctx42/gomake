@@ -19,7 +19,6 @@ import (
 func Test_newTarget_generic(t *testing.T) {
 	// --- Given ---
 	pkg := &Package{Name: "main"}
-
 	fn := &doc.Func{
 		Name: "Generic",
 		Decl: &ast.FuncDecl{
@@ -46,7 +45,6 @@ func Test_newTarget_generic(t *testing.T) {
 func Test_Targets_addFunc_alias(t *testing.T) {
 	// --- Given ---
 	pkg := &Package{Name: "main"}
-
 	fn := &doc.Func{
 		Name: "Aliased",
 		Decl: &ast.FuncDecl{
@@ -74,7 +72,6 @@ func Test_Targets_addFunc_alias(t *testing.T) {
 			},
 		},
 	}
-
 	tgs := NewTargets()
 
 	// --- When ---
@@ -82,16 +79,13 @@ func Test_Targets_addFunc_alias(t *testing.T) {
 
 	// --- Then ---
 	assert.NoError(t, err)
-
 	assert.Equal(t, 0, tgs.Len())
-
 	assert.Equal(t, []string{"Aliased"}, tgs.skips)
 }
 
 func Test_Targets_reportSkips(t *testing.T) {
 	// --- Given ---
 	tst := ringtest.New(t).WetStderr()
-
 	rng := tst.Ring()
 
 	tgs := NewTargets()
@@ -114,13 +108,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("basic target", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("Basic")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("Basic"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -148,13 +139,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("package imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("ns"))
 
-		fn := tst.Func("Basic")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("Basic"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -167,9 +155,7 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("kebab case namespace", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
-
 		met, nsp := tst.Method("KebabCase", "HelloWorld")
 
 		// --- When ---
@@ -187,13 +173,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("error - not exported", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("notExported")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("notExported"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errNotExported, err)
@@ -203,13 +186,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("error - invalid argument type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvType")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvType"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -219,13 +199,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid multi context", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvMultiCtx")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtx"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -235,13 +212,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid multi context with reused arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvMultiCtxReuse")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtxReuse"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -251,13 +225,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid context argument position", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvCtxPosition")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvCtxPosition"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -267,13 +238,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid no arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvNoArgs")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvNoArgs"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -283,13 +251,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid no context argument", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvNoCtx")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvNoCtx"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -299,13 +264,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid returning multiple values", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("RetInvMulti")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("RetInvMulti"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvResult, err)
@@ -315,13 +277,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid to many arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvToMany")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvToMany"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -331,13 +290,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid to many reused arguments", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("ArgInvToManyReuse")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("ArgInvToManyReuse"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvArg, err)
@@ -347,13 +303,10 @@ func Test_newTarget_main_package(t *testing.T) {
 	t.Run("invalid return type", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("RetInvType")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("RetInvType"))
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvResult, err)
@@ -365,19 +318,14 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	t.Run("target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
 
-		fn := tst.Func("Pkg1")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("Pkg1"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -403,19 +351,14 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	t.Run("target imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
 
-		fn := tst.Func("Pkg1")
-
 		// --- When ---
-		have, err := newTarget(tst.pkg, fn)
+		have, err := newTarget(tst.pkg, tst.Func("Pkg1"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -441,15 +384,11 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	t.Run("namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath)
-
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---
@@ -480,15 +419,11 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	t.Run("namespaced target imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
-
 		absPath := modkit.Path(relPath)
-
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
 		rng := ring.New()
-
 		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
-
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---

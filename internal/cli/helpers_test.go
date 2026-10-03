@@ -27,25 +27,6 @@ import (
 	"github.com/ctx42/gomake/pkg/gomake"
 )
 
-func Test_isCoreCmd_tabular(t *testing.T) {
-	tt := []struct {
-		testN string
-
-		tgtName string
-		want    bool
-	}{
-		{"1", "", false},
-		{"2", "abc", false},
-		{"3", ":abc", true},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.testN, func(t *testing.T) {
-			assert.Equal(t, tc.want, isCoreCmd(tc.tgtName))
-		})
-	}
-}
-
 func Test_expandHome_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
@@ -178,9 +159,7 @@ func Test_makefiles(t *testing.T) {
 	t.Run("files and env with build tags", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
-
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		absPath := modkit.Path(relPath)
 
 		rng := tst.Ring()
@@ -205,7 +184,6 @@ func Test_makefiles(t *testing.T) {
 	t.Run("files with build tags env without", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		absPath := modkit.Path(relPath)
 
 		rng := ring.New()
@@ -224,7 +202,6 @@ func Test_makefiles(t *testing.T) {
 	t.Run("files without build tags env with", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os/project"
-
 		absPath := modkit.Path(relPath)
 
 		rng := ring.New()
@@ -244,7 +221,6 @@ func Test_makefiles(t *testing.T) {
 	t.Run("files and env without build tags", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os/project"
-
 		absPath := modkit.Path(relPath)
 
 		rng := ring.New()
@@ -268,7 +244,6 @@ func Test_makefiles(t *testing.T) {
 	t.Run("not existing directory error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/not_existing"
-
 		absPath := modkit.Path(relPath)
 
 		rng := ring.New()
@@ -307,11 +282,8 @@ func Test_filterMkf(t *testing.T) {
 	})
 
 	t.Run("empty", func(t *testing.T) {
-		// --- Given ---
-		make2 := make([]string, 0)
-
 		// --- When ---
-		have := filterMkf(make2)
+		have := filterMkf(make([]string, 0))
 
 		// --- Then ---
 		assert.Empty(t, have)
@@ -402,14 +374,8 @@ func Test_prepare(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		rng := ring.New()
-
-		tmp := t.TempDir()
-
-		src := t.TempDir()
-
 		// --- When ---
-		_, err := prepare(ctx, rng, tmp, src)
+		_, err := prepare(ctx, ring.New(), t.TempDir(), t.TempDir())
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -418,12 +384,10 @@ func Test_prepare(t *testing.T) {
 	t.Run("cleans build dir on error after mkdir", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		srcPrj := prjkit.New(t, modkit.Path(relPath))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
@@ -436,22 +400,14 @@ func Test_prepare(t *testing.T) {
 		assert.NoError(t, os.Chmod(unreadable, 0))
 		t.Cleanup(func() { _ = os.Chmod(unreadable, 0644) })
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrPermission, err)
 		assert.Nil(t, have)
-
 		entries, rerr := os.ReadDir(dstPrj.Root())
 		assert.NoError(t, rerr)
-
 		for _, e := range entries {
 			assert.False(t, strings.HasPrefix(e.Name(), "gomake-"))
 		}
@@ -460,12 +416,10 @@ func Test_prepare(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		srcPrj := prjkit.New(t, modkit.Path(relPath))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
@@ -474,14 +428,8 @@ func Test_prepare(t *testing.T) {
 		rng.EnvSet("GOARCH", "386")
 		rng = parser.SetBuildTag(rng)
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -508,48 +456,33 @@ func Test_prepare(t *testing.T) {
 
 		assert.NotContain(t, buildTagLine,
 			oskit.ReadFileStr(t, filepath.Join(bd, mkf.MakefileMain)))
-
 		assert.NotContain(t, buildTagLine,
 			oskit.ReadFileStr(t, filepath.Join(bd, "makefile_386.go")))
-
 		assert.NotContain(t, buildTagLine,
 			oskit.ReadFileStr(t, filepath.Join(bd, "makefile_windows.go")))
-
 		assert.NotContain(t, buildTagLine,
 			oskit.ReadFileStr(t, filepath.Join(bd, "makefile_windows_386.go")))
-
 		assert.NoFileExist(t, filepath.Join(bd, mkf.MakefileGen))
-
 		assert.NotContain(t, buildTagLine,
 			oskit.ReadFileStr(t, filepath.Join(bd, mkf.MakefileUser)))
-
 		assert.FileExist(t, filepath.Join(bd, "go.mod"))
-
 		assert.FileExist(t, filepath.Join(bd, "go.sum"))
 	})
 
 	t.Run("no makefiles in src", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/no_makefiles/project"
+		ctx := t.Context()
 
+		relPath := "testdata/projects/no_makefiles/project"
 		srcPrj := prjkit.New(t, modkit.Path(relPath))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
-		rng := ring.New()
-
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(ctx, ring.New(), dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -560,12 +493,10 @@ func Test_prepare(t *testing.T) {
 	t.Run("no makefile in src GOOS and build tag set", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/no_makefile/project"
-
 		srcPrj := prjkit.New(t, modkit.Path(relPath))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
@@ -573,14 +504,8 @@ func Test_prepare(t *testing.T) {
 		rng.EnvSet("GOOS", "linux")
 		rng = parser.SetBuildTag(rng)
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, errNoMakefile, err)
@@ -591,25 +516,18 @@ func Test_prepare(t *testing.T) {
 	t.Run("no destination directory error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		srcPrj := prjkit.New(t, modkit.Path(relPath))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
 		dstPath := dstPrj.Path("not_existing")
-
 		rng := parser.SetBuildTag(ring.New())
 
-		ctx := t.Context()
-
-		root := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, dstPath, root)
+		have, err := prepare(t.Context(), rng, dstPath, srcPrj.Root())
 
 		// --- Then ---
 		var e *fs.PathError
@@ -622,7 +540,6 @@ func Test_prepare(t *testing.T) {
 	t.Run("mkf.MakefileGen cannot be in sources", func(t *testing.T) {
 		// --- Given ---
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.GoModInit()
 		srcPrj.CreateFileWith("package makefile", mkf.MakefileMain)
@@ -630,21 +547,14 @@ func Test_prepare(t *testing.T) {
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.CreateDir("rnd")
 		dstPrj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile_gen.go\" file"
@@ -655,7 +565,6 @@ func Test_prepare(t *testing.T) {
 	t.Run("mkf.MakefileBin cannot be in sources", func(t *testing.T) {
 		// --- Given ---
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.GoModInit()
 		srcPrj.CreateFileWith("package makefile", mkf.MakefileMain)
@@ -663,20 +572,13 @@ func Test_prepare(t *testing.T) {
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile\" file"
@@ -687,7 +589,6 @@ func Test_prepare(t *testing.T) {
 	t.Run("mkf.MakefileUser cannot be in sources", func(t *testing.T) {
 		// --- Given ---
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.GoModInit()
 		srcPrj.CreateFileWith("package makefile", mkf.MakefileMain)
@@ -695,20 +596,13 @@ func Test_prepare(t *testing.T) {
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		wMsg := "source directory must not contain \"makefile_user.go\" file"
@@ -721,18 +615,13 @@ func Test_prepare(t *testing.T) {
 		srcPth := "../../testdata/projects/arch_os_build_tag/project"
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, srcPth)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPth)
 
 		// --- Then ---
 		assert.ErrorIs(t, parser.ErrAbsPath, err)
@@ -742,15 +631,12 @@ func Test_prepare(t *testing.T) {
 	t.Run("no go.mod file in source", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
-
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.FileFrom(modkit.Path(relPath, mkf.MakefileMain))
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
@@ -759,14 +645,8 @@ func Test_prepare(t *testing.T) {
 		rng.EnvSet("GOARCH", "386")
 		rng = parser.SetBuildTag(rng)
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, gomake.ErrNoGoMod, err)
@@ -777,16 +657,13 @@ func Test_prepare(t *testing.T) {
 	t.Run("no go.sum file in source", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
-
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.FileFrom(modkit.Path(relPath, mkf.MakefileMain))
 		srcPrj.GoModInit()
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPrj := prjkit.New(t, dstPth)
 		dstPrj.Close()
 
@@ -795,14 +672,8 @@ func Test_prepare(t *testing.T) {
 		rng.EnvSet("GOARCH", "386")
 		rng = parser.SetBuildTag(rng)
 
-		ctx := t.Context()
-
-		root := dstPrj.Root()
-
-		root2 := srcPrj.Root()
-
 		// --- When ---
-		have, err := prepare(ctx, rng, root, root2)
+		have, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -819,7 +690,6 @@ func Test_prepare(t *testing.T) {
 			filepath.Join(bd, mkf.MakefileUser), // 2
 		}
 		assert.Equal(t, want, have.Files)
-
 		assert.FileExist(t, filepath.Join(bd, "go.mod"))
 
 		// The source has no go.sum, but gomake records the xflag checksum
@@ -860,11 +730,8 @@ func Test_stripBuildTag_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.test, func(t *testing.T) {
-			// --- Given ---
-			val := []byte(tc.in)
-
 			// --- When ---
-			have := stripBuildTag(val, tag)
+			have := stripBuildTag([]byte(tc.in), tag)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, string(have))
@@ -878,10 +745,8 @@ func Test_findGoWork(t *testing.T) {
 		root := t.TempDir()
 		oskit.Write(t, "go 1.22\nuse .\n", root, "go.work")
 
-		env := ring.New()
-
 		// --- When ---
-		have, err := findGoWork(env, root)
+		have, err := findGoWork(ring.New(), root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -892,13 +757,10 @@ func Test_findGoWork(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
 		oskit.Write(t, "go 1.22\nuse .\n", base, "go.work")
-
 		mod := oskit.MkdirAll(t, base, "mod")
 
-		env := ring.New()
-
 		// --- When ---
-		have, err := findGoWork(env, mod)
+		have, err := findGoWork(ring.New(), mod)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -908,11 +770,8 @@ func Test_findGoWork(t *testing.T) {
 	t.Run("GOWORK absolute", func(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
-
 		work := oskit.Write(t, "go 1.22\nuse .\n", base, "custom.work")
-
 		mod := oskit.MkdirAll(t, base, "mod")
-
 		env := ring.New()
 		env.EnvSet("GOWORK", work)
 
@@ -928,13 +787,11 @@ func Test_findGoWork(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
 		oskit.Write(t, "go 1.22\nuse .\n", base, "go.work")
-
 		mod := oskit.MkdirAll(t, base, "mod")
 
 		// Relative GOWORK is resolved against cwd, not modRoot.
 		cwd := must.Value(os.Getwd())
 		t.Cleanup(func() { _ = os.Chdir(cwd) })
-
 		must.Nil(os.Chdir(base))
 
 		env := ring.New()
@@ -967,7 +824,6 @@ func Test_findGoWork(t *testing.T) {
 	t.Run("error - GOWORK path missing", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
-
 		env := ring.New()
 		env.EnvSet("GOWORK", filepath.Join(root, "nope.work"))
 
@@ -983,10 +839,8 @@ func Test_findGoWork(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
 
-		env := ring.New()
-
 		// --- When ---
-		have, err := findGoWork(env, root)
+		have, err := findGoWork(ring.New(), root)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1000,16 +854,8 @@ func Test_editGoWork(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		env := ring.New()
-
-		text := "go.work"
-
-		tempDir := t.TempDir()
-
-		tempDir2 := t.TempDir()
-
 		// --- When ---
-		err := editGoWork(ctx, env, text, tempDir, tempDir2)
+		err := editGoWork(ctx, ring.New(), "go.work", t.TempDir(), t.TempDir())
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -1018,17 +864,13 @@ func Test_editGoWork(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		prjSrc := modkit.Path("testdata/projects/workspace/project")
-
 		othSrc := modkit.Path("testdata/projects/workspace/other")
 
 		// Prepare workspace destination directories. We copy them so we
 		// can rename files without changing fixtures.
 		wsPth := oskit.MkdirTemp(t, "", "workspace")
-
 		othRoot := oskit.MkdirAll(t, wsPth, "other")
-
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
 		othPrj := prjkit.New(t, othRoot)
@@ -1046,27 +888,21 @@ func Test_editGoWork(t *testing.T) {
 		// Copy edited project to new location so "../other" path in
 		// the `go.work` file is invalid to test it will be fixed by editGoWork.
 		outPth := oskit.MkdirTemp(t, "", "project")
-
 		outPrj := prjkit.New(t, outPth)
 		outPrj.ProjectFrom(prjRoot)
 		outPrj.Close()
 
-		ctx := t.Context()
-
-		join := filepath.Join(prjRoot, "go.work")
-
 		// --- When ---
 		err := editGoWork(
-			ctx,
+			t.Context(),
 			env,
-			join,
+			filepath.Join(prjRoot, "go.work"),
 			outPth,
 			prjRoot,
 		)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		stderr := exekit.New(t).ExeStderr(outPrj.Compile())
 		assert.Equal(t, "project called other\n", stderr)
 	})
@@ -1076,7 +912,6 @@ func Test_editGoWork(t *testing.T) {
 		// go.work at monorepo root: use . (parent) and use ./project.
 		// After copy into buildDir, "." must become the abs parent path.
 		wsPth := oskit.MkdirTemp(t, "", "workspace")
-
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
 		oskit.Write(
@@ -1106,16 +941,11 @@ func Test_editGoWork(t *testing.T) {
 		// Destination starts with a copy of the parent workfile.
 		oskit.Write(t, "go 1.23\n\nuse .\nuse ./project\n", outPth, "go.work")
 
-		env := ring.New()
-
-		ctx := t.Context()
-
 		// --- When ---
-		err := editGoWork(ctx, env, srcWork, outPth, prjRoot)
+		err := editGoWork(t.Context(), ring.New(), srcWork, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		text := oskit.ReadFileStr(t, filepath.Join(outPth, "go.work"))
 		// go work edit may emit a use ( ... ) block; parent is absolute,
 		// project is ".".
@@ -1127,13 +957,10 @@ func Test_editGoWork(t *testing.T) {
 	t.Run("does not mutate source when GOWORK set", func(t *testing.T) {
 		// --- Given ---
 		prjSrc := modkit.Path("testdata/projects/workspace/project")
-
 		othSrc := modkit.Path("testdata/projects/workspace/other")
 
 		wsPth := oskit.MkdirTemp(t, "", "workspace")
-
 		othRoot := oskit.MkdirAll(t, wsPth, "other")
-
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
 		othPrj := prjkit.New(t, othRoot)
@@ -1148,11 +975,9 @@ func Test_editGoWork(t *testing.T) {
 		prjPrj.Close()
 
 		srcWork := filepath.Join(prjRoot, "go.work")
-
 		before := oskit.ReadFileStr(t, srcWork)
 
 		outPth := oskit.MkdirTemp(t, "", "project")
-
 		outPrj := prjkit.New(t, outPth)
 		outPrj.ProjectFrom(prjRoot)
 		outPrj.Close()
@@ -1162,16 +987,12 @@ func Test_editGoWork(t *testing.T) {
 		env := ring.New()
 		env.EnvSet("GOWORK", srcWork)
 
-		ctx := t.Context()
-
 		// --- When ---
-		err := editGoWork(ctx, env, srcWork, outPth, prjRoot)
+		err := editGoWork(t.Context(), env, srcWork, outPth, prjRoot)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, before, oskit.ReadFileStr(t, srcWork))
-
 		// Destination was rewritten (absolute sibling path).
 		dstWork := oskit.ReadFileStr(t, filepath.Join(outPth, "go.work"))
 		assert.NotEqual(t, before, dstWork)
@@ -1180,21 +1001,14 @@ func Test_editGoWork(t *testing.T) {
 
 	t.Run("no go.work in source", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
-
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		dstPth := oskit.MkdirTemp(t, "", "project")
-
-		ctx := t.Context()
-
-		join := filepath.Join(srcPth, "go.work")
 
 		// --- When ---
 		err := editGoWork(
-			ctx,
-			env,
-			join,
+			t.Context(),
+			ring.New(),
+			filepath.Join(srcPth, "go.work"),
 			dstPth,
 			srcPth,
 		)
@@ -1209,23 +1023,18 @@ func Test_editGoWork(t *testing.T) {
 		env := ring.New()
 
 		srcPth := oskit.MkdirTemp(t, "", "project")
-
 		srcPrj := prjkit.New(t, srcPth)
 		srcPrj.GoModInit()
-		srcPrj.Exe("go", "work", "init", ".")
+		_, _ = srcPrj.Exe("go", "work", "init", ".")
 		srcPrj.Close()
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
-		ctx := t.Context()
-
-		join := filepath.Join(srcPth, "go.work")
-
 		// --- When ---
 		err := editGoWork(
-			ctx,
+			t.Context(),
 			env,
-			join,
+			filepath.Join(srcPth, "go.work"),
 			dstPth,
 			srcPth,
 		)
@@ -1237,11 +1046,8 @@ func Test_editGoWork(t *testing.T) {
 	t.Run("absolutizes dot-slash use paths", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		wsPth := oskit.MkdirTemp(t, "", "workspace")
-
 		othRoot := oskit.MkdirAll(t, wsPth, "other")
-
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
 		othPrj := prjkit.New(t, othRoot)
@@ -1256,31 +1062,24 @@ func Test_editGoWork(t *testing.T) {
 		// use ./../other is unusual; use a path with ./ prefix that still
 		// points at the sibling via a cleaned relative form.
 		oskit.Write(t, "go 1.23\n\nuse .\nuse ./../other\n", prjRoot, "go.work")
-
 		prjPrj.Close()
 
 		outPth := oskit.MkdirTemp(t, "", "project")
-
 		outPrj := prjkit.New(t, outPth)
 		outPrj.ProjectFrom(prjRoot)
 		outPrj.Close()
 
-		ctx := t.Context()
-
-		join := filepath.Join(prjRoot, "go.work")
-
 		// --- When ---
 		err := editGoWork(
-			ctx,
+			t.Context(),
 			env,
-			join,
+			filepath.Join(prjRoot, "go.work"),
 			outPth,
 			prjRoot,
 		)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		stderr := exekit.New(t).ExeStderr(outPrj.Compile())
 		assert.Equal(t, "project called other\n", stderr)
 	})
@@ -1288,15 +1087,11 @@ func Test_editGoWork(t *testing.T) {
 	t.Run("no go.work in destination", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
-
 		prjSrc := modkit.Path("testdata/projects/workspace/project")
-
 		othSrc := modkit.Path("testdata/projects/workspace/other")
 
 		wsPth := oskit.MkdirTemp(t, "", "workspace")
-
 		othRoot := oskit.MkdirAll(t, wsPth, "other")
-
 		prjRoot := oskit.MkdirAll(t, wsPth, "project")
 
 		othPrj := prjkit.New(t, othRoot)
@@ -1312,15 +1107,11 @@ func Test_editGoWork(t *testing.T) {
 
 		dstPth := oskit.MkdirTemp(t, "", "project")
 
-		ctx := t.Context()
-
-		join := filepath.Join(prjRoot, "go.work")
-
 		// --- When ---
 		err := editGoWork(
-			ctx,
+			t.Context(),
 			env,
-			join,
+			filepath.Join(prjRoot, "go.work"),
 			dstPth,
 			prjRoot,
 		)
@@ -1338,16 +1129,8 @@ func Test_editGoMod(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
 
-		env := ring.New()
-
-		text := "go.mod"
-
-		path := "example.com/m"
-
-		dir := "."
-
 		// --- When ---
-		err := editGoMod(ctx, env, text, path, dir, dir)
+		err := editGoMod(ctx, ring.New(), "go.mod", "example.com/m", ".", ".")
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -1355,61 +1138,37 @@ func Test_editGoMod(t *testing.T) {
 
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
-
 		inData := oskit.ReadFile(t, "testdata/go.mod_in")
-
 		pth := oskit.Write(t, inData, t.TempDir(), "go.mod")
-
 		wantData := oskit.ReadFileStr(t, "testdata/go.mod_want")
-
-		ctx := t.Context()
-
-		path := "example.com/user/repo"
-
-		path2 := "/module/path"
-
-		dir := filepath.Dir(pth)
 
 		// --- When ---
 		err := editGoMod(
-			ctx,
-			env,
+			t.Context(),
+			ring.New(),
 			pth,
-			path,
-			path2,
-			dir,
+			"example.com/user/repo",
+			"/module/path",
+			filepath.Dir(pth),
 		)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
-		haveData := oskit.ReadFileStr(t, pth)
-		assert.Equal(t, wantData, haveData)
+		assert.Equal(t, wantData, oskit.ReadFileStr(t, pth))
 	})
 
 	t.Run("no go.mod file", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
-
 		pth := oskit.Write(t, "", t.TempDir(), "not-go.mod")
-
-		ctx := t.Context()
-
-		path := "example.com/user/repo"
-
-		path2 := "/module/path"
-
-		dir := filepath.Dir(pth)
 
 		// --- When ---
 		err := editGoMod(
-			ctx,
-			env,
+			t.Context(),
+			ring.New(),
 			pth,
-			path,
-			path2,
-			dir,
+			"example.com/user/repo",
+			"/module/path",
+			filepath.Dir(pth),
 		)
 
 		// --- Then ---
@@ -1422,7 +1181,6 @@ func Test_editGoMod(t *testing.T) {
 func Test_xflagFallbackVer(t *testing.T) {
 	// --- Given ---
 	modPth := filepath.Join(modkit.Root(), "go.mod")
-
 	want := must.Value(modkit.ModVer(modPth, xflagModPath))
 
 	// --- When ---
@@ -1435,7 +1193,6 @@ func Test_xflagFallbackVer(t *testing.T) {
 func Test_xflagVersion(t *testing.T) {
 	// --- Given ---
 	modPth := filepath.Join(modkit.Root(), "go.mod")
-
 	want := must.Value(modkit.ModVer(modPth, xflagModPath))
 
 	// --- When ---
@@ -1447,13 +1204,8 @@ func Test_xflagVersion(t *testing.T) {
 
 func Test_goEditErr(t *testing.T) {
 	t.Run("uses trimmed toolchain output as detail", func(t *testing.T) {
-		// --- Given ---
-		path := "/b"
-
-		text := "  go: boom\n"
-
 		// --- When ---
-		err := goEditErr(errGoModEdit, path, text, ErrTest)
+		err := goEditErr(errGoModEdit, "/b", "  go: boom\n", ErrTest)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoModEdit, err)
@@ -1463,18 +1215,12 @@ func Test_goEditErr(t *testing.T) {
 	})
 
 	t.Run("empty output falls back to raw error", func(t *testing.T) {
-		// --- Given ---
-		path := "/b"
-
-		text := "   "
-
 		// --- When ---
-		err := goEditErr(errGoWorkEdit, path, text, ErrTest)
+		err := goEditErr(errGoWorkEdit, "/b", "   ", ErrTest)
 
 		// --- Then ---
 		assert.ErrorIs(t, errGoWorkEdit, err)
-		want := "editing \"go.work\" file at /b: test error"
-		assert.ErrorEqual(t, want, err)
+		assert.ErrorEqual(t, "editing \"go.work\" file at /b: test error", err)
 	})
 }
 
@@ -1485,14 +1231,6 @@ func Test_compile(t *testing.T) {
 		prj.ProjectFrom(modkit.Path("testdata/compile/simple"))
 		prj.Close()
 
-		ctx := t.Context()
-
-		environ := os.Environ()
-
-		root := prj.Root()
-
-		path := prj.Path("a.out")
-
 		files := []string{
 			"main.go",
 			"helpers.go",
@@ -1500,16 +1238,15 @@ func Test_compile(t *testing.T) {
 
 		// --- When ---
 		err := compile(
-			ctx,
-			environ,
-			root,
-			path,
+			t.Context(),
+			os.Environ(),
+			prj.Root(),
+			prj.Path("a.out"),
 			files...,
 		)
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Equal(t, "hello\n", prj.ExeStdout(prj.Path("a.out")))
 	})
 
@@ -1519,20 +1256,12 @@ func Test_compile(t *testing.T) {
 		prj.ProjectFrom(modkit.Path("testdata/compile/error"))
 		prj.Close()
 
-		ctx := t.Context()
-
-		environ := os.Environ()
-
-		root := prj.Root()
-
-		path := prj.Path("a.out")
-
 		// --- When ---
 		err := compile(
-			ctx,
-			environ,
-			root,
-			path,
+			t.Context(),
+			os.Environ(),
+			prj.Root(),
+			prj.Path("a.out"),
 			parser.MainName,
 		)
 
@@ -1558,18 +1287,12 @@ func Test_compile(t *testing.T) {
 			"helpers.go",
 		}
 
-		environ := os.Environ()
-
-		root := prj.Root()
-
-		path := prj.Path("a.out")
-
 		// --- When ---
 		err := compile(
 			ctx,
-			environ,
-			root,
-			path,
+			os.Environ(),
+			prj.Root(),
+			prj.Path("a.out"),
 			files...,
 		)
 
@@ -1582,7 +1305,6 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("list only files with build tag", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
@@ -1591,10 +1313,8 @@ func Test_gmFiles(t *testing.T) {
 		rng.EnvSet("GOARCH", "amd64")
 		rng = parser.SetBuildTag(rng)
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1610,16 +1330,13 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("unknown directory error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/not/existing"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.ErrorContain(t, "listing Go source files", err)
@@ -1629,16 +1346,13 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("files in multiple packages", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/packages/multi"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1651,16 +1365,13 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("empty package dir no error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/empty"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1671,16 +1382,11 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("buildTag must not be empty", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
-		rng := ring.New()
-
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.ErrorEqual(t, "build tag must be provided", err)
@@ -1690,16 +1396,13 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("only tagged files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_tagged/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1712,16 +1415,13 @@ func Test_gmFiles(t *testing.T) {
 	t.Run("only not tagged files", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/simple_untagged/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := gmFiles(rng, root)
+		have, err := gmFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1733,7 +1433,6 @@ func Test_goFiles(t *testing.T) {
 	t.Run("list files without build tag", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
@@ -1741,10 +1440,8 @@ func Test_goFiles(t *testing.T) {
 		rng.EnvSet("GOOS", "darwin")
 		rng.EnvSet("GOARCH", "amd64")
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1758,7 +1455,6 @@ func Test_goFiles(t *testing.T) {
 	t.Run("list files with and without build tag", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os_build_tag/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
@@ -1767,10 +1463,8 @@ func Test_goFiles(t *testing.T) {
 		rng.EnvSet("GOARCH", "amd64")
 		rng = parser.SetBuildTag(rng)
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1788,16 +1482,11 @@ func Test_goFiles(t *testing.T) {
 	t.Run("unknown directory error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/not/existing"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
-		rng := ring.New()
-
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.ErrorContain(t, "listing Go source files", err)
@@ -1807,16 +1496,11 @@ func Test_goFiles(t *testing.T) {
 	t.Run("multi package error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/packages/multi"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
-		rng := ring.New()
-
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1829,16 +1513,13 @@ func Test_goFiles(t *testing.T) {
 	t.Run("multi package error with build tag", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/packages/multi"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
 		rng := parser.SetBuildTag(ring.New())
 
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1852,16 +1533,11 @@ func Test_goFiles(t *testing.T) {
 	t.Run("empty package dir no error", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/empty"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
-		rng := ring.New()
-
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1872,16 +1548,11 @@ func Test_goFiles(t *testing.T) {
 	t.Run("current os and arch used", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/projects/arch_os/project"
-
 		prj := prjkit.New(t, modkit.Path(relPath))
 		prj.Close()
 
-		rng := ring.New()
-
-		root := prj.Root()
-
 		// --- When ---
-		have, err := goFiles(rng, root)
+		have, err := goFiles(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1896,15 +1567,10 @@ func Test_allTargets(t *testing.T) {
 	t.Run("bin only", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
-
 		cfg := &config{bin: "/tmp/out"}
 
-		rng := ring.New()
-
-		targets := builtin.Empty().Targets()
-
 		// --- When ---
-		have, err := allTargets(ctx, rng, cfg, targets)
+		have, err := allTargets(ctx, ring.New(), cfg, builtin.Empty().Targets())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -1913,10 +1579,7 @@ func Test_allTargets(t *testing.T) {
 
 	t.Run("includes makefile targets", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		relPath := "testdata/projects/simple_untagged/project"
-
 		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
@@ -1927,7 +1590,6 @@ func Test_allTargets(t *testing.T) {
 		prj.Close()
 
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
-
 		cfg, err := newConfig(
 			"1.0",
 			tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir(), "--list"),
@@ -1936,10 +1598,8 @@ func Test_allTargets(t *testing.T) {
 
 		gen := builtin.Generated().Targets()
 
-		rng := tst.Ring()
-
 		// --- When ---
-		have, err := allTargets(ctx, rng, cfg, gen)
+		have, err := allTargets(t.Context(), tst.Ring(), cfg, gen)
 
 		// --- Then ---
 		assert.NoError(t, err)

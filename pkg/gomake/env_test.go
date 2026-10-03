@@ -195,10 +195,8 @@ func Test_Expander(t *testing.T) {
 		// --- Given ---
 		expander := Expander([]string{"key=val"})
 
-		key := "key"
-
 		// --- When ---
-		have := expander(key)
+		have := expander("key")
 
 		// --- Then ---
 		assert.Equal(t, "val", have)
@@ -208,10 +206,8 @@ func Test_Expander(t *testing.T) {
 		// --- Given ---
 		expander := Expander([]string{"key=val"})
 
-		abc := "abc"
-
 		// --- When ---
-		have := expander(abc)
+		have := expander("abc")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -221,10 +217,8 @@ func Test_Expander(t *testing.T) {
 		// --- Given ---
 		expander := Expander(nil)
 
-		key := "key"
-
 		// --- When ---
-		have := expander(key)
+		have := expander("key")
 
 		// --- Then ---
 		assert.Equal(t, "", have)
@@ -241,7 +235,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		assert.Empty(t, buf.String())
 	})
 
@@ -252,7 +245,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 			"KEY1=VAL1",
 			"KEY2=VAL2",
 		}
-
 		buf := &bytes.Buffer{}
 
 		// --- When ---
@@ -260,7 +252,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		want := "" +
 			"KEY0    VAL0\n" +
 			"KEY1    VAL1\n" +
@@ -275,7 +266,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 			"KEY1=",
 			"KEY2=VAL2",
 		}
-
 		buf := &bytes.Buffer{}
 
 		// --- When ---
@@ -283,7 +273,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-
 		want := "" +
 			"KEY0    VAL0\n" +
 			"KEY2    VAL2\n"
@@ -293,7 +282,6 @@ func Test_PrettyPrintEnv(t *testing.T) {
 	t.Run("error - write failure propagates", func(t *testing.T) {
 		// --- Given ---
 		env := []string{"KEY0=VAL0"}
-
 		buf := iokit.ErrWriter(io.Discard, 0)
 
 		// --- When ---
