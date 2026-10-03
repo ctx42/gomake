@@ -228,6 +228,20 @@ func Test_LookupEnv_tabular(t *testing.T) {
 			"abc",
 			true,
 		},
+		{
+			"value contains equals",
+			[]string{"FOO=bar=baz"},
+			"FOO",
+			"bar=baz",
+			true,
+		},
+		{
+			"key contains equals",
+			[]string{"FOO=bar=baz"},
+			"FOO=bar",
+			"",
+			false,
+		},
 	}
 
 	for _, tc := range tt {

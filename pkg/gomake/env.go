@@ -6,6 +6,7 @@ package gomake
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"text/tabwriter"
 )
@@ -54,11 +55,17 @@ func EnvSplitOrdered(env []string) (map[string]string, []string) {
 }
 
 // EnvJoin joins an environment variable map into a slice of "key=value"
-// strings, matching the return type of [os.Environ].
+// strings, matching the return type of [os.Environ]. Keys are sorted so the
+// result does not depend on map iteration order.
 func EnvJoin(env map[string]string) []string {
-	out := make([]string, 0, len(env))
-	for k, v := range env {
-		out = append(out, k+"="+v)
+	keys := make([]string, 0, len(env))
+	for key := range env {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, key+"="+env[key])
 	}
 	return out
 }

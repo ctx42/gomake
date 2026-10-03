@@ -91,6 +91,71 @@ func Test_TargetConfig(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, cfg)
 	})
+
+	t.Run("error - trailing bracket", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, `{"region":"eu"}]`)
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.ErrorContain(t, "']'", err)
+		assert.Nil(t, cfg)
+	})
+
+	t.Run("error - trailing brace", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, `{"a":1}}`)
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.ErrorContain(t, "'}'", err)
+		assert.Nil(t, cfg)
+	})
+
+	t.Run("error - trailing value", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, `{"a":1} true`)
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.ErrorContain(t, "trailing data", err)
+		assert.Nil(t, cfg)
+	})
+
+	t.Run("null is an empty block", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, `null`)
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.False(t, cfg.Has("region"))
+	})
+
+	t.Run("decodes raw message", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.MetaSet(ConfigMetaKey, json.RawMessage(`{"region":"eu"}`))
+
+		// --- When ---
+		cfg, err := TargetConfig(rng)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "eu", must.Value(GetCfg[string](cfg, "region")))
+	})
 }
 
 func Test_Config_Has_tabular(t *testing.T) {

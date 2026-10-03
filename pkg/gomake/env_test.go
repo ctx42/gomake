@@ -172,6 +172,11 @@ func Test_EnvJoin_tabular(t *testing.T) {
 		{"2", map[string]string{"A": "B"}, []string{"A=B"}},
 		{"3", map[string]string{"A": "B=C"}, []string{"A=B=C"}},
 		{"4", map[string]string{"A": ""}, []string{"A="}},
+		{
+			"5",
+			map[string]string{"B": "2", "A": "1"},
+			[]string{"A=1", "B=2"},
+		},
 	}
 
 	for _, tc := range tt {

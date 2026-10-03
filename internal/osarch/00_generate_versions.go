@@ -230,7 +230,12 @@ func moduleRoot() (string, error) {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
 	for {
-		if modulePath(filepath.Join(dir, "go.mod")) == gomakeModule {
+		gomod := filepath.Join(dir, "go.mod")
+		mod, err := modulePath(gomod)
+		if err != nil {
+			return "", fmt.Errorf("read %s: %w", gomod, err)
+		}
+		if mod == gomakeModule {
 			return dir, nil
 		}
 		parent := filepath.Dir(dir)
@@ -241,35 +246,46 @@ func moduleRoot() (string, error) {
 	}
 }
 
-// modulePath returns the module path declared in the go.mod at pth, or an empty
-// string when it cannot be read.
-func modulePath(pth string) string {
+// modulePath returns the module path declared in the go.mod at pth. A missing
+// file returns "", nil. Any other read error is returned.
+func modulePath(pth string) (string, error) {
 	return directive(pth, "module ")
 }
 
 // goModVersion returns the go directive of the go.mod at pth as major.minor.
 func goModVersion(pth string) (string, error) {
-	if mm := majorMinor(directive(pth, "go ")); mm != "" {
+	line, err := directive(pth, "go ")
+	if err != nil {
+		return "", err
+	}
+	if mm := majorMinor(line); mm != "" {
 		return mm, nil
 	}
 	return "", fmt.Errorf("no go directive in %s", pth)
 }
 
-// directive returns the trimmed remainder of the first line in the file at pth
-// that starts with the given prefix, or an empty string.
-func directive(pth, prefix string) string {
+// directive returns the trimmed remainder of the first line in the file at
+// pth that starts with prefix. A missing file returns "", nil. Any other
+// read or scan error is returned.
+func directive(pth, prefix string) (string, error) {
 	b, err := os.ReadFile(pth)
 	if err != nil {
-		return ""
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+		return "", err
 	}
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if rest, ok := strings.CutPrefix(line, prefix); ok {
-			return strings.TrimSpace(rest)
+			return strings.TrimSpace(rest), nil
 		}
 	}
-	return ""
+	if err = sc.Err(); err != nil {
+		return "", err
+	}
+	return "", nil
 }
 
 // majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", "1.26",

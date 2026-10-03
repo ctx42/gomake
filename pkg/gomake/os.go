@@ -88,10 +88,12 @@ func LookupEnv(env []string, key string) (string, bool) {
 	var exists bool
 	var value string
 	for _, val := range env {
-		if strings.HasPrefix(val, key+"=") {
-			value = val[len(key)+1:]
-			exists = true
+		name, v, ok := strings.Cut(val, "=")
+		if !ok || name != key {
+			continue
 		}
+		value = v
+		exists = true
 	}
 	return value, exists
 }

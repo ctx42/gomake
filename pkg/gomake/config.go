@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -72,8 +73,15 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	if err := dec.Decode(&cfg.data); err != nil {
 		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
-	if dec.More() {
-		return nil, fmt.Errorf("gomake: target config: trailing data")
+	// Decoder.More is false when the next byte is ] or }, so a second
+	// decode is what rejects trailing values. Only io.EOF means the block
+	// ended at the first value.
+	var extra any
+	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return nil, errors.New("gomake: target config: trailing data")
+		}
+		return nil, fmt.Errorf("gomake: target config: %w", err)
 	}
 	if cfg.data == nil {
 		// Root null / non-object leaves data nil; treat as empty object.

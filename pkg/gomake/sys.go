@@ -4,10 +4,12 @@
 package gomake
 
 import (
-	"bufio"
+	"bytes"
+	"errors"
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 // PathExists reports whether the path exists. Any Stat error other than
@@ -19,14 +21,15 @@ func PathExists(pth string) bool {
 	return true
 }
 
-// FileExists reports whether the path exists and is a regular file (not a
-// directory). Any Stat error other than existence yields false.
+// FileExists reports whether the path exists and is a regular file. A
+// directory, socket, fifo, or device is not a regular file. Any Stat error
+// yields false.
 func FileExists(pth string) bool {
 	fi, err := os.Stat(pth)
 	if err != nil {
 		return false
 	}
-	return !fi.IsDir()
+	return fi.Mode().IsRegular()
 }
 
 // DirExists reports whether the path exists and is a directory. Any Stat
@@ -50,31 +53,67 @@ func ReadFile(pth string) (string, error) {
 }
 
 // ReadChar reads one rune from the reader and returns it as a string. It
-// returns [io.EOF] when the reader is empty.
-//
-// Each call wraps r in a new [bufio.Reader], so consecutive calls on the same
-// underlying reader may drop bytes buffered by a prior call. Prefer a single
-// call, or pass a shared [bufio.Reader] as r when reading more than once.
+// returns [io.EOF] when the reader is empty. A second call continues at the
+// next rune.
 func ReadChar(r io.Reader) (string, error) {
-	char, _, err := bufio.NewReader(r).ReadRune()
-	if err != nil {
+	var buf [utf8.UTFMax]byte
+	if _, err := io.ReadFull(r, buf[:1]); err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return "", io.EOF
+		}
 		return "", err
 	}
+	need := runeSize(buf[0])
+	if need > 1 {
+		_, err := io.ReadFull(r, buf[1:need])
+		if err != nil {
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return "", io.ErrUnexpectedEOF
+			}
+			return "", err
+		}
+	}
+	char, _ := utf8.DecodeRune(buf[:need])
 	return string(char), nil
 }
 
-// ReadLine reads a line delimited by "\n" from the reader. Leading and trailing
-// whitespace are trimmed from a successfully read line. On error, any partial
-// content is also trimmed so EOF after a final line without a newline still
-// yields the line text with [io.EOF].
-//
-// Each call wraps r in a new [bufio.Reader]; see [ReadChar] for multi-call
-// caveats on the same underlying reader.
-func ReadLine(r io.Reader) (string, error) {
-	txt, err := bufio.NewReader(r).ReadString('\n')
-	txt = strings.TrimSpace(txt)
-	if err != nil {
-		return txt, err
+// runeSize reports how many bytes a UTF-8 lead byte starts. An invalid lead
+// counts as one byte.
+func runeSize(b byte) int {
+	switch {
+	case b&0x80 == 0x00:
+		return 1
+	case b&0xE0 == 0xC0:
+		return 2
+	case b&0xF0 == 0xE0:
+		return 3
+	case b&0xF8 == 0xF0:
+		return 4
+	default:
+		return 1
 	}
-	return txt, nil
+}
+
+// ReadLine reads a line delimited by "\n" from the reader. Leading and
+// trailing whitespace are trimmed from a successfully read line. On error,
+// any partial content is also trimmed so EOF after a final line without a
+// newline still yields the line text with [io.EOF]. A second call continues
+// at the next line.
+func ReadLine(r io.Reader) (string, error) {
+	var buf bytes.Buffer
+	tmp := make([]byte, 1)
+	for {
+		_, err := io.ReadFull(r, tmp)
+		if err != nil {
+			txt := strings.TrimSpace(buf.String())
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+				return txt, io.EOF
+			}
+			return txt, err
+		}
+		buf.WriteByte(tmp[0])
+		if tmp[0] == '\n' {
+			return strings.TrimSpace(buf.String()), nil
+		}
+	}
 }

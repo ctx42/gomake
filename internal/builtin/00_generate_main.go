@@ -8,6 +8,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,7 +59,12 @@ func findGomakeRoot() (string, error) {
 	}
 	for {
 		gomod := filepath.Join(dir, "go.mod")
-		if f, err2 := os.Open(gomod); err2 == nil {
+		f, err2 := os.Open(gomod)
+		if err2 != nil {
+			if !errors.Is(err2, os.ErrNotExist) {
+				return "", fmt.Errorf("open %s: %w", gomod, err2)
+			}
+		} else {
 			mod, readErr := readModuleLine(f)
 			_ = f.Close()
 			if readErr != nil {
