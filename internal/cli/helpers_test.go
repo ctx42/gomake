@@ -1419,6 +1419,19 @@ func Test_editGoMod(t *testing.T) {
 	})
 }
 
+func Test_xflagFallbackVer(t *testing.T) {
+	// --- Given ---
+	modPth := filepath.Join(modkit.Root(), "go.mod")
+
+	want := must.Value(modkit.ModVer(modPth, xflagModPath))
+
+	// --- When ---
+	have := xflagFallbackVer
+
+	// --- Then ---
+	assert.Equal(t, want, have)
+}
+
 func Test_xflagVersion(t *testing.T) {
 	// --- Given ---
 	modPth := filepath.Join(modkit.Root(), "go.mod")

@@ -811,14 +811,15 @@ const (
 	// generated makefiles.
 	xflagModPath = "github.com/ctx42/xflag"
 
-	// xflagFallbackVer pins the xflag version used when build information is
-	// unavailable at runtime.
-	xflagFallbackVer = "v0.10.0"
+	// xflagFallbackVer pins the xflag version used when build information
+	// does not record the module. Test binaries omit dependency versions,
+	// so this must match the xflag require in the module's go.mod.
+	xflagFallbackVer = "v0.11.0"
 )
 
 // xflagVersion returns the xflag module version gomake was built with, so the
 // generated makefile pins the same version. It falls back to [xflagFallbackVer]
-// when build information is unavailable.
+// when build information does not record the dependency.
 func xflagVersion() string {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {

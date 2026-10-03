@@ -332,7 +332,7 @@ func helpCommand(name string, fs *xflag.FlagSet, tgs []*Target) string {
 	_, _ = fmt.Fprintf(buf, "%s [options] [target] [args]\n\n", name)
 	_, _ = fmt.Fprint(buf, "The makefile is a make-like target runner.\n\n")
 	_, _ = fmt.Fprint(buf, "options:\n")
-	_, _ = fmt.Fprint(buf, xflag.HelpOptions(fs))
+	_, _ = fmt.Fprint(buf, fs.HelpOptions())
 	_, _ = fmt.Fprint(buf, "\n")
 	_, _ = fmt.Fprint(buf, "targets:\n")
 	_, _ = fmt.Fprint(buf, HelpTargets(tgs, 2))
