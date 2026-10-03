@@ -6,6 +6,7 @@ package gomake
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -47,7 +48,7 @@ func DirExists(pth string) bool {
 func ReadFile(pth string) (string, error) {
 	content, err := os.ReadFile(pth)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("read %s: %w", pth, err)
 	}
 	return string(content), nil
 }
@@ -61,7 +62,7 @@ func ReadChar(r io.Reader) (string, error) {
 		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 			return "", io.EOF
 		}
-		return "", err
+		return "", fmt.Errorf("read rune: %w", err)
 	}
 	need := runeSize(buf[0])
 	if need > 1 {
@@ -70,7 +71,7 @@ func ReadChar(r io.Reader) (string, error) {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return "", io.ErrUnexpectedEOF
 			}
-			return "", err
+			return "", fmt.Errorf("read rune: %w", err)
 		}
 	}
 	char, _ := utf8.DecodeRune(buf[:need])
@@ -109,7 +110,7 @@ func ReadLine(r io.Reader) (string, error) {
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 				return txt, io.EOF
 			}
-			return txt, err
+			return txt, fmt.Errorf("read line: %w", err)
 		}
 		buf.WriteByte(tmp[0])
 		if tmp[0] == '\n' {

@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"fmt"
 	"go/build"
 	"os"
 	"path/filepath"
@@ -128,7 +129,7 @@ func importSpec(modSpec, root, dir string) string {
 func readModulePath(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("read %s: %w", path, err)
 	}
 
 	scn := bufio.NewScanner(bytes.NewReader(data))

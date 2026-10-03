@@ -105,7 +105,7 @@ func astAndDocPkg(
 	}
 	docPkg, err := doc.NewFromFiles(set, all, impPath, doc.AllDecls)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("doc %s: %w", impPath, err)
 	}
 	return fls, docPkg, nil
 }

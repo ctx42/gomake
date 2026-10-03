@@ -184,7 +184,7 @@ func NewPackage(
 		return nil, fmt.Errorf("%w %s", ErrGoList, impPath)
 	}
 	if err := json.Unmarshal(sout.Bytes(), pkg); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("parse go list %s: %w", impPath, err)
 	}
 
 	if pkg.Error.Err != "" {

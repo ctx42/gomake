@@ -161,7 +161,10 @@ func distList(toolchain string) (goos, goarch []string, err error) {
 	if err != nil {
 		if e, ok := errors.AsType[*exec.ExitError](err); ok {
 			msg := strings.TrimSpace(string(e.Stderr))
-			return nil, nil, fmt.Errorf("go tool dist list: %s", msg)
+			if msg == "" {
+				return nil, nil, fmt.Errorf("go tool dist list: %w", e)
+			}
+			return nil, nil, fmt.Errorf("go tool dist list: %s: %w", msg, e)
 		}
 		return nil, nil, fmt.Errorf("go tool dist list: %w", err)
 	}

@@ -55,7 +55,7 @@ func main() {
 func findGomakeRoot() (string, error) {
 	dir, err := os.Getwd()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getwd: %w", err)
 	}
 	for {
 		gomod := filepath.Join(dir, "go.mod")
@@ -93,5 +93,8 @@ func readModuleLine(f *os.File) (string, error) {
 			return strings.TrimSpace(strings.TrimPrefix(line, "module")), nil
 		}
 	}
-	return "", sc.Err()
+	if err := sc.Err(); err != nil {
+		return "", fmt.Errorf("scan: %w", err)
+	}
+	return "", nil
 }

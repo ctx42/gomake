@@ -92,8 +92,11 @@ func PrettyPrintEnv(env []string, buf io.Writer) error {
 		}
 		_, err := fmt.Fprintf(tw, "%s\t%s\n", name, envMap[name])
 		if err != nil {
-			return err
+			return fmt.Errorf("write env: %w", err)
 		}
 	}
-	return tw.Flush()
+	if err := tw.Flush(); err != nil {
+		return fmt.Errorf("write env: %w", err)
+	}
+	return nil
 }

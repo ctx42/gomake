@@ -6,6 +6,7 @@ package parser
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"text/template"
 
@@ -17,7 +18,10 @@ const MainName = "main"
 
 // CreateFile is a helper function writing code to file at given path.
 func CreateFile(dst string, code []byte) error {
-	return os.WriteFile(dst, code, 0600)
+	if err := os.WriteFile(dst, code, 0600); err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	return nil
 }
 
 // GenOpt is signature for [Generator.Generate] option.
@@ -107,7 +111,7 @@ func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 		"targets":             gen.tgs.GoCode(qualifyPkg),
 	}
 	if err := tgsTplParsed.Execute(buf, data); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("execute targets template: %w", err)
 	}
 	return buf.Bytes(), nil
 }
