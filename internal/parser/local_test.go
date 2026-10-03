@@ -24,7 +24,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(t.Context(), rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
@@ -44,7 +44,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(t.Context(), rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
 		assert.True(t, have)
@@ -58,7 +58,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(t.Context(), ring.New(), pkg)
+		have := newLocalPackage(ring.New(), pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -71,7 +71,7 @@ func Test_newLocalPackage(t *testing.T) {
 		pkg := &Package{ImpPath: dir}
 
 		// --- When ---
-		have := newLocalPackage(t.Context(), rng, pkg)
+		have := newLocalPackage(rng, pkg)
 
 		// --- Then ---
 		assert.False(t, have)
@@ -85,7 +85,7 @@ func Test_importDir(t *testing.T) {
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		have, err := importDir(t.Context(), rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -100,7 +100,7 @@ func Test_importDir(t *testing.T) {
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(t.Context(), rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -115,7 +115,7 @@ func Test_importDir(t *testing.T) {
 		dir := importDirFixture(t)
 
 		// --- When ---
-		have, err := importDir(t.Context(), rng, dir)
+		have, err := importDir(rng, dir)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -128,7 +128,7 @@ func Test_importDir(t *testing.T) {
 		dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
-		_, err := importDir(t.Context(), ring.New(), dir)
+		_, err := importDir(ring.New(), dir)
 
 		// --- Then ---
 		assert.ErrorContain(t, "no buildable Go source files", err)

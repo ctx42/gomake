@@ -133,7 +133,7 @@ func Main(
 
 	if cfg.showCheckConfig {
 		var report string
-		report, err = runCheckConfig(ctx, rng, cfg, tgs)
+		report, err = runCheckConfig(rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -144,7 +144,7 @@ func Main(
 
 	if cfg.showList {
 		var all []*mkf.Target
-		all, err = allTargets(ctx, rng, cfg, tgs)
+		all, err = allTargets(rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -155,7 +155,7 @@ func Main(
 
 	if cfg.showHelp {
 		var all []*mkf.Target
-		all, err = allTargets(ctx, rng, cfg, tgs)
+		all, err = allTargets(rng, cfg, tgs)
 		if err != nil {
 			writeErr(err)
 			return mkf.ExitCode(err)
@@ -211,7 +211,7 @@ func Main(
 
 	var gmk *goMake
 	analyzeAct := func() error {
-		gmk, err = newGoMake(ctx, rng, cfg)
+		gmk, err = newGoMake(rng, cfg)
 		return err
 	}
 	err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)

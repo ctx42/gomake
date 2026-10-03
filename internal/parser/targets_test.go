@@ -76,7 +76,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(t.Context(), ring.New(), impSpecs)
+		have, err := TargetsFromSpecs(ring.New(), impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -90,7 +90,6 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("as built-in targets", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/imports/pkg0",
 			"github.com/ctx42/gomake/testdata/imports/pkg1",
@@ -98,7 +97,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(ctx, ring.New(), impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(ring.New(), impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -122,7 +121,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(t.Context(), rng, impSpecs)
+		have, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -147,7 +146,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(t.Context(), rng, impSpecs)
+		have, err := TargetsFromSpecs(rng, impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -156,13 +155,12 @@ func Test_TargetsFromSpecs(t *testing.T) {
 
 	t.Run("invalid import", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		impSpecs := []string{
 			"github.com/ctx42/gomake/testdata/projects/empty",
 		}
 
 		// --- When ---
-		have, err := TargetsFromSpecs(ctx, ring.New(), impSpecs, BuiltInCB)
+		have, err := TargetsFromSpecs(ring.New(), impSpecs, BuiltInCB)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -176,7 +174,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		hTgs, err := TargetsFromSpecs(t.Context(), ring.New(), impSpecs)
+		hTgs, err := TargetsFromSpecs(ring.New(), impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -190,7 +188,7 @@ func Test_TargetsFromSpecs(t *testing.T) {
 		}
 
 		// --- When ---
-		hTgs, err := TargetsFromSpecs(t.Context(), ring.New(), impSpecs)
+		hTgs, err := TargetsFromSpecs(ring.New(), impSpecs)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -209,7 +207,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(t.Context(), ring.New(), "", imports)
+		have, err := TargetsFromImports(ring.New(), "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -226,7 +224,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(t.Context(), ring.New(), "", imports)
+		have, err := TargetsFromImports(ring.New(), "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -240,7 +238,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(t.Context(), ring.New(), "", imports)
+		have, err := TargetsFromImports(ring.New(), "", imports)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -249,7 +247,6 @@ func Test_TargetsFromImports(t *testing.T) {
 
 	t.Run("namespace applied to built-in targets", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		imports := []Import{
 			{
 				Path:      "github.com/ctx42/gomake/testdata/imports/pkg0",
@@ -258,7 +255,7 @@ func Test_TargetsFromImports(t *testing.T) {
 		}
 
 		// --- When ---
-		have, err := TargetsFromImports(ctx, ring.New(), "", imports, BuiltInCB)
+		have, err := TargetsFromImports(ring.New(), "", imports, BuiltInCB)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -993,11 +990,10 @@ func Test_Targets_GoImports(t *testing.T) {
 
 	t.Run("imports from showcase example", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		rng := ring.New()
 		relPath := "testdata/projects/showcase_imports/project"
 		absPath := modkit.Path(relPath)
-		pmf := must.Value(NewMakefile(ctx, rng, absPath))
+		pmf := must.Value(NewMakefile(rng, absPath))
 
 		// --- When ---
 		have := pmf.Targets.GoImports()
@@ -1013,14 +1009,12 @@ func Test_Targets_GoImports(t *testing.T) {
 
 	t.Run("imports from showcase example GOOS windows", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-
 		rng := ring.New()
 		rng.EnvSet("GOOS", "windows")
 
 		relPath := "testdata/projects/showcase_imports/project"
 		absPath := modkit.Path(relPath)
-		pmf := must.Value(NewMakefile(ctx, rng, absPath))
+		pmf := must.Value(NewMakefile(rng, absPath))
 
 		// --- When ---
 		have := pmf.Targets.GoImports()

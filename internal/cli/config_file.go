@@ -6,7 +6,6 @@ package cli
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -528,13 +527,12 @@ func invokedTarget(cfg *config, tgs *parser.Targets) *mkf.Target {
 // targets, reloads the user-level and project-level gomake.yaml files, and
 // returns the report from checkConfigReport.
 func runCheckConfig(
-	ctx context.Context,
 	rng *ring.Ring,
 	cfg *config,
 	stock []*mkf.Target,
 ) (string, error) {
 
-	tgts, err := allTargets(ctx, rng, cfg, stock)
+	tgts, err := allTargets(rng, cfg, stock)
 	if err != nil {
 		return "", err
 	}

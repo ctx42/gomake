@@ -4,7 +4,6 @@
 package parser
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -36,33 +35,23 @@ type Makefile struct {
 
 // NewMakefile returns [Makefile] for package in given directory. The path must
 // be absolute.
-func NewMakefile(
-	ctx context.Context,
-	rng *ring.Ring,
-	impPath string,
-) (*Makefile, error) {
-
-	pkg, err := NewPackage(ctx, rng, impPath)
+func NewMakefile(rng *ring.Ring, impPath string) (*Makefile, error) {
+	pkg, err := NewPackage(rng, impPath)
 	if err != nil {
 		return nil, err
 	}
-	return MakefileFromPackage(ctx, rng, pkg)
+	return MakefileFromPackage(rng, pkg)
 }
 
 // MakefileFromPackage returns [Makefile] for given package.
-func MakefileFromPackage(
-	ctx context.Context,
-	rng *ring.Ring,
-	pkg *Package,
-) (*Makefile, error) {
-
+func MakefileFromPackage(rng *ring.Ring, pkg *Package) (*Makefile, error) {
 	pmf := &Makefile{
 		Targets: NewTargets(),
 		env:     rng,
 		pkg:     pkg,
 	}
 
-	docPkg, err := pmf.addTargets(ctx)
+	docPkg, err := pmf.addTargets()
 	switch {
 	case errors.Is(err, ErrAstEmpty):
 		// When the import path has no targets, that is not really a problem
@@ -80,7 +69,7 @@ func MakefileFromPackage(
 // on the [Makefile]. It adds targets from the package functions and types,
 // pulls in targets from `gomake:import` imports, and marks the default target.
 // Returns the package documentation.
-func (pmf *Makefile) addTargets(ctx context.Context) (*doc.Package, error) {
+func (pmf *Makefile) addTargets() (*doc.Package, error) {
 	pkg := pmf.pkg
 
 	// Always non-nil so an empty go-list selection is not a dir scan.
@@ -103,7 +92,7 @@ func (pmf *Makefile) addTargets(ctx context.Context) (*doc.Package, error) {
 	// from imports tagged with `gomake:import`.
 	for _, name := range files {
 		if fil, ok := astPkg[name]; ok {
-			if err = pmf.adGmImports(ctx, fil); err != nil {
+			if err = pmf.adGmImports(fil); err != nil {
 				return nil, err
 			}
 		}
@@ -151,8 +140,8 @@ func (pmf *Makefile) markDefault(
 
 // adGmImports resolves the file's `gomake:import` imports with [gmImpPackages]
 // and adds the function and type targets found in each imported package.
-func (pmf *Makefile) adGmImports(ctx context.Context, fil *ast.File) error {
-	pks, err := gmImpPackages(ctx, pmf.env, pmf.pkg.ImpPath, fil.Decls...)
+func (pmf *Makefile) adGmImports(fil *ast.File) error {
+	pks, err := gmImpPackages(pmf.env, pmf.pkg.ImpPath, fil.Decls...)
 	if err != nil {
 		return err
 	}

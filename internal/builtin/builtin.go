@@ -9,7 +9,6 @@
 package builtin
 
 import (
-	"context"
 	_ "embed"
 	"fmt"
 	"go/token"
@@ -214,7 +213,6 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	// Generate every file before writing any of them, so a later failure
 	// does not replace an earlier file.
 	tgs, err := parser.TargetsFromImports(
-		context.Background(),
 		opts.rng,
 		opts.dir,
 		imports,

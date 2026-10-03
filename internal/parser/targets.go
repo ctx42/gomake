@@ -5,7 +5,6 @@ package parser
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"go/doc"
@@ -62,7 +61,6 @@ type Import struct {
 // then merges them into one list of targets. All targets are registered in the
 // root namespace; use [TargetsFromImports] to apply a namespace.
 func TargetsFromSpecs(
-	ctx context.Context,
 	rng *ring.Ring,
 	specs []string,
 	fns ...TgsMapCB,
@@ -72,7 +70,7 @@ func TargetsFromSpecs(
 	for i, spec := range specs {
 		imports[i] = Import{Path: spec}
 	}
-	return TargetsFromImports(ctx, rng, "", imports, fns...)
+	return TargetsFromImports(rng, "", imports, fns...)
 }
 
 // TargetsFromImports returns the targets found in the given import packages.
@@ -81,7 +79,6 @@ func TargetsFromSpecs(
 // are resolved against the go.mod of the module rooted at dir; an empty dir
 // falls back to the process working directory.
 func TargetsFromImports(
-	ctx context.Context,
 	rng *ring.Ring,
 	dir string,
 	imports []Import,
@@ -91,7 +88,6 @@ func TargetsFromImports(
 	all := NewTargets()
 	for _, imp := range imports {
 		pkg, err := NewPackage(
-			ctx,
 			rng,
 			imp.Path,
 			withPkgSpec,
@@ -101,7 +97,7 @@ func TargetsFromImports(
 		if err != nil {
 			return nil, err
 		}
-		pmf, err := MakefileFromPackage(ctx, rng, pkg)
+		pmf, err := MakefileFromPackage(rng, pkg)
 		if err != nil {
 			return nil, err
 		}

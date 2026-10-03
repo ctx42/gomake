@@ -28,7 +28,7 @@ func Test_NewMakefile(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		have, err := NewMakefile(t.Context(), rng, prj.Root())
+		have, err := NewMakefile(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -53,7 +53,7 @@ func Test_NewMakefile(t *testing.T) {
 		relPath := "../../testdata/projects/showcase_imports/project"
 
 		// --- When ---
-		have, err := NewMakefile(t.Context(), ring.New(), relPath)
+		have, err := NewMakefile(ring.New(), relPath)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -65,7 +65,7 @@ func Test_NewMakefile(t *testing.T) {
 		relPath := "testdata/projects/empty"
 
 		// --- When ---
-		have, err := NewMakefile(t.Context(), ring.New(), modkit.Path(relPath))
+		have, err := NewMakefile(ring.New(), modkit.Path(relPath))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -90,7 +90,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -130,7 +130,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -154,7 +154,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -179,7 +179,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -202,7 +202,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -223,7 +223,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -244,7 +244,7 @@ func Test_MakefileFromPackage(t *testing.T) {
 		pkg := NewTestHelper(t, rng, prj.Root()).pkg
 
 		// --- When ---
-		have, err := MakefileFromPackage(t.Context(), rng, pkg)
+		have, err := MakefileFromPackage(rng, pkg)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)

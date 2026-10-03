@@ -260,16 +260,7 @@ const srcDirMustContain = "source directory must not contain %q file"
 // [parser.BuildTag]; do not mix tagged and untagged makefile sources in src.
 //
 //nolint:cyclop,gocognit
-func prepare(
-	ctx context.Context,
-	rng *ring.Ring,
-	tmp, src string,
-) (cu *compUnit, err error) {
-
-	if err = ctx.Err(); err != nil {
-		return nil, err
-	}
-
+func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	// Before we do anything we must be in a Go project (the go.mod file
 	// exists).
 	if _, err = gomake.Root(src); err != nil {
@@ -313,7 +304,7 @@ func prepare(
 
 	// Get package with user-defined targets.
 	var pkg *parser.Package
-	if pkg, err = parser.NewPackage(ctx, rng, src); err != nil {
+	if pkg, err = parser.NewPackage(rng, src); err != nil {
 		return nil, err
 	}
 
@@ -391,9 +382,7 @@ func prepare(
 		); err != nil {
 			return nil, err
 		}
-		if err = editGoWork(
-			ctx, rng, goWorkSrc, buildDir, modRoot,
-		); err != nil {
+		if err = editGoWork(rng, goWorkSrc, buildDir, modRoot); err != nil {
 			return nil, err
 		}
 
@@ -435,7 +424,7 @@ func prepare(
 	}
 
 	if err = editGoMod(
-		ctx, rng, goModDst, mod.ImpSpec, mod.ImpPath, modRoot,
+		rng, goModDst, mod.ImpSpec, mod.ImpPath, modRoot,
 	); err != nil {
 		return nil, err
 	}
@@ -560,21 +549,13 @@ func findGoWorkValue(gowork, modRoot string) (string, error) {
 // GOWORK never mutates the caller's workfile.
 //
 //nolint:cyclop,gocognit
-func editGoWork(
-	ctx context.Context,
-	env ring.Environ,
-	srcWork, dst, modRoot string,
-) error {
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 	workDir := filepath.Dir(srcWork)
 	base := env.EnvAll()
 	srcEnv := ring.EnvSet(base, "GOWORK", srcWork)
 
 	out := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "go", "work", "edit", "-json")
+	cmd := exec.Command("go", "work", "edit", "-json") //nolint:noctx
 	cmd.Env = srcEnv
 	cmd.Dir = workDir
 	cmd.Stdout = out
@@ -642,7 +623,9 @@ func editGoWork(
 	// adding use "." for the makefile module would remove that entry.
 	for from := range replace {
 		out.Reset()
-		cmd = exec.CommandContext(ctx, "go", "work", "edit", "-dropuse", from)
+		cmd = exec.Command( //nolint:noctx
+			"go", "work", "edit", "-dropuse", from,
+		)
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -653,7 +636,7 @@ func editGoWork(
 	}
 	for _, to := range replace {
 		out.Reset()
-		cmd = exec.CommandContext(ctx, "go", "work", "edit", "-use", to)
+		cmd = exec.Command("go", "work", "edit", "-use", to) //nolint:noctx
 		cmd.Env = dstEnv
 		cmd.Dir = dst
 		cmd.Stdout = out
@@ -678,7 +661,7 @@ func editGoWork(
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.CommandContext(ctx,
+		cmd = exec.Command( //nolint:noctx
 			"go", "work", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,
@@ -700,20 +683,16 @@ func editGoWork(
 // makefile imports xflag while user projects do not. srcModDir is the original
 // module root used to absolutize local replace paths after the copy.
 func editGoMod(
-	ctx context.Context,
 	env ring.Environ,
 	pth, pkgImpSpec, pkgPath, srcModDir string,
 ) error {
 
-	if err := ctx.Err(); err != nil {
-		return err
-	}
 	dir := filepath.Dir(pth)
 	xflagReq := xflagModPath + "@" + xflagVersion()
 	// Pin GOWORK like compile so ambient workspace does not affect go mod.
 	modEnv := pinBuildGOWORK(env.EnvAll(), dir)
 
-	cmd := exec.CommandContext(ctx,
+	cmd := exec.Command( //nolint:noctx
 		"go", "mod", "edit",
 		"-module", "makefile",
 		"-require="+pkgImpSpec+"@v0.0.0",
@@ -729,14 +708,14 @@ func editGoMod(
 		return goEditErr(errGoModEdit, pth, out.String(), err)
 	}
 
-	if err := absolutizeGoModReplaces(ctx, modEnv, dir, srcModDir); err != nil {
+	if err := absolutizeGoModReplaces(modEnv, dir, srcModDir); err != nil {
 		return err
 	}
 
 	// The copied "go.sum" lacks xflag, so populate it from the module cache
 	// (gomake was built with the same version) before the build runs.
 	out.Reset()
-	cmd = exec.CommandContext(ctx, "go", "mod", "download", xflagReq)
+	cmd = exec.Command("go", "mod", "download", xflagReq) //nolint:noctx
 	cmd.Env = modEnv
 	cmd.Dir = dir
 	cmd.Stdout = out
@@ -749,17 +728,9 @@ func editGoMod(
 
 // absolutizeGoModReplaces rewrites relative local replace targets in the
 // build-dir go.mod so they resolve against the original source module root.
-func absolutizeGoModReplaces(
-	ctx context.Context,
-	env []string,
-	buildDir, srcModDir string,
-) error {
-
-	if err := ctx.Err(); err != nil {
-		return err
-	}
+func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 	out := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "go", "mod", "edit", "-json")
+	cmd := exec.Command("go", "mod", "edit", "-json") //nolint:noctx
 	cmd.Env = env
 	cmd.Dir = buildDir
 	cmd.Stdout = out
@@ -800,7 +771,7 @@ func absolutizeGoModReplaces(
 			oldSpec = rpl.Old.Path + "@" + rpl.Old.Version
 		}
 		out.Reset()
-		cmd = exec.CommandContext(ctx,
+		cmd = exec.Command( //nolint:noctx
 			"go", "mod", "edit",
 			"-dropreplace="+oldSpec,
 			"-replace="+oldSpec+"="+abs,
@@ -987,7 +958,6 @@ func goFiles(rng *ring.Ring, impPath string) ([]string, error) {
 // For listing and help, targets are parsed directly from source without
 // creating a build directory.
 func allTargets(
-	ctx context.Context,
 	rng *ring.Ring,
 	cfg *config,
 	stock []*mkf.Target,
@@ -1017,13 +987,13 @@ func allTargets(
 		var pmf *parser.Makefile
 		analyzeAct := func() error {
 			var pkg *parser.Package
-			pkg, err = parser.NewPackage(ctx, rng, cfg.src)
+			pkg, err = parser.NewPackage(rng, cfg.src)
 			if err != nil {
 				return err
 			}
 			keep, _ := selectMakefiles(pkg.Files)
 			pkg.Files = keep
-			pmf, err = parser.MakefileFromPackage(ctx, rng, pkg)
+			pmf, err = parser.MakefileFromPackage(rng, pkg)
 			return err
 		}
 		err = withProgress(rng.Stderr(), "Analyzing sources...", analyzeAct)

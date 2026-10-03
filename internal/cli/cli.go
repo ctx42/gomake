@@ -51,22 +51,14 @@ type goMake struct {
 }
 
 // newGoMake returns a new goMake.
-func newGoMake(
-	ctx context.Context,
-	rng *ring.Ring,
-	cfg *config,
-) (gmk *goMake, err error) {
-
-	if err = ctx.Err(); err != nil {
-		return nil, err
-	}
+func newGoMake(rng *ring.Ring, cfg *config) (gmk *goMake, err error) {
 	gmk = &goMake{cfg: cfg}
 	rng.EnvSet("GOOS", cfg.goos)
 	rng.EnvSet("GOARCH", cfg.goarch)
 	rng = parser.SetBuildTag(rng)
 
 	// Bring to build directory user defined targets and empty built-in targets.
-	gmk.cu, err = prepare(ctx, rng, cfg.tmp, cfg.src)
+	gmk.cu, err = prepare(rng, cfg.tmp, cfg.src)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +79,7 @@ func newGoMake(
 		Files:   gmk.cu.MkfNames,
 	}
 	var pmf *parser.Makefile
-	if pmf, err = parser.MakefileFromPackage(ctx, rng, buildPkg); err != nil {
+	if pmf, err = parser.MakefileFromPackage(rng, buildPkg); err != nil {
 		return nil, err
 	}
 	gen := parser.NewGenerator(pmf.Targets)

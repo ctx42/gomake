@@ -221,7 +221,7 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	defer func() { _ = os.RemoveAll(dir) }()
 
 	args := []string{"mod", "download", "-json", module}
-	cmd := exec.CommandContext(context.Background(), "go", args...)
+	cmd := exec.Command("go", args...) //nolint:noctx
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	out, err := cmd.Output()
@@ -317,13 +317,8 @@ func moduleAt(
 
 	// GOWORK=off so a multi-module ambient workspace does not emit multiple
 	// Path::Dir lines that break Cut parsing.
-	cmd := exec.CommandContext(
-		context.Background(),
-		"go",
-		"list",
-		"-m",
-		"-f",
-		"{{.Path}}::{{.Dir}}",
+	cmd := exec.Command( //nolint:noctx
+		"go", "list", "-m", "-f", "{{.Path}}::{{.Dir}}",
 	)
 	cmd.Env = ring.EnvSet(env.EnvAll(), "GOWORK", "off")
 	cmd.Dir = dir
@@ -364,14 +359,7 @@ func notModule(err error) bool {
 // goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the
 // workspace file that lists both modules.
 func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
-	cmd := exec.CommandContext(
-		context.Background(),
-		"go",
-		"work",
-		"init",
-		buildDir,
-		modRoot,
-	)
+	cmd := exec.Command("go", "work", "init", buildDir, modRoot) //nolint:noctx
 	cmd.Env = env.EnvAll()
 	cmd.Dir = wsDir
 	out, err := cmd.CombinedOutput()

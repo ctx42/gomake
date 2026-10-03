@@ -55,7 +55,6 @@ func NewTestHelper(
 ) *TestHelper {
 
 	t.Helper()
-	ctx := t.Context()
 
 	tst := &TestHelper{
 		impPath: impPath,
@@ -63,7 +62,7 @@ func NewTestHelper(
 	}
 
 	var err error
-	tst.pkg, err = NewPackage(ctx, rng, impPath, pkgOpts...)
+	tst.pkg, err = NewPackage(rng, impPath, pkgOpts...)
 	if err != nil {
 		t.Error(err)
 		return nil

@@ -10,7 +10,6 @@
 package install
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -52,7 +51,7 @@ func buildMain(env ring.Environ, dir, out, mainPkg, ldflags string) error {
 		args = append(args, "-ldflags", ldflags)
 	}
 	args = append(args, mainPkg)
-	cmd := exec.CommandContext(context.Background(), "go", args...)
+	cmd := exec.Command("go", args...) //nolint:noctx
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	outBytes, err := cmd.CombinedOutput()

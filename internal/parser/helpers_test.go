@@ -38,7 +38,7 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(t.Context(), rng, prj.Root())
+		hCode, hTgs, err := genMakefileUser(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -76,7 +76,7 @@ func Test_GenMakefileUser(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		hCode, hTgs, err := genMakefileUser(t.Context(), rng, prj.Root())
+		hCode, hTgs, err := genMakefileUser(rng, prj.Root())
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -101,7 +101,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		dst := prj.Path(mkf.MakefileUser)
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -128,7 +128,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		dst := prj.Path(mkf.MakefileUser)
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrDupTarget, err)
@@ -151,7 +151,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		dst := t.TempDir()
 
 		// --- When ---
-		have, err := GenMakefileUserAndSave(t.Context(), rng, prj.Root(), dst)
+		have, err := GenMakefileUserAndSave(rng, prj.Root(), dst)
 
 		// --- Then ---
 		var e *os.PathError
@@ -792,7 +792,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(t.Context(), rng, "", astFil.Decls...)
+		have, err := gmImpPackages(rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -857,7 +857,7 @@ func Test_gmImpPackages(t *testing.T) {
 		astFil := NewTestHelper(t, rng, prj.Root()).File(mkf.MakefileMain)
 
 		// --- When ---
-		have, err := gmImpPackages(t.Context(), rng, "", astFil.Decls...)
+		have, err := gmImpPackages(rng, "", astFil.Decls...)
 
 		// --- Then ---
 		assert.NoError(t, err)

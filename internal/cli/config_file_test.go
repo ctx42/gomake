@@ -974,7 +974,7 @@ func Test_runCheckConfig(t *testing.T) {
 	targets := builtintest.NewTstProvider().Targets()
 
 	// --- When ---
-	have, err := runCheckConfig(t.Context(), rng, cfg, targets)
+	have, err := runCheckConfig(rng, cfg, targets)
 
 	// --- Then ---
 	assert.NoError(t, err)

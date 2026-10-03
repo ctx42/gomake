@@ -6,7 +6,6 @@ package parser
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"go/ast"
 	"go/doc"
 	"go/token"
@@ -21,14 +20,9 @@ import (
 // genMakefileUser parses targets in `makefile*.go` files in given directory.
 // Returns source code for [mkf.MakefileUser] file and matching targets
 // collection.
-func genMakefileUser(
-	ctx context.Context,
-	rng *ring.Ring,
-	dir string,
-) ([]byte, *Targets, error) {
-
+func genMakefileUser(rng *ring.Ring, dir string) ([]byte, *Targets, error) {
 	// Parse makefile*.go files with user defined targets.
-	pmf, err := NewMakefile(ctx, rng, dir)
+	pmf, err := NewMakefile(rng, dir)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -43,13 +37,8 @@ func genMakefileUser(
 
 // GenMakefileUserAndSave based on targets in src directory generates code for
 // [mkf.MakefileUser] in the same directory. Returns user targets.
-func GenMakefileUserAndSave(
-	ctx context.Context,
-	rng *ring.Ring,
-	src, dst string,
-) (*Targets, error) {
-
-	code, tgs, err := genMakefileUser(ctx, rng, src)
+func GenMakefileUserAndSave(rng *ring.Ring, src, dst string) (*Targets, error) {
+	code, tgs, err := genMakefileUser(rng, src)
 	if err != nil {
 		return nil, err
 	}
@@ -462,7 +451,6 @@ func unquote(bl *ast.BasicLit) string { return strings.Trim(bl.Value, "\"`") }
 // Packages are resolved concurrently against the go.mod of the module rooted
 // at dir (empty dir falls back to the process working directory).
 func gmImpPackages(
-	ctx context.Context,
 	rng *ring.Ring,
 	dir string,
 	dcs ...ast.Decl,
@@ -499,7 +487,6 @@ func gmImpPackages(
 		go func(i int, ns, imp string) {
 			defer wg.Done()
 			pkg, err := NewPackage(
-				ctx,
 				rng,
 				imp,
 				withPkgSpec,

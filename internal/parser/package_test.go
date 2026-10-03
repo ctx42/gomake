@@ -53,7 +53,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -75,7 +75,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root(), withPkgNS("ns"))
+		have, err := NewPackage(rng, prj.Root(), withPkgNS("ns"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -95,7 +95,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -124,7 +124,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -152,7 +152,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -177,7 +177,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -197,7 +197,7 @@ func Test_NewPackage(t *testing.T) {
 		pth := pathkit.AbsPath(t, "testing/not/existing")
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), ring.New(), pth)
+		have, err := NewPackage(ring.New(), pth)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -206,7 +206,7 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("error - empty import path", func(t *testing.T) {
 		// --- When ---
-		have, err := NewPackage(t.Context(), ring.New(), "")
+		have, err := NewPackage(ring.New(), "")
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -224,7 +224,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.Root())
+		have, err := NewPackage(rng, prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -247,7 +247,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.ImpSpec(), withPkgSpec)
+		have, err := NewPackage(rng, prj.ImpSpec(), withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -263,7 +263,7 @@ func Test_NewPackage(t *testing.T) {
 		relPath := "../../testdata/imports/pkg2"
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), ring.New(), relPath)
+		have, err := NewPackage(ring.New(), relPath)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -284,7 +284,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, prj.ImpSpec(), withPkgSpec)
+		have, err := NewPackage(rng, prj.ImpSpec(), withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -308,7 +308,6 @@ func Test_NewPackage(t *testing.T) {
 
 		// --- When ---
 		have, err := NewPackage(
-			t.Context(),
 			rng,
 			prj.ImpSpec(),
 			withPkgSpec,
@@ -329,7 +328,7 @@ func Test_NewPackage(t *testing.T) {
 		imp := "example.com/not/existing"
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), ring.New(), imp, withPkgSpec)
+		have, err := NewPackage(ring.New(), imp, withPkgSpec)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrGoList, err)
@@ -351,7 +350,7 @@ func Test_NewPackage(t *testing.T) {
 		storeListCache(key, []byte(`{"Name":"cached"}`))
 
 		// --- When ---
-		have, err := NewPackage(t.Context(), rng, spec, withPkgSpec)
+		have, err := NewPackage(rng, spec, withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)

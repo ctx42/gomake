@@ -14,14 +14,12 @@ import (
 // a local package directory. Compare it against Benchmark_AstAndDocPkg_local to
 // see how the subprocess dominates the parser path.
 func Benchmark_NewPackage_local(b *testing.B) {
-	ctx := b.Context()
-
 	rng := SetBuildTag(ring.New())
 	dir := modkit.Path("testdata/projects/showcase_targets/project")
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := NewPackage(ctx, rng, dir); err != nil {
+		if _, err := NewPackage(rng, dir); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -43,14 +41,12 @@ func Benchmark_AstAndDocPkg_local(b *testing.B) {
 // Benchmark_NewMakefile_big measures the full local discovery path (`go list`
 // plus parse plus target extraction) for the largest realistic fixture.
 func Benchmark_NewMakefile_big(b *testing.B) {
-	ctx := b.Context()
-
 	rng := SetBuildTag(ring.New())
 	dir := modkit.Path("testdata/projects/showcase_targets/project")
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := NewMakefile(ctx, rng, dir); err != nil {
+		if _, err := NewMakefile(rng, dir); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -59,14 +55,12 @@ func Benchmark_NewMakefile_big(b *testing.B) {
 // Benchmark_NewMakefile_small measures the full local discovery path for a
 // minimal tagged makefile fixture (the common project shape).
 func Benchmark_NewMakefile_small(b *testing.B) {
-	ctx := b.Context()
-
 	rng := SetBuildTag(ring.New())
 	dir := modkit.Path("testdata/projects/simple_tagged/project")
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := NewMakefile(ctx, rng, dir); err != nil {
+		if _, err := NewMakefile(rng, dir); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -75,8 +69,6 @@ func Benchmark_NewMakefile_small(b *testing.B) {
 // Benchmark_TargetsFromSpecs measures the import-spec discovery path, which
 // resolves each spec with its own `go list` subprocess before parsing.
 func Benchmark_TargetsFromSpecs(b *testing.B) {
-	ctx := b.Context()
-
 	rng := ring.New()
 	specs := []string{
 		"github.com/ctx42/gomake/testdata/imports/pkg0",
@@ -86,7 +78,7 @@ func Benchmark_TargetsFromSpecs(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := TargetsFromSpecs(ctx, rng, specs); err != nil {
+		if _, err := TargetsFromSpecs(rng, specs); err != nil {
 			b.Fatal(err)
 		}
 	}

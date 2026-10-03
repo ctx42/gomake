@@ -106,7 +106,7 @@ func regenBuiltins(rng *ring.Ring, wd string, cfg *ImportsConfig) error {
 
 // runGoInDir executes a go subcommand in dir, capturing stderr on error.
 func runGoInDir(env ring.Environ, dir string, args ...string) error {
-	cmd := exec.CommandContext(context.Background(), "go", args...)
+	cmd := exec.Command("go", args...) //nolint:noctx
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()

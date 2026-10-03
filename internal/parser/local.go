@@ -6,7 +6,6 @@ package parser
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"errors"
 	"fmt"
 	"go/build"
@@ -32,13 +31,13 @@ var errNoModule = errors.New("no module directive")
 // result matches `go list` regardless of replace directives, vendoring, or
 // workspaces. It reports false when the directory cannot be resolved this way,
 // in which case the caller falls back to `go list`.
-func newLocalPackage(ctx context.Context, rng *ring.Ring, pkg *Package) bool {
+func newLocalPackage(rng *ring.Ring, pkg *Package) bool {
 	root, err := gomake.Root(pkg.ImpPath)
 	if err != nil {
 		return false
 	}
 
-	bp, err := importDir(ctx, rng, pkg.ImpPath)
+	bp, err := importDir(rng, pkg.ImpPath)
 	if err != nil {
 		return false
 	}
@@ -64,12 +63,7 @@ func newLocalPackage(ctx context.Context, rng *ring.Ring, pkg *Package) bool {
 // GOARCH from rng. Release tags and cgo come from the go tool started
 // with rng's environment, which is what `go list` would use. An error
 // from that query is returned so the caller can fall back to `go list`.
-func importDir(
-	ctx context.Context,
-	rng *ring.Ring,
-	dir string,
-) (*build.Package, error) {
-
+func importDir(rng *ring.Ring, dir string) (*build.Package, error) {
 	ctxt := build.Default
 	if goos := rng.EnvGet("GOOS"); goos != "" {
 		ctxt.GOOS = goos
@@ -77,7 +71,7 @@ func importDir(
 	if goarch := rng.EnvGet("GOARCH"); goarch != "" {
 		ctxt.GOARCH = goarch
 	}
-	rel, cgo, err := toolchainFacts(ctx, rng)
+	rel, cgo, err := toolchainFacts(rng)
 	if err != nil {
 		return nil, err
 	}
@@ -92,17 +86,8 @@ func importDir(
 
 // toolchainFacts asks the go tool, under env, for the release tags of its
 // version and whether cgo is enabled. CGO_ENABLED in env selects cgo.
-func toolchainFacts(
-	ctx context.Context,
-	env ring.Environ,
-) (tags []string, cgo bool, err error) {
-
-	cmd := exec.CommandContext(ctx,
-		"go",
-		"env",
-		"GOVERSION",
-		"CGO_ENABLED",
-	)
+func toolchainFacts(env ring.Environ) (tags []string, cgo bool, err error) {
+	cmd := exec.Command("go", "env", "GOVERSION", "CGO_ENABLED") //nolint:noctx
 	cmd.Env = env.EnvAll()
 	out, err := cmd.Output()
 	if err != nil {
