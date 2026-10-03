@@ -418,7 +418,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		_, err := fetchExternalTargets(context.Background(), "http://localhost:0/x")
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorContain(t, "connection refused", err)
 	})
 
 	t.Run("returns error for malformed URL", func(t *testing.T) {
@@ -426,7 +426,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		_, err := fetchExternalTargets(context.Background(), "http://\x00invalid")
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorContain(t, "invalid control character", err)
 	})
 
 	t.Run("returns error for invalid YAML body", func(t *testing.T) {

@@ -159,7 +159,7 @@ func Test_newGoMake(t *testing.T) {
 		gmk, err := newGoMake(t.Context(), rng, cfg)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, parser.ErrDupTarget, err)
 		assert.Nil(t, gmk)
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})

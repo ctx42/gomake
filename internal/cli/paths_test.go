@@ -8,16 +8,25 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
+	"github.com/ctx42/testkit/pkg/exekit"
 )
 
 func Test_GoBinPath(t *testing.T) {
 	t.Run("resolves from the toolchain", func(t *testing.T) {
+		// --- Given ---
+		raw := exekit.New(t).ExeStdout(
+			"go", "env", "-json", "GOBIN", "GOPATH",
+		)
+		want := must.Value(goBinPath(raw))
+		env := ring.New()
+
 		// --- When ---
-		have, err := GoBinPath(ring.New())
+		have, err := GoBinPath(env)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.NotEmpty(t, have)
+		assert.Equal(t, want, have)
 	})
 
 	t.Run("honors GOBIN from the passed environment", func(t *testing.T) {

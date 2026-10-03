@@ -295,11 +295,12 @@ func Test_GenMain(t *testing.T) {
 		have := oskit.ReadFileStr(t, prj.Path(targetsFN))
 		assert.True(t, strings.HasPrefix(have, "package abc\n"))
 
-		have = oskit.ReadFileStr(t, prj.Path("data", mainFN))
-		assert.True(t, strings.HasPrefix(have, "package main\n"))
+		populated := oskit.ReadFileStr(t, prj.Path("data", mainFN))
+		assert.Contain(t, "pkg0.Pkg0", populated)
 
-		have = oskit.ReadFileStr(t, prj.Path("data", mainEmptyFN))
-		assert.True(t, strings.HasPrefix(have, "package main\n"))
+		empty := oskit.ReadFileStr(t, prj.Path("data", mainEmptyFN))
+		assert.Contain(t, "make([]*Target, 0)\n", empty)
+		assert.NotContain(t, "pkg0.Pkg0", empty)
 	})
 
 	t.Run("invalid import", func(t *testing.T) {

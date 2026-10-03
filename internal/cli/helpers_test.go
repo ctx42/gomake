@@ -424,7 +424,7 @@ func Test_prepare(t *testing.T) {
 		cu, err := prepare(t.Context(), rng, dstPrj.Root(), srcPrj.Root())
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrPermission, err)
 		assert.Nil(t, cu)
 		entries, rerr := os.ReadDir(dstPrj.Root())
 		assert.NoError(t, rerr)
@@ -846,7 +846,6 @@ func Test_findGoWork(t *testing.T) {
 		have, err := findGoWork(env, root)
 
 		// --- Then ---
-		assert.Error(t, err)
 		assert.ErrorContain(t, "GOWORK", err)
 		assert.Equal(t, "", have)
 	})

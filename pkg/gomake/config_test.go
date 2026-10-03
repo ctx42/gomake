@@ -88,7 +88,7 @@ func Test_TargetConfig(t *testing.T) {
 		cfg, err := TargetConfig(rng)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorContain(t, "invalid character", err)
 		assert.Nil(t, cfg)
 	})
 

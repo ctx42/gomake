@@ -187,7 +187,7 @@ func Test_installTo(t *testing.T) {
 		err := installTo(rng.Ring(), publishedInfo, dst, tgs)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 
 	t.Run("error - non-devel full path copy then regen", func(t *testing.T) {
@@ -511,7 +511,8 @@ func Test_moduleCacheDir(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.NotEqual(t, "", dir)
+		assert.Contain(t, "github.com/ctx42/ring@v0.7.0", filepath.ToSlash(dir))
+		assert.True(t, oskit.PathExists(t, dir))
 	})
 
 	t.Run("ignores the working directory", func(t *testing.T) {
@@ -661,7 +662,7 @@ func Test_moduleAt(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "example.com/mod", mod)
-		assert.NotEqual(t, "", root)
+		assert.Equal(t, dir, root)
 	})
 
 	t.Run("not a module", func(t *testing.T) {
@@ -818,7 +819,7 @@ func Test_snapshotGenerated(t *testing.T) {
 		_, err := snapshotGenerated(build)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrPermission, err)
 	})
 }
 
@@ -858,7 +859,7 @@ func Test_copyToTemp(t *testing.T) {
 		_, _, err := copyToTemp(src)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 }
 
@@ -906,6 +907,6 @@ func Test_copyDir(t *testing.T) {
 		err := copyDir(src, dst)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrPermission, err)
 	})
 }

@@ -1867,7 +1867,8 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		assert.Contain(t, "duplicated target", tst.Stderr())
+		want := "gomake: duplicated target: PKG1, pkg1.Pkg1\n"
+		assert.Equal(t, want, tst.Stderr())
 	})
 
 	t.Run("--list AllTargets error", func(t *testing.T) {
@@ -1891,7 +1892,8 @@ func Test_main_error(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 1, code)
-		assert.Contain(t, "duplicated target", tst.Stderr())
+		want := "gomake: duplicated target: PKG1, pkg1.Pkg1\n"
+		assert.Equal(t, want, tst.Stderr())
 	})
 
 	t.Run("--help unknown target", func(t *testing.T) {
@@ -1973,7 +1975,7 @@ func BrokenCompile(ctx context.Context, rng *ring.Ring) error {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeCompile, code)
-		assert.Contain(t, "undefinedSymbol", tst.Stderr())
+		assert.Contain(t, "undefined: undefinedSymbol", tst.Stderr())
 	})
 
 	t.Run("--bin compile error", func(t *testing.T) {
@@ -2004,7 +2006,8 @@ func BrokenCompile(ctx context.Context, rng *ring.Ring) error {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeCompile, code)
-		assert.Contain(t, "undefinedSymbol", tst.Stderr())
+		assert.Contain(t, "undefined: undefinedSymbol", tst.Stderr())
+		assert.NoFileExist(t, bin)
 	})
 
 	t.Run("pre-run panic recovered", func(t *testing.T) {

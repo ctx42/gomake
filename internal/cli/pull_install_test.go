@@ -6,10 +6,12 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/oskit"
 )
 
@@ -33,23 +35,33 @@ func Test_installPath_executableLookup(t *testing.T) {
 	rng := ring.New()
 	// Ensure the override key is absent so Executable() path is used.
 	rng.EnvSet(envKeyInstallPath, "")
+	execPath := must.Value(os.Executable())
+	want := must.Value(filepath.EvalSymlinks(execPath))
+	want = must.Value(filepath.Abs(want))
 
 	// --- When ---
 	have, err := installPath(rng)
 
 	// --- Then ---
 	assert.NoError(t, err)
-	assert.NotEmpty(t, have)
+	assert.Equal(t, want, have)
 }
 
 func Test_installPathFallback(t *testing.T) {
+	// --- Given ---
+	env := ring.New()
+	name := binName
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	want := filepath.Join(must.Value(GoBinPath(env)), name)
+
 	// --- When ---
-	have, err := installPathFallback(ring.New())
+	have, err := installPathFallback(env)
 
 	// --- Then ---
 	assert.NoError(t, err)
-	assert.NotEmpty(t, have)
-	assert.Contain(t, binName, filepath.Base(have))
+	assert.Equal(t, want, have)
 }
 
 func Test_copyFile(t *testing.T) {
@@ -89,7 +101,7 @@ func Test_copyFile_error_tabular(t *testing.T) {
 			)
 
 			// --- Then ---
-			assert.Error(t, err)
+			assert.ErrorIs(t, os.ErrNotExist, err)
 		})
 	}
 }
@@ -116,6 +128,7 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 		testN string
 
 		setup func(t *testing.T, dir string) (built, installPath string)
+		want  error
 	}{
 		{
 			"built binary missing",
@@ -123,6 +136,7 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 				return filepath.Join(dir, "missing-built"),
 					filepath.Join(dir, "gomake")
 			},
+			os.ErrNotExist,
 		},
 		{
 			"rename into unreadable dir",
@@ -133,6 +147,7 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 				assert.NoError(t, os.Mkdir(filepath.Join(dir, "sub"), 0500))
 				return built, installPath
 			},
+			os.ErrPermission,
 		},
 	}
 
@@ -146,7 +161,7 @@ func Test_replaceInstall_error_tabular(t *testing.T) {
 			err := replaceInstall(built, installPath)
 
 			// --- Then ---
-			assert.Error(t, err)
+			assert.ErrorIs(t, tc.want, err)
 		})
 	}
 }

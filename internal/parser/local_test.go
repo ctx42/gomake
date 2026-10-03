@@ -5,6 +5,7 @@ package parser
 
 import (
 	"go/build"
+	"os"
 	"path/filepath"
 	"sort"
 	"testing"
@@ -130,7 +131,7 @@ func Test_importDir(t *testing.T) {
 		_, err := importDir(rng, dir)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorContain(t, "no buildable Go source files", err)
 	})
 }
 
@@ -298,7 +299,7 @@ func Test_readModulePath(t *testing.T) {
 		have, err := readModulePath(path)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 		assert.Equal(t, "", have)
 	})
 }

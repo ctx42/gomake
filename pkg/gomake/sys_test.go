@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"io"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -136,7 +137,7 @@ func Test_ReadFile(t *testing.T) {
 		content, err := ReadFile("testdata/not-existing")
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 		assert.Equal(t, "", content)
 	})
 
@@ -164,7 +165,7 @@ func Test_ReadFile(t *testing.T) {
 		content, err := ReadFile("testdata/dir")
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorContain(t, "directory", err)
 		assert.Equal(t, "", content)
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -263,7 +264,7 @@ func Test_runGoInDir_error_no_output(t *testing.T) {
 	err := runGoInDir(env, dir, "version")
 
 	// --- Then ---
-	assert.Error(t, err)
+	assert.ErrorIs(t, os.ErrNotExist, err)
 }
 
 // goList runs `go list` with args from the module tree and returns the

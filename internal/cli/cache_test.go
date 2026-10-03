@@ -324,7 +324,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		)
 
 		// --- Then ---
-		assert.Error(t, err)
+		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 
 	t.Run("GOWORK off differs from auto workspace", func(t *testing.T) {
