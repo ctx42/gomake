@@ -60,6 +60,7 @@ func findGomakeRoot() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
+	start := dir
 	for {
 		gomod := filepath.Join(dir, "go.mod")
 		f, err2 := os.Open(gomod)
@@ -83,21 +84,60 @@ func findGomakeRoot() (string, error) {
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf("could not find gomake module root from %s", dir)
+	return "", fmt.Errorf(
+		"could not find gomake module root from %s", start,
+	)
 }
 
 // readModuleLine returns the module path declared on the first "module" line
-// of f, or empty string when no such line is found.
+// of f, or empty string when no such line is found. A trailing // comment
+// is not part of the path.
 func readModuleLine(f *os.File) (string, error) {
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
-		if strings.HasPrefix(line, "module ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "module")), nil
+		rest, ok := strings.CutPrefix(line, "module")
+		if !ok || rest == "" || (rest[0] != ' ' && rest[0] != '\t') {
+			continue
 		}
+		return moduleDirective(rest), nil
 	}
 	if err := sc.Err(); err != nil {
 		return "", fmt.Errorf("scan: %w", err)
 	}
 	return "", nil
+}
+
+// moduleDirective drops a trailing // comment and surrounding quotes from a
+// module directive value.
+func moduleDirective(rest string) string {
+	rest = strings.TrimSpace(rest)
+	inQuote := false
+	escaped := false
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if inQuote {
+			if escaped {
+				escaped = false
+				continue
+			}
+			if c == '\\' {
+				escaped = true
+				continue
+			}
+			if c == '"' || c == '`' {
+				inQuote = false
+			}
+			continue
+		}
+		if c == '"' || c == '`' {
+			inQuote = true
+			continue
+		}
+		if c == '/' && i+1 < len(rest) && rest[i+1] == '/' {
+			rest = rest[:i]
+			break
+		}
+	}
+	return strings.Trim(strings.TrimSpace(rest), "\"`")
 }

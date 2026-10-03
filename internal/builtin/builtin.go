@@ -11,6 +11,7 @@ package builtin
 import (
 	_ "embed"
 	"fmt"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -135,6 +136,14 @@ func WithGenName(name string) GenOption {
 	return func(opts *genOpts) { opts.name = name }
 }
 
+// validGoIdent reports whether name can be a Go package name.
+func validGoIdent(name string) bool {
+	if name == "_" || !token.IsIdentifier(name) {
+		return false
+	}
+	return !token.Lookup(name).IsKeyword()
+}
+
 // WithGenEnv is option for [GenMain] setting build environment to use.
 // By default, [ring.New] is used.
 func WithGenEnv(rng *ring.Ring) GenOption {
@@ -192,18 +201,18 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	for _, opt := range opts {
 		opt(&def)
 	}
+	if !validGoIdent(def.name) {
+		return fmt.Errorf(
+			"package name %q is not a Go identifier",
+			def.name,
+		)
+	}
 	if def.rng == nil {
 		def.rng = ring.New()
 	}
 
-	// Create the destination tree; dst/data covers both dst and dst/data.
-	if err := os.MkdirAll(filepath.Join(def.dst, "data"), 0o755); err != nil {
-		return fmt.Errorf("creating destination tree: %w", err)
-	}
-
-	var code []byte
-
-	// Generate code for built-in targets to include in builtin package.
+	// Generate every file before writing any of them, so a later failure
+	// does not replace an earlier file.
 	tgs, err := parser.TargetsFromImports(
 		def.rng,
 		def.dir,
@@ -213,17 +222,15 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	if err != nil {
 		return fmt.Errorf("parsing target specs: %w", err)
 	}
-	code, err = parser.NewGenerator(tgs).
+	files := make([]genFile, 0, 3)
+	code, err := parser.NewGenerator(tgs).
 		Generate(parser.WithGenNames(def.name, "BuiltIn"))
 	if err != nil {
 		return fmt.Errorf("generating %s: %w", targetsFN, err)
 	}
-	err = parser.CreateFile(filepath.Join(def.dst, targetsFN), code)
-	if err != nil {
-		return fmt.Errorf("writing %s: %w", targetsFN, err)
-	}
+	dst := filepath.Join(def.dst, targetsFN)
+	files = append(files, genFile{dst: dst, code: code})
 
-	// Generate code for main package [mainFN].
 	code, err = parser.NewGenerator(tgs).
 		Generate(
 			parser.WithGenNames(parser.MainName, "BuiltIn"),
@@ -232,25 +239,76 @@ func GenImports(imports []parser.Import, opts ...GenOption) error {
 	if err != nil {
 		return fmt.Errorf("generating %s: %w", mainFN, err)
 	}
-	err = parser.CreateFile(filepath.Join(def.dst, "data", mainFN), code)
-	if err != nil {
-		return fmt.Errorf("writing %s: %w", mainFN, err)
+	dst = filepath.Join(def.dst, "data", mainFN)
+	files = append(files, genFile{dst: dst, code: code})
+
+	if def.empty {
+		gen := parser.NewGenerator(parser.NewTargets())
+		code, err = gen.Generate(
+			parser.WithGenNames(parser.MainName, "BuiltIn"),
+		)
+		if err != nil {
+			return fmt.Errorf("generating %s: %w", mainEmptyFN, err)
+		}
+		dst = filepath.Join(def.dst, "data", mainEmptyFN)
+		files = append(files, genFile{dst: dst, code: code})
 	}
 
-	// Skip generating code for empty targets file.
-	if !def.empty {
-		return nil
+	// Create the destination tree; dst/data covers both dst and dst/data.
+	if err = os.MkdirAll(filepath.Join(def.dst, "data"), 0o755); err != nil {
+		return fmt.Errorf("creating destination tree: %w", err)
 	}
+	return writeGenerated(files)
+}
 
-	// Generate code for empty targets file.
-	gen := parser.NewGenerator(parser.NewTargets())
-	code, err = gen.Generate(parser.WithGenNames(parser.MainName, "BuiltIn"))
-	if err != nil {
-		return fmt.Errorf("generating %s: %w", mainEmptyFN, err)
+// genFile is one generated file waiting to be written.
+type genFile struct {
+	dst  string
+	code []byte
+}
+
+// writeGenerated writes every file to a temporary sibling and renames them
+// into place only after every temporary file is complete. A failure leaves
+// the destination files unchanged.
+func writeGenerated(files []genFile) error {
+	type staged struct {
+		dst string
+		tmp string
 	}
-	err = parser.CreateFile(filepath.Join(def.dst, "data", mainEmptyFN), code)
-	if err != nil {
-		return fmt.Errorf("writing %s: %w", mainEmptyFN, err)
+	stagedFiles := make([]staged, 0, len(files))
+	ok := false
+	defer func() {
+		if ok {
+			return
+		}
+		for _, st := range stagedFiles {
+			_ = os.Remove(st.tmp)
+		}
+	}()
+	for _, fil := range files {
+		dir := filepath.Dir(fil.dst)
+		pattern := filepath.Base(fil.dst) + ".*.tmp"
+		tf, err := os.CreateTemp(dir, pattern)
+		if err != nil {
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+		tmp := tf.Name()
+		if _, err = tf.Write(fil.code); err != nil {
+			_ = tf.Close()
+			_ = os.Remove(tmp)
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+		if err = tf.Close(); err != nil {
+			_ = os.Remove(tmp)
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+		stagedFiles = append(stagedFiles, staged{dst: fil.dst, tmp: tmp})
 	}
+	for _, st := range stagedFiles {
+		if err := os.Rename(st.tmp, st.dst); err != nil {
+			return fmt.Errorf("writing %s: %w", st.dst, err)
+		}
+	}
+	ok = true
 	return nil
 }

@@ -4,12 +4,14 @@
 package builtin
 
 import (
+	"os"
 	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/goldy"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 
@@ -141,6 +143,31 @@ func Test_WithGenName(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, "name", def.name)
+}
+
+func Test_validGoIdent_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+		name  string
+		want  bool
+	}{
+		{"plain", "builtin", true},
+		{"digits", "go1", true},
+		{"empty", "", false},
+		{"blank", "_", false},
+		{"dash", "not-a-name", false},
+		{"keyword", "package", false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := validGoIdent(tc.name)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
 }
 
 func Test_WithGenEnv(t *testing.T) {
@@ -325,5 +352,42 @@ func Test_GenImports(t *testing.T) {
 		have := oskit.ReadFileStr(t, prj.Path(targetsFN))
 		assert.Contain(t, `PkgNS:       "myns",`, have)
 		assert.Contain(t, `Name:        ":myns:pkg0",`, have)
+	})
+
+	t.Run("error - package name is not an identifier", func(t *testing.T) {
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+		name := "not-a-name"
+
+		// --- When ---
+		err := GenImports(nil, WithGenName(name), WithGenDst(prj.Root()))
+
+		// --- Then ---
+		assert.ErrorContain(t, name, err)
+		assert.NoFileExist(t, prj.Path(targetsFN))
+	})
+
+	t.Run("write failure leaves existing files", func(t *testing.T) {
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+		original := "package original\n"
+		oskit.Write(t, original, prj.Root(), targetsFN)
+		data := oskit.MkdirAll(t, prj.Root(), "data")
+		must.Nil(os.Chmod(data, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(data, 0o755) })
+
+		imports := []parser.Import{
+			{Path: "github.com/ctx42/gomake/testdata/imports/pkg0"},
+		}
+
+		// --- When ---
+		err := GenImports(imports, WithGenDst(prj.Root()))
+
+		// --- Then ---
+		assert.ErrorContain(t, mainFN, err)
+		have := oskit.ReadFileStr(t, prj.Path(targetsFN))
+		assert.Equal(t, original, have)
 	})
 }
