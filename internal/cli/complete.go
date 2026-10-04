@@ -70,11 +70,13 @@ func setupBashCompletion(home string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer func() { _ = f.Close() }()
-
 	src := "\n# gomake completion\nsource %s\n"
-	if _, err = fmt.Fprintf(f, src, scriptPath); err != nil {
-		return "", err
+	_, err = fmt.Fprintf(f, src, scriptPath)
+	if cerr := f.Close(); err == nil {
+		err = cerr // A failed close can mean the line never reached disk.
+	}
+	if err != nil {
+		return "", fmt.Errorf("update %s: %w", rcPath, err)
 	}
 
 	format := "" +

@@ -25,7 +25,7 @@ import (
 func Test_newConfig(t *testing.T) {
 	// Tripwire: a new config field must gain an assertion below, not just a
 	// bumped count.
-	assert.Fields(t, 19, config{})
+	assert.Fields(t, 18, config{})
 
 	t.Run("no args", func(t *testing.T) {
 		// --- Given ---
@@ -53,7 +53,6 @@ func Test_newConfig(t *testing.T) {
 		assert.Equal(t, "1.2.3", have.version)
 		assert.NotNil(t, have.fs)
 		assert.Nil(t, have.args)
-		assert.Equal(t, -1, have.targetIdx)
 		assert.Empty(t, have.target)
 		assert.Equal(t, 0, len(have.userTargets))
 		assert.Equal(t, 0, len(have.projectTargets))
@@ -474,7 +473,6 @@ func Test_newConfig(t *testing.T) {
 		}
 		assert.Equal(t, wantArgs, have.args)
 		assert.Equal(t, "target", have.target)
-		assert.Equal(t, 2, have.targetIdx)
 	})
 
 	t.Run("unknown option before target name", func(t *testing.T) {
@@ -502,7 +500,6 @@ func Test_newConfig(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []string{"--help", "target"}, have.args)
 		assert.Equal(t, "target", have.target)
-		assert.Equal(t, 1, have.targetIdx)
 	})
 
 	t.Run("default target with options", func(t *testing.T) {
@@ -516,7 +513,6 @@ func Test_newConfig(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, "", have.target)
-		assert.Equal(t, -1, have.targetIdx)
 	})
 
 	t.Run("default target without options", func(t *testing.T) {
@@ -530,6 +526,5 @@ func Test_newConfig(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, "", have.target)
-		assert.Equal(t, -1, have.targetIdx)
 	})
 }

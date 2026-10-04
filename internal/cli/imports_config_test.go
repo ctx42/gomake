@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -438,6 +439,23 @@ func Test_fetchExternalTargets(t *testing.T) {
 		assert.Equal(t, []byte(body), have.Raw())
 	})
 
+	t.Run("error - body too large", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		body := "imports:\n" + strings.Repeat("#", maxTargetsSize)
+		fn := func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}
+		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
+
+		// --- When ---
+		have, err := fetchExternalTargets(ctx, srv.URL)
+
+		// --- Then ---
+		assert.ErrorContain(t, "larger than", err)
+		assert.Nil(t, have)
+	})
+
 	t.Run("returns error on non-200 status", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
@@ -645,6 +663,8 @@ func Test_decodeTargetsYAML_tabular(t *testing.T) {
 			"imports:\n  - import: a.com/pkg@v1.2.3\n",
 			[]ImportEntry{{Path: "a.com/pkg@v1.2.3"}},
 		},
+		{"empty", "", []ImportEntry{}},
+		{"comments only", "# imports:\n", []ImportEntry{}},
 	}
 
 	for _, tc := range tt {

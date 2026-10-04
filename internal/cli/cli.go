@@ -20,9 +20,6 @@ import (
 // binName represents name of the gomake binary.
 const binName = "gomake"
 
-// buildTagLine is the build tag line written at the top of tagged makefiles.
-const buildTagLine = parser.BuildTagLine
-
 // GoMake errors.
 var (
 	// errNoMakefile represents an error when project directory contains no
@@ -102,17 +99,14 @@ func newGoMake(rng *ring.Ring, cfg *config) (gmk *goMake, err error) {
 	return gmk, nil
 }
 
-// Compile compiles the makefile and returns the absolute path to the binary.
+// Compile compiles the makefile into the binary at dst.
 func (gmk *goMake) Compile(
 	ctx context.Context,
 	env []string,
 	dst string,
-) (string, error) {
+) error {
 
-	if err := compile(ctx, env, gmk.cu.BuildDir, dst); err != nil {
-		return "", err
-	}
-	return dst, nil
+	return compile(ctx, env, gmk.cu.BuildDir, dst)
 }
 
 // Execute executes a target. The target is picked based on the arguments
@@ -121,28 +115,25 @@ func (gmk *goMake) Compile(
 func (gmk *goMake) Execute(ctx context.Context, rng *ring.Ring) error {
 	env := rng.EnvAll()
 
-	gowork := rng.EnvGet("GOWORK")
-	binPath, cached := lookupBinaryCache(
+	// The cache path is keyed by the sources as they are before compiling.
+	cachePth, cerr := binaryCachePath(
 		rng,
-		gmk.cfg.src, gmk.cu.MkfNames,
-		gmk.cfg.version, gmk.cfg.goos, gmk.cfg.goarch, gowork,
+		gmk.cfg.src, gmk.cu.MkfNames, gmk.cfg.version,
+		gmk.cfg.goos, gmk.cfg.goarch, rng.EnvGet("GOWORK"),
 	)
-	if !cached {
+	binPath := cachePth
+	if cerr != nil || !gomake.PathExists(cachePth) {
 		var err error
 		compileAct := func() error {
-			_, err = gmk.Compile(ctx, env, gmk.cu.MainBin)
-			return err
+			return gmk.Compile(ctx, env, gmk.cu.MainBin)
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {
 			return err
 		}
-		storeBinaryCache(
-			rng,
-			gmk.cu.MainBin,
-			gmk.cfg.src, gmk.cu.MkfNames, gmk.cfg.version,
-			gmk.cfg.goos, gmk.cfg.goarch, gowork,
-		)
+		if cerr == nil {
+			storeBinaryCache(gmk.cu.MainBin, cachePth)
+		}
 		binPath = gmk.cu.MainBin
 	}
 

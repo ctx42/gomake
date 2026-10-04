@@ -245,8 +245,7 @@ func Main(
 		}
 
 		compileAct := func() error {
-			_, err = gmk.Compile(ctx, rng.EnvAll(), cfg.bin)
-			return err
+			return gmk.Compile(ctx, rng.EnvAll(), cfg.bin)
 		}
 		err = withProgress(rng.Stderr(), "Compiling makefile...", compileAct)
 		if err != nil {

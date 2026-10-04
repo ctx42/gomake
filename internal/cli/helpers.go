@@ -9,7 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go/build"
+	"go/build/constraint"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -87,41 +88,6 @@ func (erc *errCompile) Error() string {
 	return msg
 }
 
-// makefiles returns a list of "makefile*.go" files in the import path. The
-// list depends on the environment (GOOS, ...). It returns [errNoMakefile]
-// if there are no makefiles.
-//
-// Function does not check if "makefile.go" is on the list.
-func makefiles(rng *ring.Ring, impPath string) ([]string, error) {
-	fn := gmFiles
-	if bt := parser.GetBuildTag(rng); bt == "" {
-		fn = goFiles
-	}
-	files, err := fn(rng, impPath)
-	if err != nil {
-		return nil, err
-	}
-	files = filterMkf(files)
-	if len(files) == 0 {
-		return nil, fmt.Errorf("%w in %s", errNoMakefile, impPath)
-	}
-	return files, nil
-}
-
-// filterMkf filters out filenames that are not starting with "makefile" or
-// "makefile_".
-func filterMkf(fls []string) []string {
-	var ret []string
-	for _, fil := range fls {
-		name := filepath.Base(fil)
-		if strings.HasPrefix(name, "makefile.") ||
-			strings.HasPrefix(name, "makefile_") {
-			ret = append(ret, fil)
-		}
-	}
-	return ret
-}
-
 // validMakefileName reports whether name is an allowed makefile filename. Only
 // the main makefile and its GOOS/GOARCH variants are accepted, mirroring Go's
 // own filename build constraints:
@@ -185,16 +151,10 @@ func ignoreWarning(name string) string {
 
 // compUnit captures information about single makefile compilation unit.
 type compUnit struct {
-	// Absolute path to the makefile sources.
-	SourceDir string
-
-	// The root directory where BuildDir is created.
-	BuildRootDir string
-
 	// Absolute path to out of source build directory.
 	//
 	// The out of source build directory contains all makefiles copied from
-	// SourceDir along with generated makefile [mkf.MakefileGen] and
+	// the source directory along with generated makefile [mkf.MakefileGen] and
 	// compiled makefile [mkf.MakefileBin].
 	//
 	// In general this directory (and its contents) is removed after gomake
@@ -217,15 +177,6 @@ type compUnit struct {
 	// Absolute path to definition of user targets.
 	MainUser string
 
-	// Absolute path to source module "go.mod" file.
-	GoModSrc string
-
-	// Absolute path to "go.mod" file in build dir.
-	GoModDst string
-
-	// Absolute paths to all the files to compile to get MainBin.
-	Files []string
-
 	// Source makefile base names selected for compilation (makefile.go and its
 	// GOOS/GOARCH variants). Used for the binary cache key.
 	MkfNames []string
@@ -234,10 +185,7 @@ type compUnit struct {
 	// The entry point reports these to the user as a warning.
 	Ignored []string
 
-	// Environment to use when preparing build directory.
-	Ring *ring.Ring
-
-	// Source package info returned by go list on SourceDir.
+	// Source package info returned by go list on the source directory.
 	SrcPkg *parser.Package
 }
 
@@ -326,8 +274,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	}
 	buildDirCreated = true
 
-	// Copy all makefiles to destination and remove BuildTagLine if present.
-	tagLine := []byte(buildTagLine)
+	// Copy all makefiles to destination and remove the gomake build tag.
 	copied := make([]string, 0, len(mkfFiles))
 	for _, srcPth := range mkfFiles {
 		var filData []byte
@@ -335,7 +282,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if filData, err = os.ReadFile(srcPth); err != nil {
 			return nil, err
 		}
-		filData = stripBuildTag(filData, tagLine)
+		filData = stripBuildTag(filData)
 		dstPth := filepath.Join(buildDir, filepath.Base(srcPth))
 		if err = os.WriteFile(dstPth, filData, 0600); err != nil {
 			return nil, err
@@ -414,21 +361,14 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	}
 
 	cu = &compUnit{
-		SourceDir:    src,
-		BuildRootDir: tmp,
-		BuildDir:     buildDir,
-		MainGen:      filepath.Join(buildDir, mkf.MakefileGen),
-		MainBin:      filepath.Join(buildDir, mkf.MakefileBin),
-		MainUser:     mkfUser,
-		GoModSrc:     mod.ModPath,
-		GoModDst:     goModDst,
-		Files:        copied,
-		MkfNames:     mkfFiles,
-		Ignored:      ignored,
-		Ring:         rng,
-		SrcPkg:       pkg,
+		BuildDir: buildDir,
+		MainGen:  filepath.Join(buildDir, mkf.MakefileGen),
+		MainBin:  filepath.Join(buildDir, mkf.MakefileBin),
+		MainUser: mkfUser,
+		MkfNames: mkfFiles,
+		Ignored:  ignored,
+		SrcPkg:   pkg,
 	}
-	cu.Files = append(cu.Files, cu.MainGen, cu.MainUser)
 	return cu, nil
 }
 
@@ -436,8 +376,7 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 // the out-of-source build can compile without -tags=gomake. CRLF is normalized
 // first. Matches exact BuildTagLine and compound lines such as
 // //go:build gomake && linux (and legacy // +build forms that include gomake).
-func stripBuildTag(filData, tagLine []byte) []byte {
-	_ = tagLine // retained for call-site compatibility
+func stripBuildTag(filData []byte) []byte {
 	filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))
 	lines := bytes.Split(filData, []byte("\n"))
 	out := make([][]byte, 0, len(lines))
@@ -461,16 +400,24 @@ func stripBuildTag(filData, tagLine []byte) []byte {
 // isGomakeConstraintLine reports whether line is a //go:build or // +build
 // constraint that mentions the gomake tag.
 func isGomakeConstraintLine(line []byte) bool {
-	s := string(line)
-	if !strings.HasPrefix(s, "//") {
-		return false
+	expr, err := constraint.Parse(strings.TrimSpace(string(line)))
+	if err != nil {
+		return false // Not a build constraint line.
 	}
-	body := strings.TrimSpace(strings.TrimPrefix(s, "//"))
-	if strings.HasPrefix(body, "go:build ") {
-		return strings.Contains(body, "gomake")
-	}
-	if strings.HasPrefix(body, "+build ") {
-		return strings.Contains(body, "gomake")
+	return hasTag(expr, parser.BuildTag)
+}
+
+// hasTag reports whether the build constraint expr mentions tag.
+func hasTag(expr constraint.Expr, tag string) bool {
+	switch x := expr.(type) {
+	case *constraint.TagExpr:
+		return x.Tag == tag
+	case *constraint.NotExpr:
+		return hasTag(x.X, tag)
+	case *constraint.AndExpr:
+		return hasTag(x.X, tag) || hasTag(x.Y, tag)
+	case *constraint.OrExpr:
+		return hasTag(x.X, tag) || hasTag(x.Y, tag)
 	}
 	return false
 }
@@ -842,6 +789,11 @@ func compile(
 	cmd.Env = env
 	cmd.Dir = wd
 	if err := cmd.Run(); err != nil {
+		// A context ending mid-build kills "go build"; report the context
+		// error rather than the bare "signal: killed".
+		if cerr := ctx.Err(); cerr != nil && !errors.Is(err, cerr) {
+			err = fmt.Errorf("%w: %w", cerr, err)
+		}
 		err = &errCompile{
 			error: err,
 			sout:  sout.String(),
@@ -860,78 +812,6 @@ func pinBuildGOWORK(env []string, buildDir string) []string {
 		return ring.EnvSet(env, "GOWORK", work)
 	}
 	return ring.EnvSet(env, "GOWORK", "off")
-}
-
-// gmFiles returns the list of files which have buildTag ("go:build") for the
-// given operating system and architecture in the given impPath directory. The
-// impPath must be an absolute path.
-//
-// Example:
-//
-//	gmFiles(env, "/dir/package")
-func gmFiles(rng *ring.Ring, impPath string) ([]string, error) {
-	if bt := parser.GetBuildTag(rng); bt == "" {
-		return nil, errors.New("build tag must be provided")
-	}
-
-	// Get all the files, including those with the buildTag.
-	fls, err := goFiles(rng, impPath)
-	if err != nil {
-		return nil, fmt.Errorf("listing build tag files: %w", err)
-	}
-
-	// Get all the files without the buildTag.
-	rng = parser.RemBuildTag(rng)
-	without, err := goFiles(rng, impPath)
-	if err != nil {
-		return nil, fmt.Errorf("listing all files: %w", err)
-	}
-
-	// Remove files that are not tagged with buildTag.
-	for i := range without {
-		for it, fil := range fls {
-			if fil == without[i] {
-				fls = append(fls[:it], fls[it+1:]...)
-				break
-			}
-		}
-	}
-	return fls, nil
-}
-
-// goFiles returns a list of all Go files in a given impPath directory for
-// the given operating system and architecture, if buildTag is set to not empty
-// string it will also return files which have buildTag in "go:build".
-//
-// Returns empty slice and no error if there are no Go files in the directory.
-//
-// Example:
-//
-//	goFiles(env, "/dir/package")
-func goFiles(rng *ring.Ring, impPath string) ([]string, error) {
-	bctx := build.Default
-	if bt := parser.GetBuildTag(rng); bt != "" {
-		bctx.BuildTags = []string{bt}
-	}
-	bctx.GOOS = rng.EnvGet("GOOS")
-	bctx.GOARCH = rng.EnvGet("GOARCH")
-
-	pkg, err := bctx.Import(".", impPath, build.IgnoreVendor)
-	if err != nil {
-		if _, ok := errors.AsType[*build.NoGoError](err); ok {
-			return []string{}, nil
-		}
-		// Allow multiple packages in the same directory.
-		if _, ok := errors.AsType[*build.MultiplePackageError](err); !ok {
-			return nil, fmt.Errorf("listing Go source files: %w", err)
-		}
-	}
-
-	fls := make([]string, len(pkg.GoFiles))
-	for i := range pkg.GoFiles {
-		fls[i] = filepath.Join(impPath, pkg.GoFiles[i])
-	}
-	return fls, nil
 }
 
 // allTargets returns built-in (and pulled) targets from stock, plus makefile
@@ -999,4 +879,24 @@ func fileContainsStr(path, substr string) (bool, error) {
 		return false, err
 	}
 	return strings.Contains(string(data), substr), nil
+}
+
+// copyFile copies src to dst, creating or truncating dst with mode 0700.
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = in.Close() }()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0700)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = out.Close() }()
+
+	if _, err = io.Copy(out, in); err != nil {
+		return err
+	}
+	return out.Close()
 }

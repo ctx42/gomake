@@ -49,9 +49,9 @@ func binaryCacheDir(rng *ring.Ring) (string, error) {
 // name with //go:embed, local use/replace trees outside the module, and the
 // gomake version plus GOOS/GOARCH. mkfNames are the validated makefile base
 // names actually compiled, so ignored makefile_* files do not affect the
-// key. gowork is the raw GOWORK env value. Toolchain variables
-// (GOFLAGS, CGO_*, GOTOOLCHAIN) are read from rng, not the process
-// environment.
+// key. gowork is the raw GOWORK env value. Toolchain variables (GOFLAGS,
+// CGO_*, GOTOOLCHAIN, GOEXPERIMENT, and the architecture feature levels such
+// as GOAMD64) are read from rng, not the process environment.
 //
 //nolint:cyclop,gocognit
 func binaryCacheKey(
@@ -121,8 +121,12 @@ func binaryCacheKey(
 	// Toolchain / flag inputs that change the compiled binary.
 	_, _ = fmt.Fprintf(h, "ver:%s\ngoos:%s\ngoarch:%s\n", version, goos, goarch)
 	_, _ = fmt.Fprintf(h, "go:%s\n", runtime.Version())
+	// GOEXPERIMENT and the per-architecture feature levels select build
+	// tags and code generation.
 	for _, key := range []string{
 		"GOFLAGS", "CGO_ENABLED", "CGO_CFLAGS", "CGO_LDFLAGS", "GOTOOLCHAIN",
+		"GOEXPERIMENT", "GO386", "GOAMD64", "GOARM", "GOARM64", "GOMIPS",
+		"GOMIPS64", "GOPPC64", "GORISCV64", "GOWASM",
 	} {
 		if val := rng.EnvGet(key); val != "" {
 			_, _ = fmt.Fprintf(h, "%s:%s\n", key, val)
@@ -193,8 +197,12 @@ func isSubpath(parent, child string) bool {
 	if parent == child {
 		return true
 	}
-	sep := string(filepath.Separator)
-	return strings.HasPrefix(child, parent+sep)
+	// A root such as "/" already ends with the separator.
+	prefix := parent
+	if !strings.HasSuffix(prefix, string(filepath.Separator)) {
+		prefix += string(filepath.Separator)
+	}
+	return strings.HasPrefix(child, prefix)
 }
 
 // absWorkPaths returns the local use and replace paths from the go.work file
@@ -273,8 +281,8 @@ func isLocalDiskPath(pth string) bool {
 	return strings.HasPrefix(pth, ".")
 }
 
-// hashFile writes a labeled file into h. Returns an error only when the file
-// exists but cannot be read.
+// hashFile writes a labeled file into h. Returns an error when the file
+// cannot be read, a missing file included.
 func hashFile(
 	h interface{ Write([]byte) (int, error) },
 	label, pth string,
@@ -411,66 +419,41 @@ func findModuleRoot(srcDir string) string {
 	}
 }
 
-// lookupBinaryCache returns the path to a cached binary and true when a valid
-// cached binary exists for the given source directory, version, and platform.
-// gowork is the raw GOWORK env value (same as findGoWorkValue).
-func lookupBinaryCache(
+// binaryCachePath returns the cache path of the binary compiled from the
+// given source directory, version, and platform. gowork is the raw GOWORK env
+// value (same as findGoWorkValue). Compute it once, before compiling, so a
+// source edited during the build cannot file the binary under the new key.
+func binaryCachePath(
 	rng *ring.Ring,
 	srcDir string,
 	mkfNames []string,
 	version, goos, goarch, gowork string,
-) (string, bool) {
+) (string, error) {
 
 	key, err := binaryCacheKey(
 		rng, srcDir, mkfNames, version, goos, goarch, gowork,
 	)
 	if err != nil {
-		return "", false
+		return "", err
 	}
 	dir, err := binaryCacheDir(rng)
 	if err != nil {
-		return "", false
+		return "", err
 	}
-	name := key
 	if runtime.GOOS == "windows" {
-		name += ".exe"
+		key += ".exe"
 	}
-	pth := filepath.Join(dir, name)
-	if _, err = os.Stat(pth); err != nil {
-		return "", false
-	}
-	return pth, true
+	return filepath.Join(dir, key), nil
 }
 
-// storeBinaryCache copies the compiled binary at binPath into the cache.
-// Errors are silently ignored because the cache is advisory. The write is
+// storeBinaryCache copies the compiled binary at binPath to the cache path
+// dst. Errors are silently ignored because the cache is advisory. The write is
 // rename-atomic so concurrent lookups never see a partial binary.
-func storeBinaryCache(
-	rng *ring.Ring,
-	binPath, srcDir string,
-	mkfNames []string,
-	version, goos, goarch, gowork string,
-) {
-
-	key, err := binaryCacheKey(
-		rng, srcDir, mkfNames, version, goos, goarch, gowork,
-	)
-	if err != nil {
-		return
-	}
-	dir, err := binaryCacheDir(rng)
-	if err != nil {
-		return
-	}
-	name := key
-	if runtime.GOOS == "windows" {
-		name += ".exe"
-	}
-	dst := filepath.Join(dir, name)
+func storeBinaryCache(binPath, dst string) {
 	// Unique temp so concurrent same-key stores cannot clobber each other.
 	// CreateTemp only reserves a path; remove it so copyFile can create with
 	// executable mode (OpenFile ignores mode when the file already exists).
-	tmp, err := os.CreateTemp(dir, name+".*.tmp")
+	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".*.tmp")
 	if err != nil {
 		return
 	}

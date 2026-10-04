@@ -5,6 +5,8 @@ package cli
 
 import (
 	"fmt"
+	goparser "go/parser"
+	"go/token"
 	"io/fs"
 	"path/filepath"
 	"runtime"
@@ -47,6 +49,36 @@ func Test_genMain(t *testing.T) {
 		assert.NoError(t, err)
 		return prj
 	}
+
+	t.Run("error - source without code mark", func(t *testing.T) {
+		// --- Given ---
+		src := mkf.HelpersSrc
+		mkf.HelpersSrc = "package mkf\n"
+		t.Cleanup(func() { mkf.HelpersSrc = src })
+		pth := filepath.Join(t.TempDir(), "main.go")
+
+		// --- When ---
+		err := genMain(pth, "1.0")
+
+		// --- Then ---
+		assert.ErrorContain(t, "code mark", err)
+	})
+
+	t.Run("version with quote and backslash", func(t *testing.T) {
+		// --- Given ---
+		pth := filepath.Join(t.TempDir(), "main.go")
+		ver := `v1 "beta" \x`
+
+		// --- When ---
+		err := genMain(pth, ver)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		set := token.NewFileSet()
+		_, perr := goparser.ParseFile(set, pth, nil, 0)
+		assert.NoError(t, perr)
+		assert.FileContain(t, `WithMakefileVersion("v1 \"beta\" \\x")`, pth)
+	})
 
 	t.Run("no targets", func(t *testing.T) {
 		// --- Given ---

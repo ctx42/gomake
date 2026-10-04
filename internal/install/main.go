@@ -177,7 +177,7 @@ func installTo(
 			return fmt.Errorf("gomake: write targets: %w", err)
 		}
 	}
-	if err = cli.PrepareTargets(rng, buildDir, skipMod); err != nil {
+	if err = cli.PrepareTargets(ctx, rng, buildDir, skipMod); err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
 	return build(rng, buildDir, dst, ldflags)

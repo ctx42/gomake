@@ -104,6 +104,17 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 		"CGO_CFLAGS",
 		"CGO_LDFLAGS",
 		"GOTOOLCHAIN",
+		// GOEXPERIMENT and the architecture feature levels select build tags.
+		"GOEXPERIMENT",
+		"GO386",
+		"GOAMD64",
+		"GOARM",
+		"GOARM64",
+		"GOMIPS",
+		"GOMIPS64",
+		"GOPPC64",
+		"GORISCV64",
+		"GOWASM",
 	} {
 		if v := strings.TrimSpace(rng.EnvGet(key)); v != "" {
 			_, _ = fmt.Fprintf(h, "%s:%s\n", key, v)

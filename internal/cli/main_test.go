@@ -5,6 +5,7 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -1894,6 +1895,33 @@ func Test_watchBuildDir(t *testing.T) {
 }
 
 // prePanic is a pre-run hook that panics (exercises main's recover path).
+
+func Test_compileExit_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		err  error
+		want int
+	}{
+		{"compile error", &errCompile{error: errors.New("x")}, 124},
+		{
+			"canceled compile",
+			&errCompile{error: fmt.Errorf("%w: x", context.Canceled)},
+			1,
+		},
+		{"other", errors.New("x"), 1},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := compileExit(tc.err)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
 
 func Test_applyExternalTargetMeta(t *testing.T) {
 	t.Run("config injected under the namespace key", func(t *testing.T) {

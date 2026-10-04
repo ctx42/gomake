@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"text/template"
@@ -16,26 +17,35 @@ import (
 // must be placed after `package` and `import` lines.
 const codeMarker = "// --- CODE MARK ---\n\n"
 
-// genMain generates "makefile_gen.go" file at path with given version.
-func genMain(pth, ver string) error {
-	fil, err := os.Create(pth)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = fil.Close() }()
-
-	_, mkfSrc, _ := strings.Cut(mkf.MakefileSrc, codeMarker)
-	_, infoSrc, _ := strings.Cut(mkf.TargetSrc, codeMarker)
-	_, helpersSrc, _ := strings.Cut(mkf.HelpersSrc, codeMarker)
-
+// genMain generates "makefile_gen.go" file at path with given version. It
+// fails when an embedded mkf source lacks its code mark.
+func genMain(pth, ver string) (err error) {
 	data := map[string]any{
-		"mkf_src":     mkfSrc,
-		"info_src":    infoSrc,
-		"helpers_src": helpersSrc,
 		"version":     ver,
 		"config_arg":  targetConfigArg,
 		"config_mkey": gomake.ConfigMetaKey,
 	}
+	for key, src := range map[string]string{
+		"mkf_src":     mkf.MakefileSrc,
+		"info_src":    mkf.TargetSrc,
+		"helpers_src": mkf.HelpersSrc,
+	} {
+		_, code, found := strings.Cut(src, codeMarker)
+		if !found {
+			return fmt.Errorf("generate main: %s has no code mark", key)
+		}
+		data[key] = code
+	}
+
+	fil, err := os.Create(pth)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := fil.Close(); err == nil {
+			err = cerr // A failed close can mean a short write.
+		}
+	}()
 	return mainTplParsed.Execute(fil, data)
 }
 
@@ -87,17 +97,17 @@ func run(ctx context.Context, rng *ring.Ring) (ec int) {
 	// an internal argument, into the ring meta store the target reads. The
 	// argument is stripped so it never reaches the target.
 	args := os.Args[1:]
-	const cfgPfx = "{{ .config_arg }}="
+	const cfgPfx = {{ printf "%q" .config_arg }} + "="
 	for i, a := range args {
 		if strings.HasPrefix(a, cfgPfx) {
-			rng.MetaSet("{{ .config_mkey }}", a[len(cfgPfx):])
+			rng.MetaSet({{ printf "%q" .config_mkey }}, a[len(cfgPfx):])
 			args = append(args[:i:i], args[i+1:]...)
 			break
 		}
 	}
 
 	ringOF := WithMakefileRing(rng)
-	verOF := WithMakefileVersion("{{ .version }}")
+	verOF := WithMakefileVersion({{ printf "%q" .version }})
 	argsOF := WithMakefileArgs(args...)
 
 	mf, err := NewMakefile(targets, ringOF, verOF, argsOF)

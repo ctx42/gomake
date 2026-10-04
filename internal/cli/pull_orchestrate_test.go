@@ -4,6 +4,7 @@
 package cli
 
 import (
+	"context"
 	"go/ast"
 	goparser "go/parser"
 	"go/token"
@@ -30,7 +31,7 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := PrepareTargets(rng.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -45,10 +46,22 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := PrepareTargets(rng.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
+	})
+
+	t.Run("error - canceled context", func(t *testing.T) {
+		// --- Given ---
+		ctx, cxl := context.WithCancel(t.Context())
+		cxl()
+
+		// --- When ---
+		err := PrepareTargets(ctx, ringtest.New(t).Ring(), t.TempDir(), "")
+
+		// --- Then ---
+		assert.ErrorIs(t, context.Canceled, err)
 	})
 }
 
@@ -61,7 +74,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -78,7 +91,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -95,7 +108,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorRegexp(t,
@@ -168,7 +181,8 @@ func Test_regenBuiltins(t *testing.T) {
 		err := regenBuiltins(rng.Ring(), dir, cfg)
 
 		// --- Then ---
-		assert.ErrorContain(t, "codegen builtins", err)
+		want := `^codegen builtins: .*malformed import path "not-a-valid-`
+		assert.ErrorRegexp(t, want, err)
 	})
 }
 
@@ -246,7 +260,7 @@ func Test_runGoInDir(t *testing.T) {
 		env := ring.New()
 
 		// --- When ---
-		err := runGoInDir(env, t.TempDir(), "version")
+		err := runGoInDir(t.Context(), env, t.TempDir(), "version")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -255,9 +269,10 @@ func Test_runGoInDir(t *testing.T) {
 	t.Run("error with output", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
+		sub := "this-subcmd-does-not-exist"
 
 		// --- When ---
-		err := runGoInDir(env, t.TempDir(), "this-subcmd-does-not-exist")
+		err := runGoInDir(t.Context(), env, t.TempDir(), sub)
 
 		// --- Then ---
 		// go echoes the unknown subcommand
@@ -274,7 +289,7 @@ func Test_runGoInDir_error_no_output(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "nonexistent")
 
 	// --- When ---
-	err := runGoInDir(env, dir, "version")
+	err := runGoInDir(t.Context(), env, dir, "version")
 
 	// --- Then ---
 	assert.ErrorIs(t, os.ErrNotExist, err)

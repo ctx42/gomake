@@ -91,10 +91,6 @@ type config struct {
 	// arguments (if present).
 	args []string
 
-	// The index in args slice pointing to target name. It's set to -1 when
-	// target name was not provided to gomake.
-	targetIdx int
-
 	// Target name extracted from arguments. It might be empty for invocations
 	// without a target name, for example when requesting to run default target.
 	target string
@@ -112,10 +108,9 @@ type config struct {
 func newConfig(ver string, rng *ring.Ring) (*config, error) {
 	env := rng.EnvAll()
 	cfg := &config{
-		goos:      gomake.GetGOOS(env),
-		goarch:    gomake.GetGOARCH(env),
-		version:   ver,
-		targetIdx: -1,
+		goos:    gomake.GetGOOS(env),
+		goarch:  gomake.GetGOARCH(env),
+		version: ver,
 	}
 	if err := cfg.parse(env, rng.Args()); err != nil {
 		return nil, err
@@ -189,7 +184,7 @@ func (cfg *config) parse(env, args []string) error {
 
 	if cfg.showComplete {
 		if cfg.fs.NFlag() > 1 || len(cfg.fs.Args()) > 0 {
-			return fmt.Errorf("--complete must be the only option")
+			return errors.New("--complete must be the only option")
 		}
 		return nil
 	}
@@ -256,7 +251,6 @@ func (cfg *config) parse(env, args []string) error {
 	left := cfg.fs.Args()
 	if len(left) > 0 {
 		cfg.target = left[0]
-		cfg.targetIdx = len(mkfArgs)
 	}
 	mkfArgs = append(mkfArgs, left...)
 	cfg.args = mkfArgs
@@ -271,23 +265,23 @@ func (cfg *config) parse(env, args []string) error {
 		}
 
 		if cfg.showHelp {
-			return fmt.Errorf("-h, --help cannot be used with --bin")
+			return errors.New("-h, --help cannot be used with --bin")
 		}
 
 		if cfg.showVersion {
-			return fmt.Errorf("--version cannot be used with --bin")
+			return errors.New("--version cannot be used with --bin")
 		}
 
 		if cfg.showList {
-			return fmt.Errorf("--list cannot be used with --bin")
+			return errors.New("--list cannot be used with --bin")
 		}
 
 		if cfg.timeout > 0 {
-			return fmt.Errorf("--timeout cannot be used with --bin")
+			return errors.New("--timeout cannot be used with --bin")
 		}
 
 		if cfg.target != "" {
-			return fmt.Errorf("--bin cannot be used with targets")
+			return errors.New("--bin cannot be used with targets")
 		}
 	}
 

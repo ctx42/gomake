@@ -292,9 +292,10 @@ key the target knows but does not use is harmless — targets that share a
 namespace node share its settings and each ignores the keys outside its own
 schema.
 
-`--check-config` checks only structure: it flags a top-level key matching no
-discovered import path and an import config that is not a mapping. It never
-judges setting keys, which are opaque to GoMake.
+`--check-config` checks only structure: it flags a project-level key matching
+no discovered import path and an import config that is not a mapping. A
+user-level key may configure another project's imports, so it is never flagged
+as unmatched. It never judges setting keys, which are opaque to GoMake.
 
 ## Relationship to targets.yaml
 

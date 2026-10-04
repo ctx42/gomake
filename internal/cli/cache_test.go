@@ -4,6 +4,8 @@
 package cli
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -80,6 +82,32 @@ func Test_binaryCacheKey(t *testing.T) {
 
 		// --- Then ---
 		assert.NotEqual(t, hWithout, hWith)
+	})
+
+	t.Run("GOAMD64 changes key", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", root, "go.mod")
+		oskit.Write(t, "package main\n", root, "makefile.go")
+
+		mkf := []string{"makefile.go"}
+
+		base := ring.New()
+		base.EnvSet("GOAMD64", "v1")
+
+		alt := ring.New()
+		alt.EnvSet("GOAMD64", "v3")
+
+		// --- When ---
+		hBase := must.Value(binaryCacheKey(
+			base, root, mkf, "1.0", "linux", "amd64", "",
+		))
+		hAlt := must.Value(binaryCacheKey(
+			alt, root, mkf, "1.0", "linux", "amd64", "",
+		))
+
+		// --- Then ---
+		assert.NotEqual(t, hBase, hAlt)
 	})
 
 	t.Run("error - go.sum stat", func(t *testing.T) {
@@ -327,6 +355,46 @@ func Test_binaryCacheKey(t *testing.T) {
 	})
 }
 
+func Test_hashExternalModuleTrees(t *testing.T) {
+	t.Run("replace target outside the module", func(t *testing.T) {
+		// --- Given ---
+		ext := t.TempDir()
+		oskit.Write(t, "module example.com/ext\n", ext, "go.mod")
+		src := oskit.Write(t, "package ext\n", ext, "ext.go")
+
+		root := t.TempDir()
+		mod := "module example.com/m\n\nreplace example.com/ext => " +
+			ext + "\n"
+		oskit.Write(t, mod, root, "go.mod")
+
+		h0 := sha256.New()
+		must.Nil(hashExternalModuleTrees(h0, root, ""))
+		oskit.Write(t, "package ext // edited\n", src)
+		h1 := sha256.New()
+
+		// --- When ---
+		err := hashExternalModuleTrees(h1, root, "")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.NotEqual(t, h0.Sum(nil), h1.Sum(nil))
+	})
+
+	t.Run("no external trees", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", root, "go.mod")
+		h := sha256.New()
+
+		// --- When ---
+		err := hashExternalModuleTrees(h, root, "")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, sha256.New().Sum(nil), h.Sum(nil))
+	})
+}
+
 func Test_isSubpath_tabular(t *testing.T) {
 	tt := []struct {
 		test   string
@@ -338,6 +406,7 @@ func Test_isSubpath_tabular(t *testing.T) {
 		{"child", "/a/b", "/a/b/c", true},
 		{"sibling prefix", "/a/b", "/a/bc", false},
 		{"parent", "/a/b/c", "/a/b", false},
+		{"filesystem root", "/", "/x", true},
 	}
 
 	for _, tc := range tt {
@@ -501,6 +570,56 @@ func Test_isLocalDiskPath_tabular(t *testing.T) {
 	}
 }
 
+func Test_hashFile(t *testing.T) {
+	t.Run("labeled content", func(t *testing.T) {
+		// --- Given ---
+		pth := oskit.Write(t, "data", t.TempDir(), "f")
+		buf := &bytes.Buffer{}
+
+		// --- When ---
+		err := hashFile(buf, "label", pth)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "label\ndata", buf.String())
+	})
+
+	t.Run("error - missing file", func(t *testing.T) {
+		// --- Given ---
+		buf := &bytes.Buffer{}
+
+		// --- When ---
+		err := hashFile(buf, "label", filepath.Join(t.TempDir(), "none"))
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+		assert.Equal(t, "", buf.String())
+	})
+}
+
+func Test_hashModuleGoFiles(t *testing.T) {
+	t.Run("go files and embedded files", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "package m\n", root, "a.go")
+		oskit.Write(t, "package m\n", root, "a_test.go")
+		emb := oskit.MkdirAll(t, root, "assets")
+		src := "package assets\n\n//go:embed x.txt\nvar X string\n"
+		oskit.Write(t, src, emb, "assets.go")
+		oskit.Write(t, "x", emb, "x.txt")
+		buf := &bytes.Buffer{}
+
+		// --- When ---
+		err := hashModuleGoFiles(buf, root)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Contain(t, "go:a.go\n", buf.String())
+		assert.NotContain(t, "a_test.go", buf.String())
+		assert.Contain(t, "embed:assets/x.txt\nx", buf.String())
+	})
+}
+
 func Test_walkCacheFiles(t *testing.T) {
 	t.Run("kept files sorted", func(t *testing.T) {
 		// --- Given ---
@@ -590,44 +709,75 @@ func Test_findModuleRoot(t *testing.T) {
 	})
 }
 
-func Test_lookupBinaryCache_miss(t *testing.T) {
-	// --- Given ---
-	root := t.TempDir()
-	oskit.Write(t, "module example.com/m\n", root, "go.mod")
-	oskit.Write(t, "package main\n", root, "makefile.go")
+func Test_binaryCachePath(t *testing.T) {
+	t.Run("keyed before edit", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
 
-	items := []string{"makefile.go"}
+		root := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", root, "go.mod")
+		oskit.Write(t, "package main\n", root, "makefile.go")
 
-	// --- When ---
-	hPth, hOk := lookupBinaryCache(ring.New(),
-		root, items, "1.0", "linux", "amd64", "",
-	)
+		mkf := []string{"makefile.go"}
 
-	// --- Then ---
-	assert.False(t, hOk)
-	assert.Equal(t, "", hPth)
+		// --- When ---
+		have, err := binaryCachePath(
+			rng, root, mkf, "1.0", "linux", "amd64", "",
+		)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		key := must.Value(binaryCacheKey(
+			rng, root, mkf, "1.0", "linux", "amd64", "",
+		))
+		dir := must.Value(binaryCacheDir(rng))
+		assert.Equal(t, filepath.Join(dir, key), have)
+	})
+
+	t.Run("error - missing makefile", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
+
+		root := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", root, "go.mod")
+
+		mkf := []string{"makefile.go"}
+
+		// --- When ---
+		have, err := binaryCachePath(
+			rng, root, mkf, "1.0", "linux", "amd64", "",
+		)
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+		assert.Equal(t, "", have)
+	})
 }
 
-func Test_storeBinaryCache_and_lookup(t *testing.T) {
-	// --- Given ---
-	// os.UserCacheDir honors XDG_CACHE_HOME on Linux.
-	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+func Test_storeBinaryCache(t *testing.T) {
+	t.Run("store", func(t *testing.T) {
+		// --- Given ---
+		bin := oskit.Write(t, "fake-binary", t.TempDir(), "makefile")
+		dst := filepath.Join(t.TempDir(), "key")
 
-	root := t.TempDir()
-	oskit.Write(t, "module example.com/m\n", root, "go.mod")
-	oskit.Write(t, "package main\n", root, "makefile.go")
-	bin := oskit.Write(t, "fake-binary", root, "makefile")
+		// --- When ---
+		storeBinaryCache(bin, dst)
 
-	mkf := []string{"makefile.go"}
+		// --- Then ---
+		assert.Equal(t, "fake-binary", oskit.ReadFileStr(t, dst))
+	})
 
-	// --- When ---
-	storeBinaryCache(ring.New(), bin, root, mkf, "1.0", "linux", "amd64", "")
-	hPth, hOk := lookupBinaryCache(
-		ring.New(), root, mkf, "1.0", "linux", "amd64", "",
-	)
+	t.Run("missing cache dir", func(t *testing.T) {
+		// --- Given ---
+		bin := oskit.Write(t, "fake-binary", t.TempDir(), "makefile")
+		dst := filepath.Join(t.TempDir(), "missing", "key")
 
-	// --- Then ---
-	assert.True(t, hOk)
-	assert.True(t, filepath.IsAbs(hPth))
-	assert.Equal(t, "fake-binary", oskit.ReadFileStr(t, hPth))
+		// --- When ---
+		storeBinaryCache(bin, dst)
+
+		// --- Then ---
+		assert.NoFileExist(t, dst)
+	})
 }

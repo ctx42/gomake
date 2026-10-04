@@ -134,16 +134,20 @@ func projectConfigPath(srcDir string) string {
 // loadConfigFile reads and parses the gomake.yaml file at pth. A missing file
 // yields an empty configuration and no error. Any other read error, invalid
 // YAML, an unknown gomake-owned key, or an unsupported schema version is
-// reported as an error.
+// reported as an error naming the file.
 func loadConfigFile(pth string) (*fileConfig, error) {
 	data, err := os.ReadFile(pth)
 	if errors.Is(err, os.ErrNotExist) {
 		return &fileConfig{}, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", errCfgParse, err)
+		return nil, fmt.Errorf("read %s: %w", pth, err)
 	}
-	return parseConfigFile(data)
+	cfg, err := parseConfigFile(data)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", pth, err)
+	}
+	return cfg, nil
 }
 
 // parseConfigFile decodes the content of a gomake.yaml file. Empty content
@@ -595,10 +599,12 @@ func checkConfigReport(
 }
 
 // checkConfigProblems returns the soft configuration problems, in report order:
-// non-absolute settings.tmp values (user then project), sorted project-level
-// import keys whose value is not a mapping, then sorted project-level import
-// keys matching no discovered target. validImps holds the discovered import
-// paths keyed to their target names.
+// non-absolute settings.tmp values (user then project), then per level (user
+// then project) sorted import keys whose value is not a mapping, followed for
+// the project level by sorted import keys matching no discovered target. A
+// user-level key may configure another project's import, so it is never
+// unmatched. validImps holds the discovered import paths keyed to their
+// target names.
 func checkConfigProblems(
 	validImps map[string]map[string]bool,
 	user, project *fileConfig,
@@ -619,9 +625,10 @@ func checkConfigProblems(
 	for _, ent := range []struct {
 		label string
 		tree  map[string]any
+		match bool // Report keys matching no discovered target.
 	}{
-		{"user", user.Targets},
-		{"project", project.Targets},
+		{"user", user.Targets, false},
+		{"project", project.Targets, true},
 	} {
 		var malformed, unmatched []string
 		for imp, blk := range ent.tree {
@@ -629,7 +636,7 @@ func checkConfigProblems(
 				malformed = append(malformed, imp)
 				continue
 			}
-			if validImps[imp] == nil {
+			if ent.match && validImps[imp] == nil {
 				unmatched = append(unmatched, imp)
 			}
 		}

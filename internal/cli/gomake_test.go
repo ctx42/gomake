@@ -48,8 +48,7 @@ func Test_newGoMake(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Same(t, cfg, have.cfg)
-		assert.Equal(t, cfg.src, have.cu.SourceDir)
-		assert.Equal(t, cfg.tmp, have.cu.BuildRootDir)
+		assert.Equal(t, cfg.tmp, filepath.Dir(have.cu.BuildDir))
 		wantNames := []string{
 			"abc:ns0:hello",
 			"abc:ns0:ns1:hello",
@@ -245,11 +244,10 @@ func Test_goMake_Compile(t *testing.T) {
 	gmk := must.Value(newGoMake(rng, cfg))
 
 	// --- When ---
-	have, err := gmk.Compile(t.Context(), rng.EnvAll(), bin)
+	err := gmk.Compile(t.Context(), rng.EnvAll(), bin)
 
 	// --- Then ---
 	assert.NoError(t, err)
-	assert.Equal(t, bin, have)
 	assert.FileExist(t, bin)
 }
 

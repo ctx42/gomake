@@ -22,15 +22,17 @@ import (
 // target imports. Imports under skipMod (an empty string disables this) are a
 // module a Go workspace already provides from disk, so their `go get` is
 // skipped.
-func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
-	if err := prepareExternalTargets(rng, wd, skipMod); err != nil {
+func PrepareTargets(
+	ctx context.Context,
+	rng *ring.Ring,
+	wd string,
+	skipMod string,
+) error {
+
+	if err := prepareExternalTargets(ctx, rng, wd, skipMod); err != nil {
 		return err
 	}
-	cfg, err := LoadExternalTargets(
-		context.Background(),
-		rng,
-		filepath.Join(wd, TargetsFile),
-	)
+	cfg, err := LoadExternalTargets(ctx, rng, filepath.Join(wd, TargetsFile))
 	if err != nil {
 		return err
 	}
@@ -44,12 +46,14 @@ func PrepareTargets(rng *ring.Ring, wd, skipMod string) error {
 // listed import, and regenerates `internal/builtin/targets.go`. It's called by
 // install and build scripts before compiling the binary. Imports under skipMod
 // are provided by a Go workspace and their `go get` is skipped.
-func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
-	cfg, err := LoadExternalTargets(
-		context.Background(),
-		rng,
-		filepath.Join(wd, TargetsFile),
-	)
+func prepareExternalTargets(
+	ctx context.Context,
+	rng *ring.Ring,
+	wd string,
+	skipMod string,
+) error {
+
+	cfg, err := LoadExternalTargets(ctx, rng, filepath.Join(wd, TargetsFile))
 	if err != nil {
 		return err
 	}
@@ -57,9 +61,9 @@ func prepareExternalTargets(rng *ring.Ring, wd, skipMod string) error {
 		if underModule(ent.Path, skipMod) {
 			continue
 		}
-		if err = runGoInDir(rng, wd, "get", ent.Path); err != nil {
+		if err = runGoInDir(ctx, rng, wd, "get", ent.Path); err != nil {
 			getErr := fmt.Errorf("go get %s: %w", ent.Path, err)
-			if terr := runGoInDir(rng, wd, "mod", "tidy"); terr != nil {
+			if terr := runGoInDir(ctx, rng, wd, "mod", "tidy"); terr != nil {
 				return fmt.Errorf("%w; go mod tidy: %w", getErr, terr)
 			}
 			return getErr
@@ -104,9 +108,16 @@ func regenBuiltins(rng *ring.Ring, wd string, cfg *ImportsConfig) error {
 	return nil
 }
 
-// runGoInDir executes a go subcommand in dir, capturing stderr on error.
-func runGoInDir(env ring.Environ, dir string, args ...string) error {
-	cmd := exec.Command("go", args...)
+// runGoInDir executes a go subcommand in dir, capturing stderr on error. The
+// ctx cancels the subcommand.
+func runGoInDir(
+	ctx context.Context,
+	env ring.Environ,
+	dir string,
+	args ...string,
+) error {
+
+	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = dir
 	out, err := cmd.CombinedOutput()

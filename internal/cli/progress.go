@@ -29,8 +29,11 @@ func withProgress(w io.Writer, msg string, action func() error) error {
 			_, _ = fmt.Fprintln(w, msg)
 		}
 	}()
-	err := action()
-	close(done)
-	<-stopped // Ensure the progress goroutine cannot write after we return.
-	return err
+	// Ensure the progress goroutine cannot write after we return, a panic in
+	// action included.
+	defer func() {
+		close(done)
+		<-stopped
+	}()
+	return action()
 }

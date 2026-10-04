@@ -4,9 +4,12 @@
 package cli
 
 import (
+	"bytes"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ctx42/testing/pkg/assert"
 )
 
 // gateWriter is an io.Writer that signals when its first Write begins and
@@ -68,3 +71,35 @@ func Test_withProgress(t *testing.T) {
 			"completed")
 	}
 }
+
+func Test_withProgress_panic(t *testing.T) {
+	// --- Given ---
+	prev := progressThreshold
+	progressThreshold = 10 * time.Millisecond
+	t.Cleanup(func() { progressThreshold = prev })
+
+	var mu sync.Mutex
+	buf := &bytes.Buffer{}
+	w := writerFunc(func(p []byte) (int, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		return buf.Write(p)
+	})
+
+	// --- When ---
+	func() {
+		defer func() { _ = recover() }()
+		_ = withProgress(w, "working...", func() error { panic("boom") })
+	}()
+
+	// --- Then ---
+	time.Sleep(50 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Equal(t, "", buf.String())
+}
+
+// writerFunc adapts a function to [io.Writer].
+type writerFunc func(p []byte) (int, error)
+
+func (fn writerFunc) Write(p []byte) (int, error) { return fn(p) }

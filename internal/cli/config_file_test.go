@@ -127,6 +127,20 @@ func Test_loadConfigFile(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, errCfgVersion, err)
+		assert.ErrorContain(t, pth, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - unreadable path", func(t *testing.T) {
+		// --- Given ---
+		pth := oskit.MkdirAll(t, t.TempDir(), configFileName)
+
+		// --- When ---
+		have, err := loadConfigFile(pth)
+
+		// --- Then ---
+		assert.ErrorIsNot(t, errCfgParse, err)
+		assert.ErrorContain(t, "read "+pth, err)
 		assert.Nil(t, have)
 	})
 }
@@ -1041,6 +1055,21 @@ func Test_checkConfigProblems(t *testing.T) {
 		assert.Equal(t, 2, len(have))
 		assert.Contain(t, "user", have[0])
 		assert.Contain(t, "project", have[1])
+	})
+
+	t.Run("user import path of another project", func(t *testing.T) {
+		// --- Given ---
+		valid := map[string]map[string]bool{"ext.com/a": {"build": true}}
+		user := &fileConfig{Targets: map[string]any{
+			"ext.com/other": map[string]any{"deploy": nil},
+		}}
+		project := &fileConfig{}
+
+		// --- When ---
+		have := checkConfigProblems(valid, user, project)
+
+		// --- Then ---
+		assert.Equal(t, 0, len(have))
 	})
 
 	t.Run("unmatched project import path", func(t *testing.T) {

@@ -61,6 +61,24 @@ func Test_listCacheKey(t *testing.T) {
 		assert.NotEqual(t, hKey1, hKey2)
 	})
 
+	t.Run("changes when ring GOEXPERIMENT changes", func(t *testing.T) {
+		// --- Given ---
+		dir := modkit.Path("testdata/projects/simple_tagged/project")
+
+		base := SetBuildTag(ring.New())
+		alt := SetBuildTag(ring.New())
+		alt.EnvSet("GOEXPERIMENT", "jsonv2")
+
+		// --- When ---
+		hKey1, hOk1 := listCacheKey(base, dir, "example.com/x")
+		hKey2, hOk2 := listCacheKey(alt, dir, "example.com/x")
+
+		// --- Then ---
+		assert.True(t, hOk1)
+		assert.True(t, hOk2)
+		assert.NotEqual(t, hKey1, hKey2)
+	})
+
 	t.Run("unreadable go.mod is not cached", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()

@@ -25,8 +25,14 @@ import (
 // lives at the gomake source root and is committed to the repo.
 const TargetsFile = "targets.yaml"
 
-// fetchTimeout bounds an HTTP fetch of an external targets file.
-const fetchTimeout = 10 * time.Second
+// Remote targets file limits.
+const (
+	// fetchTimeout bounds an HTTP fetch of an external targets file.
+	fetchTimeout = 10 * time.Second
+
+	// maxTargetsSize bounds the size of a fetched targets file.
+	maxTargetsSize = 1 << 20
+)
 
 // External targets config errors.
 var (
@@ -198,9 +204,13 @@ func fetchExternalTargets(
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP %d fetching %s", resp.StatusCode, url)
 	}
-	data, err := io.ReadAll(resp.Body)
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxTargetsSize+1))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("read %s: %w", url, err)
+	}
+	if len(data) > maxTargetsSize {
+		format := "%s: targets file larger than %d bytes"
+		return nil, fmt.Errorf(format, url, maxTargetsSize)
 	}
 	cfg, err := parseExternalTargets(data)
 	if err != nil {
@@ -241,7 +251,8 @@ func parseExternalTargets(data []byte) (*ImportsConfig, error) {
 
 // decodeTargetsYAML decodes the YAML content of targets.yaml and returns the
 // import entries. Each entry must have a non-empty "import" field. Unknown
-// fields and invalid YAML are rejected with [errInvConfig].
+// fields and invalid YAML are rejected with [errInvConfig]. An empty document
+// has no entries.
 func decodeTargetsYAML(data []byte) ([]ImportEntry, error) {
 	var raw struct {
 		Imports []struct {
@@ -251,7 +262,8 @@ func decodeTargetsYAML(data []byte) ([]ImportEntry, error) {
 		} `yaml:"imports"`
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(data), yaml.Strict())
-	if err := dec.Decode(&raw); err != nil {
+	err := dec.Decode(&raw)
+	if err != nil && !errors.Is(err, io.EOF) { // EOF: no document, no imports.
 		return nil, fmt.Errorf("%w: %w", errInvConfig, err)
 	}
 	entries := make([]ImportEntry, 0, len(raw.Imports))
@@ -262,8 +274,8 @@ func decodeTargetsYAML(data []byte) ([]ImportEntry, error) {
 		}
 		ent := ImportEntry{Path: item.Path, Namespace: item.Namespace}
 		if item.Config != nil {
-			jsonBytes, err := json.Marshal(item.Config)
-			if err != nil {
+			var jsonBytes []byte
+			if jsonBytes, err = json.Marshal(item.Config); err != nil {
 				format := "%w: imports[%d]: config: %w"
 				return nil, fmt.Errorf(format, errInvConfig, i, err)
 			}
