@@ -37,6 +37,7 @@ func Test_NewProject(t *testing.T) {
 		// --- Then ---
 		assert.NotNil(t, have.hidPrj)
 		assert.NotEmpty(t, have.ringVer)
+		assert.NotEmpty(t, have.xflagVer)
 		assert.Same(t, tspy, have.t)
 
 		have.Close() // Must close to prevent error.
@@ -59,6 +60,25 @@ func Test_NewProject(t *testing.T) {
 
 		tspy.Finish()
 	})
+
+	t.Run("error - test already failed", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectTempDir(1)
+		tspy.ExpectError()
+		tspy.ExpectFatal()
+		wMsg := "" +
+			"earlier failure\n" +
+			"cannot create a project in a failed test"
+		tspy.ExpectLogEqual(wMsg)
+		tspy.Close()
+
+		tspy.Error("earlier failure")
+		fn := func() { NewProject(tspy) }
+
+		// --- When ---
+		assert.Panic(t, fn)
+	})
 }
 
 func Test_Project_MakefilesFrom(t *testing.T) {
@@ -77,7 +97,6 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		// --- Then ---
 		wantLs := []string{"makefile.go", "makefile_helpers.go"}
 		assert.Equal(t, wantLs, oskit.List(t, prj.Root()))
-
 		haveContent := oskit.ReadFileStr(t, prj.Root(), "makefile.go")
 		assert.Equal(t, wantMkfContent, haveContent)
 		haveContent = oskit.ReadFileStr(t, prj.Root(), "makefile_helpers.go")
@@ -111,7 +130,6 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 			filepath.Join(prj.Root(), "makefile_helpers.go"),
 		}
 		assert.Equal(t, wantLs, have)
-
 		haveContent := oskit.ReadFileStr(t, prj.Root(), "makefile.go")
 		assert.Equal(t, wantMkfContent, haveContent)
 		haveContent = oskit.ReadFileStr(t, prj.Root(), "makefile_helpers.go")
@@ -128,6 +146,7 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		tspy.Close()
 
 		prj := NewProject(tspy)
+
 		src := oskit.MkdirAll(t, t.TempDir(), "src")
 		body := "" +
 			"// SPDX-FileCopyrightText: (c) 2026 Rafal Zajac\n" +
@@ -155,6 +174,7 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		tspy.Close()
 
 		prj := NewProject(tspy)
+
 		src := oskit.MkdirAll(t, t.TempDir(), "src")
 		body := "" +
 			"//go:build gomake\n" +
@@ -172,6 +192,96 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		prj.Close() // Must close to prevent error.
 	})
 
+	t.Run("tag text after package clause", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectTempDir(1)
+		tspy.Close()
+
+		prj := NewProject(tspy)
+
+		src := oskit.MkdirAll(t, t.TempDir(), "src")
+		body := "" +
+			"package testdata\n" +
+			"\n" +
+			"var s = `\n" +
+			"//go:build gomake\n" +
+			"`\n"
+		oskit.Write(t, body, src, "makefile.go")
+
+		// --- When ---
+		prj.MakefilesFrom(src)
+
+		// --- Then ---
+		assert.Equal(t, body, oskit.ReadFileStr(t, prj.Root(), "makefile.go"))
+
+		prj.Close() // Must close to prevent error.
+	})
+
+	t.Run("CRLF line endings", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectTempDir(1)
+		tspy.Close()
+
+		prj := NewProject(tspy)
+
+		src := oskit.MkdirAll(t, t.TempDir(), "src")
+		body := "//go:build gomake\r\n\r\npackage testdata\r\n"
+		oskit.Write(t, body, src, "makefile.go")
+
+		// --- When ---
+		prj.MakefilesFrom(src)
+
+		// --- Then ---
+		text := oskit.ReadFileStr(t, prj.Root(), "makefile.go")
+		assert.Equal(t, "package testdata\n", text)
+
+		prj.Close() // Must close to prevent error.
+	})
+
+	t.Run("no tag", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectTempDir(1)
+		tspy.Close()
+
+		prj := NewProject(tspy)
+
+		src := oskit.MkdirAll(t, t.TempDir(), "src")
+		oskit.Write(t, "package testdata\n", src, "makefile.go")
+
+		// --- When ---
+		prj.MakefilesFrom(src)
+
+		// --- Then ---
+		text := oskit.ReadFileStr(t, prj.Root(), "makefile.go")
+		assert.Equal(t, "package testdata\n", text)
+
+		prj.Close() // Must close to prevent error.
+	})
+
+	t.Run("no makefiles", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectTempDir(1)
+		tspy.Close()
+
+		prj := NewProject(tspy)
+
+		// --- When ---
+		have := prj.MakefilesFrom(t.TempDir())
+
+		// --- Then ---
+		assert.Len(t, 0, have)
+
+		prj.Close() // Must close to prevent error.
+	})
+
 	t.Run("error - used more than once", func(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t)
@@ -179,11 +289,9 @@ func Test_Project_MakefilesFrom(t *testing.T) {
 		tspy.ExpectTempDir(1)
 		tspy.ExpectError()
 		tspy.ExpectFatal()
-
 		wMsg := "" +
 			"the MakefilesFrom method can be used only once\n" +
 			"expected instance to be closed at the test end"
-
 		tspy.ExpectLogEqual(wMsg)
 		tspy.Close()
 
@@ -259,12 +367,11 @@ func Test_Project_UseGomakeSrc(t *testing.T) {
 
 		// --- Then ---
 		want := "github.com/ctx42/gomake v0.0.0"
-		pth := filepath.Join(prj.Root(), "go.mod")
-		assert.FileContain(t, want, pth)
+		assert.FileContain(t, want, filepath.Join(prj.Root(), "go.mod"))
 		want = "github.com/ctx42/ring " + prj.ringVer
-		assert.FileContain(t, want, pth)
+		assert.FileContain(t, want, filepath.Join(prj.Root(), "go.mod"))
 		want = "replace github.com/ctx42/gomake v0.0.0 => " + selfDir
-		assert.FileContain(t, want, pth)
+		assert.FileContain(t, want, filepath.Join(prj.Root(), "go.mod"))
 
 		prj.Close() // Must close to prevent error.
 	})
@@ -282,6 +389,23 @@ func Test_Project_UseGomakeSrc(t *testing.T) {
 		prj.Close()
 
 		fn := func() { prj.UseGomakeSrc("/dir/a/b") }
+
+		// --- When ---
+		assert.Panic(t, fn)
+	})
+
+	t.Run("error - no go.mod", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectTempDir(1)
+		tspy.ExpectCleanups(1)
+		tspy.ExpectError()
+		tspy.ExpectFatal()
+		tspy.ExpectLogContain("command failed: go mod edit")
+		tspy.Close()
+
+		prj := NewProject(tspy)
+		fn := func() { prj.UseGomakeSrc(modkit.Root()) }
 
 		// --- When ---
 		assert.Panic(t, fn)

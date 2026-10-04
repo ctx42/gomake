@@ -22,7 +22,8 @@ func (key ctxKey) String() string { return string(key) }
 // preRunKey is the context key under which [TestPreRun] stores its counter.
 const preRunKey ctxKey = "PRE_RUN"
 
-// Generates test built-in targets.
+// The directive below generates the test built-in targets.
+//
 //go:generate go run 00_generate_main.go
 
 // tgsMainSrc holds the generated targets_main.go_ source embedded

@@ -7,7 +7,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -51,7 +53,7 @@ func moduleRoot() (string, error) {
 		if err == nil {
 			return dir, nil
 		}
-		if !os.IsNotExist(err) {
+		if !errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("stat go.mod: %w", err)
 		}
 		parent := filepath.Dir(dir)

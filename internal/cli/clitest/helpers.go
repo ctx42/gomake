@@ -4,11 +4,10 @@
 package clitest
 
 import (
-	"bufio"
 	"bytes"
-	"net/url"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -17,14 +16,17 @@ import (
 
 // TestEnv returns an environment with the minimum number of variables.
 //
-// GOCACHE is derived from `go env`, and XDG_CONFIG_HOME is set to an isolated
-// empty temp directory so user-level gomake.yaml resolution never reads the
-// developer's real $HOME/.config/gomake/gomake.yaml.
+// GOCACHE and GOENV are derived from `go env`, and XDG_CONFIG_HOME is set to
+// an isolated empty temp directory so user-level gomake.yaml resolution never
+// reads the developer's real $HOME/.config/gomake/gomake.yaml. GOENV keeps
+// the `go env -w` settings, which would otherwise move with XDG_CONFIG_HOME.
 //
 // Variables copied from the current environment, when they are set:
 //   - GOROOT
 //   - GO111MODULE
 //   - GOPATH
+//   - GOMODCACHE
+//   - GOPROXY, GOPRIVATE, GONOPROXY, GONOSUMDB, GOINSECURE
 //   - SHELL
 //   - PATH
 //   - HOME
@@ -40,13 +42,20 @@ func TestEnv(t tester.T) []string {
 	// $HOME/.config/gomake/gomake.yaml must not leak into config resolution.
 	env = append(
 		env,
-		"GOCACHE="+goCache(t),
+		"GOCACHE="+goEnv(t, "GOCACHE"),
+		"GOENV="+goEnv(t, "GOENV"),
 		"XDG_CONFIG_HOME="+t.TempDir(),
 	)
 
 	env = fromEnv("GOROOT", env)
 	env = fromEnv("GO111MODULE", env)
 	env = fromEnv("GOPATH", env)
+	env = fromEnv("GOMODCACHE", env)
+	env = fromEnv("GOPROXY", env)
+	env = fromEnv("GOPRIVATE", env)
+	env = fromEnv("GONOPROXY", env)
+	env = fromEnv("GONOSUMDB", env)
+	env = fromEnv("GOINSECURE", env)
 	env = fromEnv("SHELL", env)
 	env = fromEnv("PATH", env)
 	env = fromEnv("HOME", env)
@@ -56,8 +65,9 @@ func TestEnv(t tester.T) []string {
 	return env
 }
 
-// fromEnv sets internal environment variable form real environment named key.
-// The internal variable is set only if it is set in the real environment.
+// fromEnv appends the variable named key from the real environment to env,
+// which is the point of the snapshot: it reads the process environment on
+// purpose. The variable is appended only if it is set.
 func fromEnv(key string, env []string) []string {
 	if val, set := os.LookupEnv(key); set {
 		return append(env, key+"="+val)
@@ -65,13 +75,13 @@ func fromEnv(key string, env []string) []string {
 	return env
 }
 
-// goCache returns path to go cache. Uses "go env" with os.Environ.
-// Stdout is the path. A non-empty stderr fails the test so a warning
-// cannot become part of the path.
-func goCache(t tester.T) string {
+// goEnv returns the value of the Go environment variable key as reported by
+// "go env" run with the real environment. A non-empty stderr fails the test
+// so a warning cannot become part of the value.
+func goEnv(t tester.T, key string) string {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
-	cmd := exec.CommandContext(t.Context(), "go", "env", "GOCACHE")
+	cmd := exec.CommandContext(t.Context(), "go", "env", key)
 	cmd.Env = os.Environ()
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -110,86 +120,9 @@ func findMakefiles(t tester.T, dir string) []string {
 	return list
 }
 
-// JoinImpSpec joins import spec elements.
+// JoinImpSpec joins import path elements with slashes, as [path.Join] does;
+// nothing is escaped, since an import path is not a URL.
 func JoinImpSpec(t tester.T, base string, elem ...string) string {
 	t.Helper()
-	ret, err := url.JoinPath(base, elem...)
-	if err != nil {
-		t.Error(err)
-	}
-	return ret
-}
-
-// rowColValue extracts column value from a line which starts with the header.
-// When a line is malformed, it marks the test as failed, returns an empty
-// string and continues execution.
-//
-// For example, having text:
-//
-//	Name:       first
-//	Last Name:  second
-//
-// and calling `rowColValue("Last Name:", 1, text)` returns "second" (the header
-// must include the colon so Fields indexes align with data columns).
-func rowColValue(t tester.T, header string, column int, text string) string {
-	t.Helper()
-
-	if header == "" {
-		t.Error("expected header to be non-empty")
-		return ""
-	}
-	if column < 1 {
-		t.Errorf("expected column to be positive, got: %d", column)
-		return ""
-	}
-
-	scn := bufio.NewScanner(strings.NewReader(text))
-	for scn.Scan() {
-		line := strings.TrimSpace(scn.Text())
-		if !strings.HasPrefix(line, header) {
-			continue
-		}
-		line = strings.TrimSpace(strings.TrimPrefix(line, header))
-		fields := strings.Fields(line)
-		fc := len(fields)
-		if fc == 0 {
-			continue
-		}
-		if column >= fc+1 {
-			t.Errorf("expected row to have at least %d fields", column)
-			return ""
-		}
-		return strings.TrimSpace(fields[column-1])
-	}
-	if err := scn.Err(); err != nil {
-		t.Error(err)
-		return ""
-	}
-	t.Errorf("expected row with header %q to exist", header)
-	return ""
-}
-
-// infoToEnv expects to get the output containing two columns which are then
-// parsed and used in the map: first as a key, second as a value. It marks the
-// test as failed if the output line has more than two columns or keys are
-// repeating. Returns constructed map.
-func infoToEnv(t tester.T, output string) map[string]string {
-	t.Helper()
-	m := make(map[string]string, 10)
-	for lin := range strings.SplitSeq(output, "\n") {
-		lin = strings.TrimSpace(lin)
-		fls := strings.Fields(lin)
-		if len(fls) == 2 {
-			key := fls[0]
-			if _, exists := m[key]; exists {
-				t.Errorf("did not expect keys to repeat, key: %q", key)
-			}
-			m[key] = fls[1]
-			continue
-		}
-		if len(fls) != 0 {
-			t.Errorf("expected line to have two fields, got: %q", lin)
-		}
-	}
-	return m
+	return path.Join(append([]string{base}, elem...)...)
 }

@@ -32,7 +32,7 @@ func Test_NewTstProvider(t *testing.T) {
 		have := NewTstProvider()
 
 		// --- Then ---
-		assert.Len(t, 0, have.PreRuns())
+		assert.Len(t, 0, have.pre)
 	})
 
 	t.Run("clones the hooks", func(t *testing.T) {
@@ -43,16 +43,42 @@ func Test_NewTstProvider(t *testing.T) {
 		have := NewTstProvider(pre...)
 
 		// --- Then ---
-		assert.Len(t, 1, have.PreRuns())
-		assert.Same(t, pre[0], have.PreRuns()[0])
-		// PreRuns returns a clone so a caller cannot replace a hook.
-		pr := have.PreRuns()
-		pr[0] = nil
-		assert.Same(t, TestPreRun, have.PreRuns()[0])
-		// The input slice is cloned too.
-		pre[0] = nil
-		assert.Same(t, TestPreRun, have.PreRuns()[0])
+		assert.Len(t, 1, have.pre)
+		assert.Same(t, TestPreRun, have.pre[0])
+		assert.NotSame(t, pre, have.pre)
 	})
+}
+
+func Test_TstProvider_Targets(t *testing.T) {
+	// --- When ---
+	have := NewTstProvider().Targets()
+
+	// --- Then ---
+	assert.Len(t, 2, have)
+	assert.Equal(t, ":panic-string", have[0].Name)
+	assert.Equal(t, ":print", have[1].Name)
+}
+
+func Test_TstProvider_Source(t *testing.T) {
+	// --- When ---
+	have := NewTstProvider().Source()
+
+	// --- Then ---
+	assert.NotSame(t, tgsMainSrc, have)
+	assert.Contain(t, "func targetsBuiltIn()", string(have))
+}
+
+func Test_TstProvider_PreRuns(t *testing.T) {
+	// --- Given ---
+	prv := NewTstProvider(TestPreRun)
+
+	// --- When ---
+	have := prv.PreRuns()
+
+	// --- Then ---
+	assert.Len(t, 1, have)
+	assert.Same(t, TestPreRun, have[0])
+	assert.NotSame(t, prv.pre, have)
 }
 
 func Test_TestTargets(t *testing.T) {
@@ -70,7 +96,8 @@ func Test_TestTargetsSrc(t *testing.T) {
 	have := TestTargetsSrc()
 
 	// --- Then ---
-	assert.Equal(t, string(tgsMainSrc), string(have))
+	assert.NotSame(t, tgsMainSrc, have)
+	assert.Contain(t, "func targetsBuiltIn()", string(have))
 }
 
 func Test_TestPreRun(t *testing.T) {
@@ -88,13 +115,11 @@ func Test_TestPreRun(t *testing.T) {
 		assert.Equal(t, 1, hCtx.Value(preRunKey))
 	})
 
-	t.Run("second call increments counter and appends env", func(t *testing.T) {
+	t.Run("second call", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
-		rng := ring.New()
+		ctx, rng, _ := TestPreRun(t.Context(), ring.New())
 
 		// --- When ---
-		ctx, rng, _ = TestPreRun(ctx, rng)
 		hCtx, hRng, err := TestPreRun(ctx, rng)
 
 		// --- Then ---

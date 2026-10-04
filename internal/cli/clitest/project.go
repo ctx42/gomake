@@ -1,25 +1,19 @@
 // SPDX-FileCopyrightText: (c) 2026 Rafal Zajac
 // SPDX-License-Identifier: MIT
 
-// Package clitest helps gomake integration tests set up temporary
-// projects, copy makefiles, and align module dependencies with the tool
-// under test.
 package clitest
 
 import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strings"
 
-	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 	"github.com/ctx42/testkit/pkg/prjkit"
 )
-
-// GmModName represents gomake import spec.
-const GmModName = "github.com/ctx42/gomake"
 
 type hidPrj = prjkit.Project // Hide embedded field.
 
@@ -33,24 +27,36 @@ type Project struct {
 }
 
 // NewProject creates a temporary directory for a project. By default the
-// directory basename is "project" and the module path is [GmModName].
+// directory basename is "project" and the module path is
+// "example.com/comp/project". It fails the test at once when the test has
+// already failed, since no project can be created then.
 func NewProject(t tester.T, opts ...func(*prjkit.Project)) *Project {
 	t.Helper()
 
-	dir := oskit.MkdirAll(t, t.TempDir(), "project")
-	prj := &Project{
-		hidPrj: prjkit.New(t, dir, opts...),
-		t:      t,
-	}
 	modPth := filepath.Join(modkit.Root(), "go.mod")
-	prj.ringVer = must.Value(modkit.ModVer(modPth, "github.com/ctx42/ring"))
-	prj.xflagVer = must.Value(modkit.ModVer(modPth, "github.com/ctx42/xflag"))
-	return prj
+	ringVer, err := modkit.ModVer(modPth, "github.com/ctx42/ring")
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+	xflagVer, err := modkit.ModVer(modPth, "github.com/ctx42/xflag")
+	if err != nil {
+		t.Fatal(err)
+		return nil
+	}
+
+	dir := oskit.MkdirAll(t, t.TempDir(), "project")
+	hid := prjkit.New(t, dir, opts...)
+	if hid == nil { // prjkit.New refuses to run in a failed test.
+		t.Fatal("cannot create a project in a failed test")
+		return nil
+	}
+	return &Project{hidPrj: hid, ringVer: ringVer, xflagVer: xflagVer, t: t}
 }
 
-// MakefilesFrom copies makefiles from src to project root. The `go:build
-// gomake` directives if present in the makefiles will be removed. It can be
-// called only once.
+// MakefilesFrom copies makefiles from src to the project root, removing the
+// `go:build gomake` directive, if present, from each. It can be called only
+// once.
 func (prj *Project) MakefilesFrom(src string) []string {
 	prj.t.Helper()
 	_ = prj.CheckOpen()
@@ -68,6 +74,7 @@ func (prj *Project) MakefilesFrom(src string) []string {
 		srcPth = filepath.Join(prj.mkfFrom, srcPth)
 		if filData, err = os.ReadFile(srcPth); err != nil {
 			prj.t.Fatal(err)
+			return nil
 		}
 		// Normalize CRLF so LF-only tag matching works on Windows sources.
 		filData = bytes.ReplaceAll(filData, []byte("\r\n"), []byte("\n"))
@@ -78,8 +85,15 @@ func (prj *Project) MakefilesFrom(src string) []string {
 		default:
 			// Drop the tag line. A following blank line is kept as one
 			// newline so the result matches a tag that already had one.
+			// Build constraints precede the package clause, so the search
+			// stops there and never touches the same text in the body.
 			line := append([]byte{'\n'}, tagLine...)
-			i := bytes.Index(filData, line)
+			header := filData
+			nlData := append([]byte{'\n'}, filData...)
+			if end := bytes.Index(nlData, []byte("\npackage ")); end >= 0 {
+				header = filData[:end]
+			}
+			i := bytes.Index(header, line)
 			if i < 0 {
 				break
 			}
@@ -92,6 +106,7 @@ func (prj *Project) MakefilesFrom(src string) []string {
 		dstPth := filepath.Join(prj.Root(), filepath.Base(srcPth))
 		if err = os.WriteFile(dstPth, filData, 0600); err != nil {
 			prj.t.Fatal(err)
+			return nil
 		}
 		copied = append(copied, dstPth)
 	}
@@ -99,28 +114,42 @@ func (prj *Project) MakefilesFrom(src string) []string {
 }
 
 // UseGomakeSrc edits test project's "go.mod" file and replaces
-// "github.com/ctx42/gomake" imports with the source on the disk at src.
+// "github.com/ctx42/gomake" imports with the source on the disk at src, an
+// absolute path. Call it after [prjkit.Project.GoModInit]; a failed edit
+// fails the test at once.
 func (prj *Project) UseGomakeSrc(src string) {
 	prj.t.Helper()
 	_ = prj.CheckOpen()
 
 	gmPth := "github.com/ctx42/gomake@v0.0.0"
 	ringPth := "github.com/ctx42/ring@" + prj.ringVer
-	_, _ = prj.Exe("go", "mod", "edit", "-require="+ringPth)
-	_, _ = prj.Exe("go", "mod", "edit", "-require="+gmPth)
-	_, _ = prj.Exe("go", "mod", "edit", "-replace="+gmPth+"="+src)
+	prj.mustExe("go", "mod", "edit", "-require="+ringPth)
+	prj.mustExe("go", "mod", "edit", "-require="+gmPth)
+	prj.mustExe("go", "mod", "edit", "-replace="+gmPth+"="+src)
 }
 
 // RequireXflag adds the xflag module requirement and records its checksum so
 // the generated makefile, which imports xflag, compiles in the test project.
 // It mirrors what gomake injects into the build directory's "go.mod" and must
 // be called after any "go mod tidy" that would otherwise drop the unused
-// requirement.
+// requirement. A failed command fails the test at once.
 func (prj *Project) RequireXflag() {
 	prj.t.Helper()
 	_ = prj.CheckOpen()
 
 	xflagPth := "github.com/ctx42/xflag@" + prj.xflagVer
-	_, _ = prj.Exe("go", "mod", "edit", "-require="+xflagPth)
-	_, _ = prj.Exe("go", "mod", "download", xflagPth)
+	prj.mustExe("go", "mod", "edit", "-require="+xflagPth)
+	prj.mustExe("go", "mod", "download", xflagPth)
+}
+
+// mustExe runs cmd in the project and fails the test at once when the
+// command fails, so later steps never run against a half-edited go.mod.
+func (prj *Project) mustExe(cmd string, args ...string) {
+	prj.t.Helper()
+	failed := prj.t.Failed()
+	_, _ = prj.Exe(cmd, args...)
+	if !failed && prj.t.Failed() {
+		line := strings.Join(append([]string{cmd}, args...), " ")
+		prj.t.Fatal("command failed: " + line)
+	}
 }

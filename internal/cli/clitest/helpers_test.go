@@ -25,21 +25,26 @@ func Test_TestEnv(t *testing.T) {
 	have := TestEnv(tspy)
 
 	// --- Then ---
-	xdg := ""
+	env := make(map[string]string, len(have))
 	for _, kv := range have {
-		if val, ok := strings.CutPrefix(kv, "XDG_CONFIG_HOME="); ok {
-			xdg = val
-		}
+		key, val, _ := strings.Cut(kv, "=")
+		env[key] = val
 	}
-	assert.Len(t, 0, oskit.List(t, xdg))
+	assert.Len(t, 0, oskit.List(t, env["XDG_CONFIG_HOME"]))
+	tspy.AssertExpectations() // Removes the XDG_CONFIG_HOME temp dir.
+	assert.Equal(t, goEnv(t, "GOCACHE"), env["GOCACHE"])
+	assert.Equal(t, goEnv(t, "GOENV"), env["GOENV"])
 
-	tspy.AssertExpectations()
-
-	assert.Has(t, "GOCACHE="+goCache(t), have)
-	mayBe := []string{
+	copied := []string{
 		"GOROOT",
 		"GO111MODULE",
 		"GOPATH",
+		"GOMODCACHE",
+		"GOPROXY",
+		"GOPRIVATE",
+		"GONOPROXY",
+		"GONOSUMDB",
+		"GOINSECURE",
 		"SHELL",
 		"PATH",
 		"HOME",
@@ -47,11 +52,15 @@ func Test_TestEnv(t *testing.T) {
 		"TERM",
 		"SSH_AUTH_SOCK",
 	}
-	for _, wantKey := range mayBe {
-		if val, exists := os.LookupEnv(wantKey); exists {
-			assert.Has(t, wantKey+"="+val, have)
+	want := len(copied) + 3 // Plus GOCACHE, GOENV and XDG_CONFIG_HOME.
+	for _, key := range copied {
+		val, set := os.LookupEnv(key)
+		if !set {
+			want--
 		}
+		assert.Equal(t, val, env[key], key)
 	}
+	assert.Len(t, want, have)
 }
 
 func Test_fromEnv(t *testing.T) {
@@ -83,7 +92,7 @@ func Test_fromEnv(t *testing.T) {
 	})
 }
 
-func Test_goCache(t *testing.T) {
+func Test_goEnv(t *testing.T) {
 	t.Run("system", func(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t)
@@ -93,7 +102,7 @@ func Test_goCache(t *testing.T) {
 		want = strings.TrimSpace(want)
 
 		// --- When ---
-		have := goCache(tspy)
+		have := goEnv(tspy, "GOCACHE")
 
 		// --- Then ---
 		tspy.AssertExpectations()
@@ -109,7 +118,7 @@ func Test_goCache(t *testing.T) {
 		tspy.Close()
 
 		// --- When ---
-		have := goCache(tspy)
+		have := goEnv(tspy, "GOCACHE")
 
 		// --- Then ---
 		tspy.AssertExpectations()
@@ -133,6 +142,35 @@ func Test_findMakefiles(t *testing.T) {
 		}
 		assert.Equal(t, want, have)
 	})
+
+	t.Run("directory named like a makefile", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.Close()
+
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, "makefile_x.go")
+		oskit.Write(t, "package x\n", dir, "makefile.go")
+
+		// --- When ---
+		have := findMakefiles(tspy, dir)
+
+		// --- Then ---
+		assert.Equal(t, []string{"makefile.go"}, have)
+	})
+
+	t.Run("error - missing directory", func(t *testing.T) {
+		// --- Given ---
+		tspy := tester.New(t)
+		tspy.ExpectFatal()
+		tspy.ExpectLogContain("no such file or directory")
+		tspy.Close()
+
+		fn := func() { findMakefiles(tspy, "testdata/missing") }
+
+		// --- When ---
+		assert.Panic(t, fn)
+	})
 }
 
 func Test_JoinImpSpec(t *testing.T) {
@@ -148,223 +186,15 @@ func Test_JoinImpSpec(t *testing.T) {
 		assert.Equal(t, "example.com/mod/pkg/abc/def", have)
 	})
 
-	t.Run("error - invalid base", func(t *testing.T) {
-		// --- Given ---
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogContain("missing protocol scheme")
-		tspy.Close()
-
-		// --- When ---
-		have := JoinImpSpec(tspy, ":", "example.com/mod/pkg")
-
-		// --- Then ---
-		assert.Empty(t, have)
-	})
-}
-
-func Test_rowColValue(t *testing.T) {
-	t.Run("error - empty header", func(t *testing.T) {
-		// --- Given ---
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogEqual("expected header to be non-empty")
-		tspy.Close()
-
-		// --- When ---
-		have := rowColValue(tspy, "", 1, "header col1 col2")
-
-		// --- Then ---
-		assert.Equal(t, "", have)
-	})
-
-	t.Run("error - column not positive", func(t *testing.T) {
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogEqual("expected column to be positive, got: 0")
-		tspy.Close()
-
-		// --- When ---
-		have := rowColValue(tspy, "header", 0, "header col1 col2")
-
-		// --- Then ---
-		assert.Equal(t, "", have)
-	})
-
-	t.Run("error - column out of range", func(t *testing.T) {
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogEqual("expected row to have at least 5 fields")
-		tspy.Close()
-
-		// --- When ---
-		have := rowColValue(tspy, "header", 5, "header col1 col2")
-
-		// --- Then ---
-		assert.Equal(t, "", have)
-	})
-
-	t.Run("error - header row missing", func(t *testing.T) {
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogEqual("expected row with header \"header1\" to exist")
-		tspy.Close()
-
-		// --- When ---
-		have := rowColValue(tspy, "header1", 5, "header0 col01 col02")
-
-		// --- Then ---
-		assert.Equal(t, "", have)
-	})
-}
-
-func Test_rowColValue_tabular(t *testing.T) {
-	tt := []struct {
-		testN string
-
-		header string
-		column int
-		text   string
-		want   string
-	}{
-		{
-			"first column",
-			"header0",
-			1,
-			"header0 col1 col2",
-			"col1",
-		},
-		{
-			"last column",
-			"header0",
-			2,
-			"header0 col1 col2",
-			"col2",
-		},
-		{
-			"trimmed",
-			"header0",
-			2,
-			"header0 col1  col2  ",
-			"col2",
-		},
-		{
-			"works with tabs",
-			"header0",
-			2,
-			"header0\tcol1\tcol2",
-			"col2",
-		},
-		{
-			"works with tabs and spaces",
-			"header0",
-			2,
-			"header0  \t  col1 \t col2 ",
-			"col2",
-		},
-		{
-			"finds row",
-			"header1",
-			2,
-			"header0 col01 col02\nheader1 col11 col12\n",
-			"col12",
-		},
-		{
-			"handles empty lines",
-			"header1",
-			2,
-			"header0 col01 col02\n\nheader1 col11 col12\n",
-			"col12",
-		},
-		{
-			"double column header",
-			"header00 header01",
-			2,
-			"header00 header01 col01 col02",
-			"col02",
-		},
-	}
-
-	for _, tc := range tt {
-		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-			tspy := tester.New(t)
-			tspy.Close()
-
-			// --- When ---
-			have := rowColValue(tspy, tc.header, tc.column, tc.text)
-
-			// --- Then ---
-			assert.Equal(t, tc.want, have)
-		})
-	}
-}
-
-func Test_infoToEnv(t *testing.T) {
-	t.Run("split", func(t *testing.T) {
+	t.Run("characters a URL escapes", func(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t)
 		tspy.Close()
 
-		output := "" +
-			"key0 value0\n" +
-			"key1 value1\n"
-
 		// --- When ---
-		have := infoToEnv(tspy, output)
+		have := JoinImpSpec(tspy, "example.com/mod", "a b", "c%d")
 
 		// --- Then ---
-		want := map[string]string{
-			"key0": "value0",
-			"key1": "value1",
-		}
-		assert.Equal(t, want, have)
-	})
-
-	t.Run("error - repeating keys", func(t *testing.T) {
-		// --- Given ---
-		tspy := tester.New(t)
-		tspy.ExpectError()
-		tspy.ExpectLogEqual("did not expect keys to repeat, key: \"key0\"")
-		tspy.Close()
-
-		output := "" +
-			"key0 value0\n" +
-			"key0 value1\n"
-
-		// --- When ---
-		have := infoToEnv(tspy, output)
-
-		// --- Then ---
-		want := map[string]string{
-			"key0": "value1",
-		}
-		assert.Equal(t, want, have)
-	})
-
-	t.Run("error - more than two columns", func(t *testing.T) {
-		// --- Given ---
-		tspy := tester.New(t)
-		tspy.ExpectError()
-
-		wMsg := "" +
-			"expected line to have two fields, " +
-			"got: \"key1 value10 value11\""
-
-		tspy.ExpectLogEqual(wMsg)
-		tspy.Close()
-
-		output := "" +
-			"key0 value0\n" +
-			"key1 value10 value11\n"
-
-		// --- When ---
-		have := infoToEnv(tspy, output)
-
-		// --- Then ---
-		want := map[string]string{
-			"key0": "value0",
-		}
-		assert.Equal(t, want, have)
+		assert.Equal(t, "example.com/mod/a b/c%d", have)
 	})
 }
