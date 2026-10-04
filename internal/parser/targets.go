@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"go/ast"
 	"go/doc"
 	"sort"
 	"strings"
@@ -21,10 +22,11 @@ type TgsMapCB func(*Targets, *mkf.Target)
 
 // Targets represent a collection of unique gomake targets.
 type Targets struct {
-	unique map[string]struct{} // Map of target names (for uniqueness).
-	list   []*mkf.Target       // List of unique targets (sorted).
-	sorted bool                // True when list is sorted.
-	skips  []string            // Exported funcs skipped because of an alias.
+	unique   map[string]struct{} // Map of target names (for uniqueness).
+	list     []*mkf.Target       // List of unique targets (sorted).
+	sorted   bool                // True when list is sorted.
+	skips    []string            // Exported funcs skipped because of an alias.
+	reserved []string            // Main package names imports must avoid.
 }
 
 // NewTargets returns new instance of Targets.
@@ -114,17 +116,26 @@ func (tgs *Targets) Len() int {
 	return len(tgs.list)
 }
 
-// Add adds new target(s) to the collection. Returns [ErrDupTarget] when target
-// is already in the collection. The zero value is safe to add to.
+// Add adds new target(s) to the collection. Returns [ErrDupTarget], adding
+// nothing, when a target's name is already in the collection or repeats in
+// ts. The zero value is safe to add to.
 func (tgs *Targets) Add(ts ...*mkf.Target) error {
+	batch := make(map[string]*mkf.Target, len(ts))
+	for _, tgt := range ts {
+		got := tgs.Get(tgt.Name)
+		if got == nil {
+			got = batch[tgt.Name]
+		}
+		if got != nil {
+			format := "%w: %s, %s"
+			return fmt.Errorf(format, ErrDupTarget, got.DefRef, tgt.DefRef)
+		}
+		batch[tgt.Name] = tgt
+	}
 	if tgs.unique == nil {
 		tgs.unique = make(map[string]struct{})
 	}
 	for _, tgt := range ts {
-		if got := tgs.Get(tgt.Name); got != nil {
-			format := "%w: %s, %s"
-			return fmt.Errorf(format, ErrDupTarget, got.DefRef, tgt.DefRef)
-		}
 		tgs.unique[tgt.Name] = struct{}{}
 		tgs.list = append(tgs.list, tgt)
 		tgs.sorted = false
@@ -198,6 +209,9 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 			continue
 		}
 		complete[typ.Name] = nsp
+		if !nsReachable(pkg, typ) {
+			continue
+		}
 		if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
 			return err
 		}
@@ -206,13 +220,9 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 	prev := len(inc) // Number of incomplete types.
 	for len(inc) > 0 {
 		for rcv, types := range inc {
+			// Only the package's own types extend a namespace: a type of the
+			// same name in another package must not lend its trail.
 			nspParent, ok := complete[rcv]
-			if !ok {
-				if tgt := tgs.withReceiver(rcv); tgt != nil {
-					nspParent = tgt.Breadcrumbs
-					ok = true
-				}
-			}
 			if !ok {
 				continue
 			}
@@ -220,6 +230,9 @@ func (tgs *Targets) addType(pkg *Package, tps ...*doc.Type) error {
 				nsp := append([]string{}, nspParent...)
 				nsp = append(nsp, pth[rcv][i]...)
 				complete[typ.Name] = nsp
+				if !nsReachable(pkg, typ) {
+					continue
+				}
 				if err := tgs.addMethods(pkg, typ.Methods, nsp...); err != nil {
 					return err
 				}
@@ -279,18 +292,11 @@ func (tgs *Targets) reportSkips(rng *ring.Ring) {
 	}
 }
 
-// withReceiver returns the first target information instance with given
-// [mkf.Target.Receiver].
-func (tgs *Targets) withReceiver(name string) *mkf.Target {
-	if name == "" {
-		return nil
-	}
-	for _, tgt := range tgs.list {
-		if name == tgt.Receiver {
-			return tgt
-		}
-	}
-	return nil
+// nsReachable reports whether generated code can reference the namespace
+// type typ declared in pkg: any type of the main package, or an exported
+// type of an imported one.
+func nsReachable(pkg *Package, typ *doc.Type) bool {
+	return pkg.Name == MainName || ast.IsExported(typ.Name)
 }
 
 // Sort sorts the internal list of targets.
@@ -335,12 +341,17 @@ func (tgs *Targets) Names() []string {
 }
 
 // MarkDefault marks the first target whose DefRef matches as default and
-// returns its name. Returns empty string if DefRef does not match any target.
-// Other targets' Default flags are cleared so at most one default remains.
-func (tgs *Targets) MarkDefault(defRef string) string {
+// returns its name. A non-empty impSpec restricts the match to the targets
+// imported from that path. Returns empty string if DefRef does not match any
+// target. Other targets' Default flags are cleared so at most one default
+// remains.
+func (tgs *Targets) MarkDefault(impSpec, defRef string) string {
 	def := ""
 	for _, tgt := range tgs.list {
 		tgt.Default = false
+		if impSpec != "" && tgt.ImpSpec != impSpec {
+			continue
+		}
 		if def == "" && tgt.DefRef == defRef {
 			def = tgt.Name
 			tgt.Default = true
@@ -366,6 +377,12 @@ func (tgs *Targets) Map(fns ...TgsMapCB) {
 			fn(tgs, tgt)
 		}
 	}
+}
+
+// reserve records the main package's top-level identifiers, which generated
+// import names must avoid.
+func (tgs *Targets) reserve(names ...string) {
+	tgs.reserved = append(tgs.reserved, names...)
 }
 
 // importAliasMap returns a map from ImpSpec to the Go import alias that
@@ -404,6 +421,11 @@ func (tgs *Targets) importAliasMap() map[string]string {
 		"mkf":     "reserved",
 		"targets": "reserved",
 		"tgt":     "reserved",
+	}
+	// The generated file shares the package block with the main package, so
+	// an import name must not repeat one of its top-level identifiers.
+	for _, name := range tgs.reserved {
+		taken[name] = "reserved"
 	}
 	out := make(map[string]string, len(pkgBySpec))
 	for _, spec := range specs {

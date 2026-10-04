@@ -3,6 +3,13 @@
 
 package pkg9
 
+import (
+	"context"
+	"fmt"
+
+	"github.com/ctx42/ring/pkg/ring"
+)
+
 func BasicWin(_ context.Context, rng *ring.Ring) error {
 	_, _ = fmt.Fprint(rng.Stdout(), "BasicWin")
 	return nil

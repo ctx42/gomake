@@ -4,8 +4,8 @@
 package parser
 
 import (
-	"bufio"
 	"bytes"
+	"fmt"
 	"go/ast"
 	"go/doc"
 	"go/token"
@@ -99,42 +99,29 @@ func isHidden(s string) (string, bool) {
 // lines. If nothing was removed it returns original string and zero.
 func removeLines(s, start string) (string, int) {
 	buf := strings.Builder{}
-	scn := bufio.NewScanner(strings.NewReader(s))
 	var removed int
-	for scn.Scan() {
-		lin := scn.Text()
+	for lin := range strings.Lines(s) {
 		if strings.HasPrefix(lin, start) {
 			removed++
 			continue
 		}
+		// Drop the line ending, CRLF included.
+		lin = strings.TrimSuffix(strings.TrimSuffix(lin, "\n"), "\r")
 		buf.WriteString(lin)
 		buf.WriteString("\n")
-	}
-	if err := scn.Err(); err != nil {
-		return s, 0
 	}
 	return strings.TrimSpace(buf.String()), removed
 }
 
-// targetSynopsis sanitizes target function documentation and creates a summary.
-// Summary is defined as a first sentence in the target function documentation
-// without the name of the function itself.
+// targetSynopsis returns the first sentence of the target documentation
+// docStr without its closing period. The caller strips the function name the
+// documentation starts with, so a word repeating the name is kept.
 //
-// Example:
-//
-//	// TargetName does stuff. Some more stuff.
-//	// A lot of more stuff.
-//	func TargetName(ctx context.Context, rng *ring.Ring) error {}
-//
-// Summary for the above example would be "does stuff.".
-func targetSynopsis(name, docStr string) string {
+// Example: for the documentation "does stuff. Some more stuff." the synopsis
+// is "does stuff".
+func targetSynopsis(docStr string) string {
 	var p doc.Package
-	syn := p.Synopsis(docStr)
-	tokens := strings.Split(syn, " ")
-	if strings.EqualFold(name, tokens[0]) {
-		syn = strings.Join(tokens[1:], " ")
-	}
-	return strings.TrimRight(syn, ".")
+	return strings.TrimRight(p.Synopsis(docStr), ".")
 }
 
 // breadcrumbs returns type's breadcrumb trail or nil. See [isNS] documentation
@@ -208,6 +195,11 @@ const (
 func isNS(spc *ast.TypeSpec, prev []string) []string {
 	_, ok := spc.Type.(*ast.SelectorExpr)
 	if ok {
+		return nil
+	}
+	// Generated code declares a namespace variable without type arguments,
+	// so a generic type cannot be a namespace.
+	if spc.TypeParams != nil && len(spc.TypeParams.List) > 0 {
 		return nil
 	}
 	switch typ := spc.Type.(type) {
@@ -377,48 +369,86 @@ func toKebabCase(camel string) string {
 	return b.String()
 }
 
-// importLocalNames maps import local names to import paths for all imports in
-// the given files. Named imports use the name; unnamed imports use the last
-// path segment. Dot and blank imports are skipped.
-func importLocalNames(files map[string]*ast.File) map[string]string {
+// importLocalNames maps the import local names of fil to their import paths.
+// Named imports use the name; unnamed imports use the last path segment. Dot
+// and blank imports are skipped.
+func importLocalNames(fil *ast.File) map[string]string {
 	out := make(map[string]string)
-	for _, fil := range files {
-		if fil == nil {
+	for _, imp := range fil.Imports {
+		path := unquote(imp.Path)
+		if path == "" {
 			continue
 		}
-		for _, imp := range fil.Imports {
-			path := unquote(imp.Path)
-			if path == "" {
+		if imp.Name != nil {
+			switch imp.Name.Name {
+			case "_", ".":
+				continue
+			default:
+				out[imp.Name.Name] = path
 				continue
 			}
-			if imp.Name != nil {
-				switch imp.Name.Name {
-				case "_", ".":
-					continue
-				default:
-					out[imp.Name.Name] = path
-					continue
-				}
-			}
-			// Default local name is the last path element.
-			base := path
-			if i := strings.LastIndex(path, "/"); i >= 0 {
-				base = path[i+1:]
-			}
-			out[base] = path
 		}
+		// Default local name is the last path element.
+		base := path
+		if i := strings.LastIndex(path, "/"); i >= 0 {
+			base = path[i+1:]
+		}
+		out[base] = path
 	}
 	return out
+}
+
+// topLevelNames returns the package-block identifiers declared in files:
+// functions (not methods), types, variables, and constants.
+func topLevelNames(files map[string]*ast.File) []string {
+	var names []string
+	for _, fil := range files {
+		for _, dcl := range fil.Decls {
+			switch dcl := dcl.(type) {
+			case *ast.FuncDecl:
+				if dcl.Recv == nil {
+					names = append(names, dcl.Name.Name)
+				}
+
+			case *ast.GenDecl:
+				for _, spec := range dcl.Specs {
+					switch spec := spec.(type) {
+					case *ast.TypeSpec:
+						names = append(names, spec.Name.Name)
+
+					case *ast.ValueSpec:
+						for _, name := range spec.Names {
+							names = append(names, name.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+	return names
+}
+
+// fileImports maps the import local names of the file in files containing pos
+// to their import paths. Import names are file-scoped, so a declaration sees
+// only the imports of its own file. Returns nil when no file contains pos.
+func fileImports(files map[string]*ast.File, pos token.Pos) map[string]string {
+	for _, fil := range files {
+		if fil != nil && fil.FileStart <= pos && pos < fil.FileEnd {
+			return importLocalNames(fil)
+		}
+	}
+	return nil
 }
 
 // gmImpSpec returns import namespace and import spec only for specs tagged
 // with `gomake:import`. Otherwise it returns two empty strings. The tag may
 // be an end-of-line comment or a doc comment above the spec; an end-of-line
 // tag wins when both are present. The namespace is always lowercase
-// regardless of how it was written in the source.
-func gmImpSpec(is *ast.ImportSpec) (string, string) {
+// regardless of how it was written in the source. A tag with more than one
+// namespace word returns [ErrImportTag].
+func gmImpSpec(is *ast.ImportSpec) (string, string, error) {
 	if is == nil {
-		return "", ""
+		return "", "", nil
 	}
 	lines := append(commentBodies(is.Comment), commentBodies(is.Doc)...)
 	for _, text := range lines {
@@ -429,14 +459,14 @@ func gmImpSpec(is *ast.ImportSpec) (string, string) {
 		path := unquote(is.Path)
 		switch len(fields) {
 		case 1:
-			return "", path // Import without namespace.
+			return "", path, nil // Import without namespace.
 		case 2:
-			return strings.ToLower(fields[1]), path // Import with namespace.
+			return strings.ToLower(fields[1]), path, nil // With namespace.
 		default:
-			return "", ""
+			return "", "", fmt.Errorf("%w: %q: %s", ErrImportTag, path, text)
 		}
 	}
-	return "", ""
+	return "", "", nil
 }
 
 // unquote removes quotes from the beginning and the end of a string.
@@ -447,9 +477,10 @@ func gmImpSpec(is *ast.ImportSpec) (string, string) {
 //	`str` -> str
 func unquote(bl *ast.BasicLit) string { return strings.Trim(bl.Value, "\"`") }
 
-// gmImpPackages returns packages imported with a `gomake:import` comment.
-// Packages are resolved concurrently against the go.mod of the module rooted
-// at dir (empty dir falls back to the process working directory).
+// gmImpPackages returns packages imported with a `gomake:import` comment,
+// each namespace and import path pair once. Packages are resolved
+// concurrently against the go.mod of the module rooted at dir (empty dir falls
+// back to the process working directory).
 func gmImpPackages(
 	rng *ring.Ring,
 	dir string,
@@ -461,18 +492,27 @@ func gmImpPackages(
 		imp string
 	}
 	var specs []impSpec
+	seen := make(map[impSpec]bool)
 	for _, del := range dcs {
 		gen, ok := del.(*ast.GenDecl)
 		if !ok || gen.Tok != token.IMPORT {
 			continue
 		}
 		for _, spec := range gen.Specs {
-			//nolint:forcetypeassert
-			pkgNS, imp := gmImpSpec(spec.(*ast.ImportSpec))
+			ispec := spec.(*ast.ImportSpec) //nolint:forcetypeassert
+			pkgNS, imp, err := gmImpSpec(ispec)
+			if err != nil {
+				return nil, err
+			}
 			if imp == "" {
 				continue
 			}
-			specs = append(specs, impSpec{ns: pkgNS, imp: imp})
+			key := impSpec{ns: pkgNS, imp: imp}
+			if seen[key] {
+				continue // Tagged in more than one file.
+			}
+			seen[key] = true
+			specs = append(specs, key)
 		}
 	}
 	if len(specs) == 0 {
@@ -508,9 +548,10 @@ func gmImpPackages(
 	return pks, nil
 }
 
-// findDefault returns expression assigned to variable named Default. Returns
-// nil when variable is not declared or not set.
-func findDefault(vars ...*doc.Value) []string {
+// findDefault returns the code reference assigned to the variable named
+// Default and the position of its declaration. Returns nil when the variable
+// is not declared or not set.
+func findDefault(vars ...*doc.Value) ([]string, token.Pos) {
 	for _, v := range vars {
 		for _, spec := range v.Decl.Specs {
 			vs, ok := spec.(*ast.ValueSpec)
@@ -522,7 +563,7 @@ func findDefault(vars ...*doc.Value) []string {
 					continue
 				}
 				if len(vs.Values) == 0 {
-					return nil // Declared without an initializer.
+					return nil, token.NoPos // Declared without an initializer.
 				}
 				// Shared initializer for multi-name specs uses Values[0];
 				// per-name values use the matching index when present.
@@ -530,11 +571,11 @@ func findDefault(vars ...*doc.Value) []string {
 				if j < len(vs.Values) {
 					idx = j
 				}
-				return codeRef(vs.Values[idx], nil)
+				return codeRef(vs.Values[idx], nil), vs.Pos()
 			}
 		}
 	}
-	return nil
+	return nil, token.NoPos
 }
 
 // codeRef takes Go expression and returns its code reference. Function calls

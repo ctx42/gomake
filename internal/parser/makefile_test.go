@@ -4,11 +4,13 @@
 package parser
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 
@@ -112,6 +114,377 @@ func Test_NewMakefile(t *testing.T) {
 		want := "gomake: skipping Aliased: " +
 			"aliased context or ring parameter\n"
 		assert.Equal(t, want, tst.Stderr())
+	})
+
+	t.Run("ring from another package", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"container/ring\"\n" +
+			"\t\"context\"\n" +
+			")\n" +
+			"\n" +
+			"func Other(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 0, have.Targets.Len())
+	})
+
+	t.Run("namespace not borrowed across packages", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		libDir := oskit.MkdirAll(t, dir, "lib")
+		oskit.Write(t, "package lib\n\ntype Docker struct{}\n", libDir, "a.go")
+		lib := "" +
+			"package lib\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"type Compose Docker\n" +
+			"\n" +
+			"func (Compose) Up(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, libDir, "b.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			"\n" +
+			"\t\"example.com/mk/lib\" //gomake:import\n" +
+			")\n" +
+			"\n" +
+			"type Docker struct{} //gomake:ns_root\n" +
+			"\n" +
+			"func (Docker) Build(\n" +
+			"\tctx context.Context,\n" +
+			"\trng *ring.Ring,\n" +
+			") error {\n" +
+			"\treturn nil\n" +
+			"}\n" +
+			"\n" +
+			"var _ lib.Compose\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"docker:build"}, have.Targets.Names())
+	})
+
+	t.Run("unexported namespace in import", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := "" +
+			"package lib\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"type tools struct{} //gomake:ns_root\n" +
+			"\n" +
+			"func (tools) Lint(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "lib"), "lib.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import \"example.com/mk/lib\" //gomake:import\n" +
+			"\n" +
+			"var _ = lib.X\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 0, have.Targets.Len())
+	})
+
+	t.Run("generic namespace", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"type B[T any] struct{} //gomake:ns_root\n" +
+			"\n" +
+			"func (B[T]) Run(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 0, have.Targets.Len())
+	})
+
+	t.Run("import alias avoids main names", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := "" +
+			"package git\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"func Build(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "x", "git"), "git.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import gt \"example.com/mk/x/git\" //gomake:import\n" +
+			"\n" +
+			"var _ = gt.Build\n" +
+			"\n" +
+			"func git() {}\n"
+		oskit.Write(t, src, dir, "makefile.go")
+		have := must.Value(NewMakefile(rng, dir))
+
+		// --- When ---
+		imports := have.Targets.GoImports()
+
+		// --- Then ---
+		assert.Equal(t, "\ngit2 \"example.com/mk/x/git\"\n", imports)
+		assert.Contain(t, "git2.Build", have.Targets.GoCode(false))
+	})
+
+	t.Run("same import in two files", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := "" +
+			"package lib\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"func Build(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "lib"), "lib.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import \"example.com/mk/lib\" //gomake:import\n" +
+			"\n" +
+			"var _ = lib.Build\n"
+		oskit.Write(t, src, dir, "makefile.go")
+		oskit.Write(t, src, dir, "makefile_"+runtime.GOOS+".go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"build"}, have.Targets.Names())
+	})
+
+	t.Run("error - malformed import tag", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		oskit.Write(t, "package lib\n", oskit.MkdirAll(t, dir, "lib"), "lib.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import \"example.com/mk/lib\" //gomake:import ns extra\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrImportTag, err)
+		assert.ErrorContain(t, "example.com/mk/lib", err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - default names no target", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"var Default = Missing\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrNoDefault, err)
+		assert.ErrorContain(t, `"Missing"`, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("default in package sharing a name", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := "" +
+			"package git\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"func Build(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "one", "git"), "git.go")
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "two", "git"), "git.go")
+		src := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\ta \"example.com/mk/one/git\" //gomake:import one\n" +
+			"\tb \"example.com/mk/two/git\" //gomake:import two\n" +
+			")\n" +
+			"\n" +
+			"var Default = b.Build\n" +
+			"\n" +
+			"var _ = a.Build\n"
+		oskit.Write(t, src, dir, "makefile.go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "two:build", have.Default)
+	})
+
+	t.Run("default alias reused in another file", func(t *testing.T) {
+		// --- Given ---
+		rng := SetBuildTag(ring.New())
+
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := "" +
+			"package git\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"func Build(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "one", "git"), "git.go")
+		oskit.Write(t, lib, oskit.MkdirAll(t, dir, "two", "git"), "git.go")
+		one := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import x \"example.com/mk/one/git\" //gomake:import one\n" +
+			"\n" +
+			"var _ = x.Build\n"
+		oskit.Write(t, one, dir, "makefile.go")
+		two := "" +
+			"//go:build gomake\n" +
+			"\n" +
+			"package main\n" +
+			"\n" +
+			"import x \"example.com/mk/two/git\" //gomake:import two\n" +
+			"\n" +
+			"var Default = x.Build\n"
+		oskit.Write(t, two, dir, "makefile_"+runtime.GOOS+".go")
+
+		// --- When ---
+		have, err := NewMakefile(rng, dir)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "two:build", have.Default)
 	})
 }
 

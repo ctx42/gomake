@@ -4,6 +4,7 @@
 package parser
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -39,6 +40,17 @@ func Test_withPkgNS(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, "ns", pkg.PkgNS)
+}
+
+func Test_withPkgDir(t *testing.T) {
+	// --- Given ---
+	pkg := &Package{}
+
+	// --- When ---
+	withPkgDir("/path/to")(pkg)
+
+	// --- Then ---
+	assert.Equal(t, "/path/to", pkg.ImpPath)
 }
 
 func Test_NewPackage(t *testing.T) {
@@ -337,17 +349,17 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("served from cache without go list", func(t *testing.T) {
 		// --- Given ---
-		t.Setenv("XDG_CACHE_HOME", t.TempDir())
 		proj := modkit.Root()
 
 		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
 		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
 
 		spec := "example.com/cached/pkg"
 
 		key, ok := listCacheKey(rng, proj, spec)
 		assert.True(t, ok)
-		storeListCache(key, []byte(`{"Name":"cached"}`))
+		storeListCache(rng, key, []byte(`{"Name":"cached"}`))
 
 		// --- When ---
 		have, err := NewPackage(rng, spec, withPkgSpec)
@@ -355,5 +367,47 @@ func Test_NewPackage(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, "cached", have.Name)
+	})
+
+	t.Run("cache entry for another package", func(t *testing.T) {
+		// --- Given ---
+		proj := modkit.Root()
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
+		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
+
+		spec := "github.com/ctx42/ring/pkg/ring"
+		key, _ := listCacheKey(rng, proj, spec)
+		entry := `{"ImportPath":"example.com/other","Name":"cached","Dir":"/"}`
+		storeListCache(rng, key, []byte(entry))
+
+		// --- When ---
+		have, err := NewPackage(rng, spec, withPkgSpec)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "ring", have.Name)
+	})
+
+	t.Run("cache entry with vanished directory", func(t *testing.T) {
+		// --- Given ---
+		proj := modkit.Root()
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
+		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
+
+		spec := "github.com/ctx42/ring/pkg/ring"
+		key, _ := listCacheKey(rng, proj, spec)
+		gone := filepath.Join(t.TempDir(), "gone")
+		entry := `{"ImportPath":"` + spec + `","Name":"cached","Dir":"` +
+			gone + `"}`
+		storeListCache(rng, key, []byte(entry))
+
+		// --- When ---
+		have, err := NewPackage(rng, spec, withPkgSpec)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "ring", have.Name)
 	})
 }

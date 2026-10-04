@@ -6,11 +6,14 @@ package parser
 import (
 	"go/ast"
 	"go/doc"
+	goparser "go/parser"
+	"go/token"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
@@ -44,41 +47,29 @@ func Test_newTarget_generic(t *testing.T) {
 
 func Test_Targets_addFunc_alias(t *testing.T) {
 	// --- Given ---
+	src := "" +
+		"package main\n" +
+		"\n" +
+		"import (\n" +
+		"\t\"context\"\n" +
+		"\n" +
+		"\tr \"github.com/ctx42/ring/pkg/ring\"\n" +
+		")\n" +
+		"\n" +
+		"func Aliased(ctx context.Context, rng *r.Ring) error {\n" +
+		"\treturn nil\n" +
+		"}\n"
+	set := token.NewFileSet()
+	fil := must.Value(goparser.ParseFile(set, "makefile.go", src, 0))
+	docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
 	pkg := &Package{
-		Name:    "main",
-		imports: map[string]string{"context": "context", "r": ringPath},
-	}
-	fn := &doc.Func{
-		Name: "Aliased",
-		Decl: &ast.FuncDecl{
-			Name: ast.NewIdent("Aliased"),
-			Type: &ast.FuncType{
-				Params: &ast.FieldList{List: []*ast.Field{
-					{
-						Names: []*ast.Ident{ast.NewIdent("ctx")},
-						Type: &ast.SelectorExpr{
-							X:   ast.NewIdent("context"),
-							Sel: ast.NewIdent("Context"),
-						},
-					},
-					{
-						Names: []*ast.Ident{ast.NewIdent("rng")},
-						Type: &ast.StarExpr{X: &ast.SelectorExpr{
-							X:   ast.NewIdent("r"),
-							Sel: ast.NewIdent("Ring"),
-						}},
-					},
-				}},
-				Results: &ast.FieldList{List: []*ast.Field{{
-					Type: ast.NewIdent("error"),
-				}}},
-			},
-		},
+		Name:  "main",
+		files: map[string]*ast.File{"makefile.go": fil},
 	}
 	tgs := NewTargets()
 
 	// --- When ---
-	err := tgs.addFunc(pkg, fn)
+	err := tgs.addFunc(pkg, docPkg.Funcs...)
 
 	// --- Then ---
 	assert.NoError(t, err)
@@ -455,38 +446,74 @@ func Test_newTarget_non_main_package(t *testing.T) {
 	})
 }
 
+func Test_newTarget(t *testing.T) {
+	t.Run("synopsis keeps a repeated name", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"// Deploy deploy the app.\n" +
+			"func Deploy(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		set := token.NewFileSet()
+		fil := must.Value(goparser.ParseFile(
+			set, "makefile.go", src, goparser.ParseComments,
+		))
+		docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
+		pkg := &Package{
+			Name:  MainName,
+			files: map[string]*ast.File{"makefile.go": fil},
+		}
+
+		// --- When ---
+		have, err := newTarget(pkg, docPkg.Funcs[0])
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "deploy the app.", have.Doc)
+		assert.Equal(t, "deploy the app", have.Synopsis)
+	})
+}
+
 func Test_newTarget_strips_nolint_from_doc(t *testing.T) {
 	// --- Given ---
-	pkg := &Package{Name: MainName}
-
 	// A target whose doc carries a spaced "// nolint" line. go/doc keeps such
 	// a line in Func.Doc (only the "//" prefix is stripped), so NewTarget must
 	// remove it from the rendered documentation.
-	df := &doc.Func{
-		Name: "Basic",
-		Doc:  "Basic does stuff.\nnolint:gocyclo\nMore docs.",
-		Decl: &ast.FuncDecl{
-			Name: ast.NewIdent("Basic"),
-			Type: &ast.FuncType{
-				Params: &ast.FieldList{List: []*ast.Field{
-					{Type: &ast.SelectorExpr{
-						X:   ast.NewIdent("context"),
-						Sel: ast.NewIdent("Context"),
-					}},
-					{Type: &ast.StarExpr{X: &ast.SelectorExpr{
-						X:   ast.NewIdent("ring"),
-						Sel: ast.NewIdent("Ring"),
-					}}},
-				}},
-				Results: &ast.FieldList{List: []*ast.Field{
-					{Type: ast.NewIdent("error")},
-				}},
-			},
-		},
+	src := "" +
+		"package main\n" +
+		"\n" +
+		"import (\n" +
+		"\t\"context\"\n" +
+		"\n" +
+		"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+		")\n" +
+		"\n" +
+		"// Basic does stuff.\n" +
+		"// nolint:gocyclo\n" +
+		"// More docs.\n" +
+		"func Basic(ctx context.Context, rng *ring.Ring) error {\n" +
+		"\treturn nil\n" +
+		"}\n"
+	set := token.NewFileSet()
+	fil := must.Value(goparser.ParseFile(
+		set, "makefile.go", src, goparser.ParseComments,
+	))
+	docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
+	pkg := &Package{
+		Name:  MainName,
+		files: map[string]*ast.File{"makefile.go": fil},
 	}
 
 	// --- When ---
-	have, err := newTarget(pkg, df)
+	have, err := newTarget(pkg, docPkg.Funcs[0])
 
 	// --- Then ---
 	assert.NoError(t, err)

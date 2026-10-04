@@ -204,6 +204,16 @@ func (NS4) Hello(_ context.Context, rng *ring.Ring) error {
 // namespace.
 type NOT5 NOT2
 
+// The NOT types carry target-shaped methods; none may become a target.
+
+func (NOT0) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT1) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT2) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT3) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT4) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT5) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+func (NOT6) Hello(_ context.Context, _ *ring.Ring) error { return nil }
+
 type NSDef struct{} //gomake:ns_root
 
 func (NSDef) Default(_ context.Context, rng *ring.Ring) error {

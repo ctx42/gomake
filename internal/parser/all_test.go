@@ -7,9 +7,12 @@ import (
 	"go/ast"
 	"go/doc"
 	"go/token"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/notice"
 	"github.com/ctx42/testing/pkg/tester"
 )
@@ -78,6 +81,7 @@ func NewTestHelper(
 		t.Error(err)
 		return nil
 	}
+	tst.pkg.files = tst.files
 	return tst
 }
 
@@ -164,3 +168,15 @@ func (tst *TestHelper) ImportSpecs(name string) []*ast.ImportSpec {
 
 // Values returns package declared variables / constants.
 func (tst *TestHelper) Values() []*doc.Value { return tst.docPkg.Vars }
+
+// goFilesIn returns the paths of the non-directory *.go entries in dir. It
+// panics when dir cannot be read.
+func goFilesIn(dir string) []string {
+	var files []string
+	for _, ent := range must.Value(os.ReadDir(dir)) {
+		if !ent.IsDir() && strings.HasSuffix(ent.Name(), ".go") {
+			files = append(files, filepath.Join(dir, ent.Name()))
+		}
+	}
+	return files
+}

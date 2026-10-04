@@ -10,9 +10,10 @@ import (
 	"github.com/ctx42/testkit/pkg/modkit"
 )
 
-// Benchmark_NewPackage_local isolates the cost of the `go list` subprocess for
-// a local package directory. Compare it against Benchmark_AstAndDocPkg_local to
-// see how the subprocess dominates the parser path.
+// Benchmark_NewPackage_local measures resolving a local package directory,
+// which runs in-process (newLocalPackage) without the `go list` subprocess.
+// Compare it against Benchmark_AstAndDocPkg_local to see the resolution cost
+// on top of parsing.
 func Benchmark_NewPackage_local(b *testing.B) {
 	rng := SetBuildTag(ring.New())
 	dir := modkit.Path("testdata/projects/showcase_targets/project")
@@ -32,14 +33,15 @@ func Benchmark_AstAndDocPkg_local(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, _, err := astAndDocPkg(dir, nil); err != nil {
+		if _, _, err := astAndDocPkg(dir, goFilesIn(dir)); err != nil {
 			b.Fatal(err)
 		}
 	}
 }
 
-// Benchmark_NewMakefile_big measures the full local discovery path (`go list`
-// plus parse plus target extraction) for the largest realistic fixture.
+// Benchmark_NewMakefile_big measures the full local discovery path (package
+// resolution plus parse plus target extraction) for the largest realistic
+// fixture.
 func Benchmark_NewMakefile_big(b *testing.B) {
 	rng := SetBuildTag(ring.New())
 	dir := modkit.Path("testdata/projects/showcase_targets/project")

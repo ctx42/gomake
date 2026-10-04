@@ -588,11 +588,11 @@ imports:
       port: 5432
 ```
 
-| Field       | Required | Description                                                   |
-|-------------|----------|---------------------------------------------------------------|
-| `import`    | Yes      | Go import path of the target package                          |
-| `namespace` | No       | CLI prefix for all targets from this package (e.g. `release`) |
-| `config`    | No       | Arbitrary YAML passed to targets via Ring metadata at runtime |
+| Field       | Required | Description                                                               |
+|-------------|----------|---------------------------------------------------------------------------|
+| `import`    | Yes      | Go import path of the target package                                      |
+| `namespace` | No       | CLI prefix for all targets from this package, lowercased (e.g. `release`) |
+| `config`    | No       | Arbitrary YAML passed to targets via Ring metadata at runtime             |
 
 ### How it works
 

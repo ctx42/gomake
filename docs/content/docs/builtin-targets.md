@@ -44,11 +44,11 @@ imports:
       port: 5432
 ```
 
-| Field       | Required | Description                                                   |
-|-------------|----------|---------------------------------------------------------------|
-| `import`    | Yes      | Go import path of the target package                          |
-| `namespace` | No       | CLI prefix for all targets from this package (e.g. `release`) |
-| `config`    | No       | Arbitrary YAML surfaced as `ring.Ring` metadata (see below)   |
+| Field       | Required | Description                                                               |
+|-------------|----------|---------------------------------------------------------------------------|
+| `import`    | Yes      | Go import path of the target package                                      |
+| `namespace` | No       | CLI prefix for all targets from this package, lowercased (e.g. `release`) |
+| `config`    | No       | Arbitrary YAML surfaced as `ring.Ring` metadata (see below)               |
 
 The `import` path may pin a version, e.g.
 `example.com/myorg/gomake-targets/release@v1.3.0`. Duplicate import paths are

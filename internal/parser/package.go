@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"go/ast"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,9 +26,10 @@ func withPkgSpec(pkg *Package) {
 	pkg.ImpPath, pkg.ImpSpec = "", pkg.ImpPath
 }
 
-// withPkgNS is a [NewPackage] option setting package namespace.
+// withPkgNS is a [NewPackage] option setting the package namespace,
+// lowercased as for a `gomake:import` tag.
 func withPkgNS(ns string) func(*Package) {
-	return func(pkg *Package) { pkg.PkgNS = ns }
+	return func(pkg *Package) { pkg.PkgNS = strings.ToLower(ns) }
 }
 
 // withPkgDir is a [NewPackage] option setting the directory `go list` runs in
@@ -97,8 +99,8 @@ type Package struct {
 	// Arguments for the "go list" command.
 	args []string
 
-	// Import local names mapped to import paths across the parsed files.
-	imports map[string]string
+	// Parsed package files by name.
+	files map[string]*ast.File
 }
 
 // NewPackage runs "go list" to get information about a package identified by
@@ -155,7 +157,7 @@ func NewPackage(
 		key, cacheable = listCacheKey(rng, pkg.ImpPath, pkg.ImpSpec)
 	}
 	if cacheable {
-		if data, ok := loadListCache(key); ok {
+		if data, ok := loadListCache(rng, key); ok {
 			// Unmarshal into a copy so a rejected entry does not clobber pkg.
 			// Reject entries whose resolved directory has vanished (e.g. a
 			// pruned module cache) and fall through to `go list`.
@@ -211,7 +213,7 @@ func NewPackage(
 	}
 
 	if cacheable && pkg.Error.Err == "" && cacheableModule(pkg.Module) {
-		storeListCache(key, sout.Bytes())
+		storeListCache(rng, key, sout.Bytes())
 	}
 	return pkg, nil
 }

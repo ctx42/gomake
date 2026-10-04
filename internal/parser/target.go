@@ -68,7 +68,8 @@ func newTarget(
 		return nil, errGeneric
 	}
 
-	if err := checkParams(ft.Params, pkg.imports); err != nil {
+	imports := fileImports(pkg.files, df.Decl.Pos())
+	if err := checkParams(ft.Params, imports); err != nil {
 		return nil, err
 	}
 
@@ -121,7 +122,7 @@ func setDerivedFields(tgt *mkf.Target) {
 	tgt.DefRef = ref + tgt.FuncName
 
 	// Help / Documentation.
-	tgt.Synopsis = targetSynopsis(tgt.FuncName, tgt.Doc)
+	tgt.Synopsis = targetSynopsis(tgt.Doc)
 }
 
 // targetName returns CLI target name based on package namespace, breadcrumbs
@@ -151,9 +152,10 @@ func targetName(pkgNS string, crumbs []string, funcName string) string {
 }
 
 // checkParams checks target parameters. For invalid parameters returns
-// [errInvArg] error. The second parameter must be `*ring.Ring` (pointer).
-// imports maps import local names to paths; a parameter that names context
-// or the ring package through an alias returns errAliased.
+// [errInvArg] error. The first parameter must be context.Context and the
+// second *ring.Ring (pointer), each from its own package: imports maps import
+// local names to paths. A parameter that names context or the ring package
+// through an alias returns errAliased.
 func checkParams(params *ast.FieldList, imports map[string]string) error {
 	if params == nil || len(params.List) != 2 {
 		return errInvArg
@@ -163,7 +165,7 @@ func checkParams(params *ast.FieldList, imports map[string]string) error {
 	argsCnt := 0
 
 	typ := qIdent(params.List[0].Type)
-	if typ != "context.Context" {
+	if typ != "context.Context" || imports["context"] != "context" {
 		if importedAs(params.List[0].Type, imports, "context", "Context") {
 			return errAliased
 		}
@@ -174,7 +176,7 @@ func checkParams(params *ast.FieldList, imports map[string]string) error {
 	// Require an explicit pointer; qIdent strips * so compare StarExpr first.
 	// An import alias (r "…/ring", *r.Ring) is rejected and reported.
 	star, ok := params.List[1].Type.(*ast.StarExpr)
-	if !ok || qIdent(star.X) != "ring.Ring" {
+	if !ok || qIdent(star.X) != "ring.Ring" || imports["ring"] != ringPath {
 		if ok && importedAs(star.X, imports, ringPath, "Ring") {
 			return errAliased
 		}

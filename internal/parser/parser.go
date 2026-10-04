@@ -72,6 +72,13 @@ var (
 
 	// ErrAbsPath is returned when package path is not absolute.
 	ErrAbsPath = errors.New("path must be absolute")
+
+	// ErrNoDefault is returned when the Default variable names no target.
+	ErrNoDefault = errors.New("default target not found")
+
+	// ErrImportTag is returned for a `gomake:import` tag with more than one
+	// namespace word.
+	ErrImportTag = errors.New("malformed gomake:import tag")
 )
 
 // GenMain represents an entry point for the program called by "go generate".

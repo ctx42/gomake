@@ -10,6 +10,7 @@ import (
 	"go/token"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -245,6 +246,20 @@ func Test_isHidden(t *testing.T) {
 	})
 }
 
+func Test_removeLines(t *testing.T) {
+	t.Run("line over scanner limit", func(t *testing.T) {
+		// --- Given ---
+		long := strings.Repeat("a", 70_000)
+
+		// --- When ---
+		have, hN := removeLines(long+"\nnolint:xxx", "nolint")
+
+		// --- Then ---
+		assert.Equal(t, long, have)
+		assert.Equal(t, 1, hN)
+	})
+}
+
 func Test_removeLines_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
@@ -307,21 +322,17 @@ func Test_targetSynopsis_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
-		name string
 		doc  string
 		want string
 	}{
-		{"1", "FnName", "FnName does stuff.", "does stuff"},
-		{"2", "FnName", "FnName does stuff", "does stuff"},
-		{"3", "OtherName", "FnName does stuff.", "FnName does stuff"},
-		{"4", "", "FnName does stuff.", "FnName does stuff"},
-		{"5", "FnName", "", ""},
-		{"6", "", "FnName", "FnName"},
-		{"7", "FnName", "FnName does stuff.\nA lot of stuff.", "does stuff"},
+		{"sentence", "does stuff.", "does stuff"},
+		{"no period", "does stuff", "does stuff"},
+		{"empty", "", ""},
+		{"single word", "FnName", "FnName"},
+		{"first sentence", "does stuff.\nA lot of stuff.", "does stuff"},
 		{
-			"8",
-			"FnName",
-			"FnName does stuff. Some more stuff.\nA lot of stuff.",
+			"first of several",
+			"does stuff. Some more stuff.\nA lot of stuff.",
 			"does stuff",
 		},
 	}
@@ -329,7 +340,7 @@ func Test_targetSynopsis_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have := targetSynopsis(tc.name, tc.doc)
+			have := targetSynopsis(tc.doc)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
@@ -529,6 +540,83 @@ func Test_isNSRoot(t *testing.T) {
 	})
 }
 
+func Test_attachDeclDoc(t *testing.T) {
+	t.Run("single spec", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package p\n" +
+			"\n" +
+			"// Doc on import.\n" +
+			"import _ \"fmt\"\n" +
+			"\n" +
+			"//gomake:ns_root\n" +
+			"type Foo struct{}\n"
+		fil := must.Value(goparser.ParseFile(
+			token.NewFileSet(), "a.go", src, goparser.ParseComments,
+		))
+
+		// --- When ---
+		attachDeclDoc(fil)
+
+		// --- Then ---
+		typ := fil.Decls[1].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)
+		assert.Equal(t, []string{"gomake:ns_root"}, commentBodies(typ.Doc))
+		imp := fil.Decls[0].(*ast.GenDecl).Specs[0].(*ast.ImportSpec)
+		assert.Equal(t, []string{"Doc on import."}, commentBodies(imp.Doc))
+	})
+
+	t.Run("grouped specs", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package p\n" +
+			"\n" +
+			"// Group doc.\n" +
+			"type (\n" +
+			"\tA struct{}\n" +
+			"\tB struct{}\n" +
+			")\n"
+		fil := must.Value(goparser.ParseFile(
+			token.NewFileSet(), "a.go", src, goparser.ParseComments,
+		))
+
+		// --- When ---
+		attachDeclDoc(fil)
+
+		// --- Then ---
+		typ := fil.Decls[0].(*ast.GenDecl).Specs[0].(*ast.TypeSpec)
+		assert.Nil(t, typ.Doc)
+	})
+
+	t.Run("nil file", func(t *testing.T) {
+		// --- When ---
+		attachDeclDoc(nil)
+	})
+}
+
+func Test_commentBodies(t *testing.T) {
+	t.Run("comments", func(t *testing.T) {
+		// --- Given ---
+		grp := &ast.CommentGroup{List: []*ast.Comment{
+			{Text: "//gomake:import ns"},
+			{Text: "//  spaced text "},
+		}}
+
+		// --- When ---
+		have := commentBodies(grp)
+
+		// --- Then ---
+		assert.Equal(t, []string{"gomake:import ns", "spaced text"}, have)
+	})
+
+	t.Run("nil group", func(t *testing.T) {
+		// --- When ---
+		have := commentBodies(nil)
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
+}
+
 func Test_toKebabCase_tabular(t *testing.T) {
 	tt := []struct {
 		in   string
@@ -561,19 +649,99 @@ func Test_importLocalNames(t *testing.T) {
 		"import (\n" +
 		"\ta \"example.com/one/git\"\n" +
 		"\t\"example.com/pkg\"\n" +
+		"\t_ \"example.com/blank\"\n" +
 		")\n"
-	set := token.NewFileSet()
 	fil := must.Value(goparser.ParseFile(
-		set, "x.go", src, goparser.ImportsOnly,
+		token.NewFileSet(), "x.go", src, goparser.ImportsOnly,
 	))
-	files := map[string]*ast.File{"x.go": fil}
 
 	// --- When ---
-	have := importLocalNames(files)
+	have := importLocalNames(fil)
 
 	// --- Then ---
-	assert.Equal(t, "example.com/one/git", have["a"])
-	assert.Equal(t, "example.com/pkg", have["pkg"])
+	want := map[string]string{
+		"a":   "example.com/one/git",
+		"pkg": "example.com/pkg",
+	}
+	assert.Equal(t, want, have)
+}
+
+func Test_topLevelNames(t *testing.T) {
+	// --- Given ---
+	src := "" +
+		"package main\n" +
+		"\n" +
+		"import x \"example.com/x\"\n" +
+		"\n" +
+		"type T struct{}\n" +
+		"\n" +
+		"func (T) M() {}\n" +
+		"\n" +
+		"func F() {}\n" +
+		"\n" +
+		"var a, b = 1, 2\n" +
+		"\n" +
+		"const c = 3\n"
+	fil := must.Value(goparser.ParseFile(token.NewFileSet(), "a.go", src, 0))
+
+	// --- When ---
+	have := topLevelNames(map[string]*ast.File{"a.go": fil})
+
+	// --- Then ---
+	assert.Equal(t, []string{"T", "F", "a", "b", "c"}, have)
+}
+
+func Test_fileImports(t *testing.T) {
+	t.Run("file containing pos", func(t *testing.T) {
+		// --- Given ---
+		set := token.NewFileSet()
+		srcA := "package main\nimport x \"example.com/a\"\n"
+		filA := must.Value(goparser.ParseFile(set, "a.go", srcA, 0))
+		srcB := "package main\nimport x \"example.com/b\"\n"
+		filB := must.Value(goparser.ParseFile(set, "b.go", srcB, 0))
+		files := map[string]*ast.File{"a.go": filA, "b.go": filB}
+
+		// --- When ---
+		have := fileImports(files, filB.Name.Pos())
+
+		// --- Then ---
+		assert.Equal(t, map[string]string{"x": "example.com/b"}, have)
+	})
+
+	t.Run("no file contains pos", func(t *testing.T) {
+		// --- Given ---
+		set := token.NewFileSet()
+		src := "package main\nimport x \"example.com/a\"\n"
+		fil := must.Value(goparser.ParseFile(set, "a.go", src, 0))
+		files := map[string]*ast.File{"a.go": fil}
+
+		// --- When ---
+		have := fileImports(files, token.NoPos)
+
+		// --- Then ---
+		assert.Nil(t, have)
+	})
+}
+
+func Test_gmImpSpec(t *testing.T) {
+	t.Run("error - two namespace words", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package p\n" +
+			"import _ \"example.com/x\" //gomake:import ns mx\n"
+		fil := must.Value(goparser.ParseFile(
+			token.NewFileSet(), "a.go", src, goparser.ParseComments,
+		))
+
+		// --- When ---
+		hNS, hSpec, err := gmImpSpec(fil.Imports[0])
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrImportTag, err)
+		assert.ErrorContain(t, `"example.com/x"`, err)
+		assert.Equal(t, "", hNS)
+		assert.Equal(t, "", hSpec)
+	})
 }
 
 func Test_gmImpSpec_tabular(t *testing.T) {
@@ -651,7 +819,7 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 			"",
 		},
 		{
-			"invalid more than one gomake namespace",
+			"invalid misspelled tag",
 			10,
 			"",
 			"",
@@ -667,9 +835,10 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			hNS, hSpec := gmImpSpec(iss[tc.index])
+			hNS, hSpec, err := gmImpSpec(iss[tc.index])
 
 			// --- Then ---
+			assert.NoError(t, err)
 			assert.Equal(t, tc.wantSpec, hSpec)
 			assert.Equal(t, tc.wantNS, hNS)
 		})
@@ -691,9 +860,10 @@ func Test_gmImpSpec_doc(t *testing.T) {
 		))
 
 		// --- When ---
-		hNS, hSpec := gmImpSpec(fil.Imports[0])
+		hNS, hSpec, err := gmImpSpec(fil.Imports[0])
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "ns", hNS)
 		assert.Equal(t, "example.com/bar", hSpec)
 	})
@@ -711,9 +881,10 @@ func Test_gmImpSpec_doc(t *testing.T) {
 		}
 
 		// --- When ---
-		hNS, hSpec := gmImpSpec(is)
+		hNS, hSpec, err := gmImpSpec(is)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "line", hNS)
 		assert.Equal(t, "example.com/bar", hSpec)
 	})
@@ -730,18 +901,20 @@ func Test_gmImpSpec_doc(t *testing.T) {
 		_, fls := must.Values(astFiles(dir, []string{pth}))
 
 		// --- When ---
-		hNS, hSpec := gmImpSpec(fls[pth].Imports[0])
+		hNS, hSpec, err := gmImpSpec(fls[pth].Imports[0])
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "ns", hNS)
 		assert.Equal(t, "example.com/bar", hSpec)
 	})
 
 	t.Run("nil spec", func(t *testing.T) {
 		// --- When ---
-		hNS, hSpec := gmImpSpec(nil)
+		hNS, hSpec, err := gmImpSpec(nil)
 
 		// --- Then ---
+		assert.NoError(t, err)
 		assert.Equal(t, "", hNS)
 		assert.Equal(t, "", hSpec)
 	})
@@ -904,6 +1077,32 @@ func Test_gmImpPackages(t *testing.T) {
 		assert.Equal(t, []string{"file0.go", "file1_windows.go"}, pkg.Files)
 		assert.Len(t, 4, have)
 	})
+
+	t.Run("same import twice", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/mk\n\ngo 1.26\n", dir, "go.mod")
+		lib := oskit.MkdirAll(t, dir, "lib")
+		oskit.Write(t, "package lib\n", lib, "lib.go")
+
+		src := "" +
+			"package main\n" +
+			"\n" +
+			"import \"example.com/mk/lib\" //gomake:import\n"
+		set := token.NewFileSet()
+		mode := goparser.ParseComments
+		filA := must.Value(goparser.ParseFile(set, "a.go", src, mode))
+		filB := must.Value(goparser.ParseFile(set, "b.go", src, mode))
+		decls := append(filA.Decls, filB.Decls...)
+
+		// --- When ---
+		have, err := gmImpPackages(ring.New(), dir, decls...)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Len(t, 1, have)
+		assert.Equal(t, "example.com/mk/lib", have[0].ImpSpec)
+	})
 }
 
 func Test_findDefault(t *testing.T) {
@@ -922,10 +1121,11 @@ func Test_findDefault(t *testing.T) {
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		have := findDefault(vls...)
+		have, hPos := findDefault(vls...)
 
 		// --- Then ---
 		assert.Nil(t, have)
+		assert.Equal(t, token.NoPos, hPos)
 	})
 
 	t.Run("default target from local package", func(t *testing.T) {
@@ -943,10 +1143,11 @@ func Test_findDefault(t *testing.T) {
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		have := findDefault(vls...)
+		have, hPos := findDefault(vls...)
 
 		// --- Then ---
 		assert.Equal(t, []string{"Hello"}, have)
+		assert.True(t, hPos.IsValid())
 	})
 
 	t.Run("target from imported package", func(t *testing.T) {
@@ -964,10 +1165,11 @@ func Test_findDefault(t *testing.T) {
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		have := findDefault(vls...)
+		have, hPos := findDefault(vls...)
 
 		// --- Then ---
 		assert.Equal(t, []string{"pkg1", "Pkg1"}, have)
+		assert.True(t, hPos.IsValid())
 	})
 
 	t.Run("target from local namespace", func(t *testing.T) {
@@ -985,10 +1187,11 @@ func Test_findDefault(t *testing.T) {
 		vls := NewTestHelper(t, rng, prj.Root()).Values()
 
 		// --- When ---
-		have := findDefault(vls...)
+		have, hPos := findDefault(vls...)
 
 		// --- Then ---
 		assert.Equal(t, []string{"NS", "Hello"}, have)
+		assert.True(t, hPos.IsValid())
 	})
 
 	t.Run("default declared without a value", func(t *testing.T) {
@@ -1004,10 +1207,11 @@ func Test_findDefault(t *testing.T) {
 		}
 
 		// --- When ---
-		have := findDefault(val)
+		have, hPos := findDefault(val)
 
 		// --- Then ---
 		assert.Nil(t, have)
+		assert.Equal(t, token.NoPos, hPos)
 	})
 }
 

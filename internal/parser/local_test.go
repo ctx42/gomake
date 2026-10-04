@@ -151,6 +151,33 @@ func sortedGoFiles(bp *build.Package) []string {
 	return have
 }
 
+func Test_goFlagsTags_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		flags string
+		want  []string
+	}{
+		{"empty", "", nil},
+		{"equals form", "-tags=a,b", []string{"a", "b"}},
+		{"separate value", "-tags a,b", []string{"a", "b"}},
+		{"double dash", "--tags a", []string{"a"}},
+		{"missing value", "-tags", nil},
+		{"other flags", "-mod=mod -tags=x -v", []string{"x"}},
+		{"repeated", "-tags=a -tags=b", []string{"a", "b"}},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := goFlagsTags(tc.flags)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
 func Test_buildTags(t *testing.T) {
 	t.Run("meta tag only", func(t *testing.T) {
 		// --- Given ---
@@ -215,6 +242,30 @@ func Test_listTagArgs(t *testing.T) {
 	})
 }
 
+func Test_splitTags_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		in   string
+		want []string
+	}{
+		{"empty", "", []string{}},
+		{"one", "a", []string{"a"}},
+		{"several", "a,b", []string{"a", "b"}},
+		{"spaces and blanks", " a , ,b ", []string{"a", "b"}},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := splitTags(tc.in)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
 func Test_importSpec_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
@@ -273,6 +324,18 @@ func Test_readModulePath(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrNotExist, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - no module directive", func(t *testing.T) {
+		// --- Given ---
+		pth := oskit.Write(t, "go 1.26\n", t.TempDir(), "go.mod")
+
+		// --- When ---
+		have, err := readModulePath(pth)
+
+		// --- Then ---
+		assert.ErrorIs(t, errNoModule, err)
 		assert.Equal(t, "", have)
 	})
 }

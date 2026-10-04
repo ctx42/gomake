@@ -4,6 +4,7 @@
 package parser
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -79,6 +80,82 @@ func Test_listCacheKey(t *testing.T) {
 		assert.NotEqual(t, hKey1, hKey2)
 	})
 
+	t.Run("changes when ring GO111MODULE changes", func(t *testing.T) {
+		// --- Given ---
+		dir := modkit.Path("testdata/projects/simple_tagged/project")
+
+		base := SetBuildTag(ring.New())
+		alt := SetBuildTag(ring.New())
+		alt.EnvSet("GO111MODULE", "off")
+
+		// --- When ---
+		hKey1, _ := listCacheKey(base, dir, "example.com/x")
+		hKey2, _ := listCacheKey(alt, dir, "example.com/x")
+
+		// --- Then ---
+		assert.NotEqual(t, hKey1, hKey2)
+	})
+
+	t.Run("GOWORK file content", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
+		work := oskit.Write(t, "go 1.26\n", t.TempDir(), "go.work")
+
+		rng := SetBuildTag(ring.New())
+		rng.EnvSet("GOWORK", work)
+		hKey1, _ := listCacheKey(rng, dir, "example.com/x")
+		oskit.Write(t, "go 1.26\n\nuse .\n", work)
+		oskit.Write(t, "h1:x\n", work+".sum")
+
+		// --- When ---
+		hKey2, hOk := listCacheKey(rng, dir, "example.com/x")
+
+		// --- Then ---
+		assert.True(t, hOk)
+		assert.NotEqual(t, hKey1, hKey2)
+	})
+
+	t.Run("relative GOWORK", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
+		oskit.Write(t, "go 1.26\n", dir, "go.work")
+		t.Chdir(dir)
+
+		rng := SetBuildTag(ring.New())
+		rng.EnvSet("GOWORK", "go.work")
+		hKey1, _ := listCacheKey(rng, dir, "example.com/x")
+		oskit.Write(t, "go 1.26\n\nuse .\n", dir, "go.work")
+
+		// --- When ---
+		hKey2, hOk := listCacheKey(rng, dir, "example.com/x")
+
+		// --- Then ---
+		assert.True(t, hOk)
+		assert.NotEqual(t, hKey1, hKey2)
+	})
+
+	t.Run("go work in a parent directory", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		oskit.Write(t, "go 1.26\n", root, "go.work")
+		dir := oskit.MkdirAll(t, root, "sub")
+		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
+
+		rng := SetBuildTag(ring.New())
+		rng.EnvUnset("GOWORK")
+		hKey1, _ := listCacheKey(rng, dir, "example.com/x")
+		oskit.Write(t, "go 1.26\n\nuse ./sub\n", root, "go.work")
+
+		// --- When ---
+		hKey2, hOk := listCacheKey(rng, dir, "example.com/x")
+
+		// --- Then ---
+		assert.True(t, hOk)
+		assert.NotEqual(t, hKey1, hKey2)
+	})
+
 	t.Run("unreadable go.mod is not cached", func(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
@@ -147,31 +224,49 @@ func Test_cacheableModule_tabular(t *testing.T) {
 	}
 }
 
-func Test_listCache_roundtrip(t *testing.T) {
-	t.Run("store then load", func(t *testing.T) {
+func Test_listCacheDir(t *testing.T) {
+	// --- Given ---
+	cache := t.TempDir()
+	rng := ring.New()
+	rng.EnvSet("XDG_CACHE_HOME", cache)
+
+	// --- When ---
+	have, err := listCacheDir(rng)
+
+	// --- Then ---
+	assert.NoError(t, err)
+	assert.Equal(t, filepath.Join(cache, "gomake", "list"), have)
+	assert.DirExist(t, have)
+}
+
+func Test_loadListCache(t *testing.T) {
+	t.Run("missing entry", func(t *testing.T) {
 		// --- Given ---
-		t.Setenv("XDG_CACHE_HOME", t.TempDir())
-		key := "deadbeef"
-		want := []byte(`{"Name":"x"}`)
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
 
 		// --- When ---
-		storeListCache(key, want)
-		have, hOk := loadListCache(key)
-
-		// --- Then ---
-		assert.True(t, hOk)
-		assert.Equal(t, want, have)
-	})
-
-	t.Run("load missing entry", func(t *testing.T) {
-		// --- Given ---
-		t.Setenv("XDG_CACHE_HOME", t.TempDir())
-
-		// --- When ---
-		have, hOk := loadListCache("missing")
+		have, hOk := loadListCache(rng, "missing")
 
 		// --- Then ---
 		assert.False(t, hOk)
 		assert.Nil(t, have)
+	})
+}
+
+func Test_storeListCache(t *testing.T) {
+	t.Run("store then load", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
+		want := []byte(`{"Name":"x"}`)
+
+		// --- When ---
+		storeListCache(rng, "deadbeef", want)
+
+		// --- Then ---
+		have, hOk := loadListCache(rng, "deadbeef")
+		assert.True(t, hOk)
+		assert.Equal(t, want, have)
 	})
 }

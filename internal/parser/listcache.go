@@ -20,15 +20,19 @@ import (
 )
 
 // listCacheDir returns the directory holding cached `go list` results, creating
-// it when needed.
-func listCacheDir() (string, error) {
-	base, err := os.UserCacheDir()
-	if err != nil {
-		return "", err
+// it when needed. XDG_CACHE_HOME is taken from env when set; otherwise the
+// platform user cache directory is used.
+func listCacheDir(env ring.Environ) (string, error) {
+	base := env.EnvGet("XDG_CACHE_HOME")
+	if base == "" {
+		var err error
+		if base, err = os.UserCacheDir(); err != nil {
+			return "", fmt.Errorf("list cache dir: %w", err)
+		}
 	}
 	dir := filepath.Join(base, "gomake", "list")
-	if err = os.MkdirAll(dir, 0o750); err != nil {
-		return "", err
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", fmt.Errorf("list cache dir: %w", err)
 	}
 	return dir, nil
 }
@@ -39,6 +43,10 @@ func listCacheDir() (string, error) {
 // change invalidates the key. It reports false when the project module
 // cannot be located, or when go.mod or an existing go.sum cannot be read.
 // A missing go.sum is ignored. A false result must not be cached.
+//
+// Settings saved with `go env -w` and the version of the go binary on PATH
+// are not part of the key (the key uses gomake's own toolchain version);
+// clear the cache after changing them.
 //
 //nolint:cyclop,gocognit
 func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
@@ -104,6 +112,7 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 		"CGO_CFLAGS",
 		"CGO_LDFLAGS",
 		"GOTOOLCHAIN",
+		"GO111MODULE",
 		// GOEXPERIMENT and the architecture feature levels select build tags.
 		"GOEXPERIMENT",
 		"GO386",
@@ -143,8 +152,8 @@ func cacheableModule(m module) bool {
 
 // loadListCache returns the cached `go list` output for key and true when a
 // cache entry exists.
-func loadListCache(key string) ([]byte, bool) {
-	dir, err := listCacheDir()
+func loadListCache(env ring.Environ, key string) ([]byte, bool) {
+	dir, err := listCacheDir(env)
 	if err != nil {
 		return nil, false
 	}
@@ -158,8 +167,8 @@ func loadListCache(key string) ([]byte, bool) {
 // storeListCache writes the `go list` output for key to the cache. It is
 // advisory: errors are ignored. The write is rename-atomic so concurrent
 // readers never see a partial entry.
-func storeListCache(key string, data []byte) {
-	dir, err := listCacheDir()
+func storeListCache(env ring.Environ, key string, data []byte) {
+	dir, err := listCacheDir(env)
 	if err != nil {
 		return
 	}

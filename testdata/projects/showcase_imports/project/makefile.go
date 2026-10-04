@@ -20,7 +20,7 @@ import (
 	_ "github.com/ctx42/gomake/testdata/imports/pkg3" //
 	_ "github.com/ctx42/gomake/testdata/imports/pkg4" // gomake
 	_ "github.com/ctx42/gomake/testdata/imports/pkg5" // gomake:
-	_ "github.com/ctx42/gomake/testdata/imports/pkg6" // gomake:import ns mx
+	_ "github.com/ctx42/gomake/testdata/imports/pkg6" // gomake:imports ns
 	_ "github.com/ctx42/gomake/testdata/imports/pkg7" // notgomake:import
 
 	// Regular imports.

@@ -17,7 +17,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, have, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAstEmpty, err)
@@ -25,13 +25,12 @@ func Test_astFiles(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("error - not existing directory", func(t *testing.T) {
+	t.Run("error - missing file", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/not_existing"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/not_existing")
 
 		// --- When ---
-		_, have, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, []string{"makefile.go"})
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstParse, err)
@@ -45,7 +44,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, have, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -95,7 +94,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, have, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -111,7 +110,7 @@ func Test_astFiles(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		_, have, err := astFiles(absPath, nil)
+		_, have, err := astFiles(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
@@ -128,7 +127,7 @@ func Test_astAndDocPkg(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, nil)
+		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -147,7 +146,7 @@ func Test_astAndDocPkg(t *testing.T) {
 		absPath := modkit.Path(relPath)
 
 		// --- When ---
-		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, nil)
+		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
