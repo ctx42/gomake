@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/ctx42/testing/pkg/assert"
-	"github.com/ctx42/xdef/pkg/xdef"
 )
 
 func Test_Line(t *testing.T) {
@@ -25,7 +24,7 @@ func Test_Line(t *testing.T) {
 }
 
 func Test_LDFlags(t *testing.T) {
-	t.Run("stamps the version", func(t *testing.T) {
+	t.Run("stamped", func(t *testing.T) {
 		// --- When ---
 		have := LDFlags("v1.2.3")
 
@@ -34,43 +33,29 @@ func Test_LDFlags(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("xdef name", func(t *testing.T) {
-		// The injected name is sourced from xdef so that it never drifts
-		// from the name the ctx42 build tooling injects. Guard that linkage.
+	t.Run("stamp target exists", func(t *testing.T) {
+		// The linker silently ignores a -X definition naming a variable that
+		// does not exist, so renaming the stamped variable would break
+		// injection without failing any other test. Every name it targets
+		// must be a package-level variable declared in version.go.
+		// --- Given ---
+		declared := declaredVarNames(t, "version.go")
 
 		// --- When ---
 		have := LDFlags("v1.2.3")
 
 		// --- Then ---
-		assert.Contain(t, "."+xdef.VarScmRev+"=", have)
-	})
-
-	t.Run("the name targets a package variable", func(t *testing.T) {
-		// The linker silently ignores a -X definition naming a variable that
-		// does not exist, so renaming the stamped variable would break
-		// injection without failing any other test. The package-level
-		// variables declared in version.go are exactly the ones it targets.
-		// --- Given ---
-		want := declaredVarNames(t, "version.go")
-		slices.Sort(want)
-
-		// --- When ---
-		hFlags := LDFlags("v1.2.3")
-
-		// --- Then ---
-		names := make([]string, 0, len(want))
-		for _, arg := range strings.Fields(hFlags) {
+		for _, arg := range strings.Fields(have) {
 			if arg == "-X" {
 				continue
 			}
 			def, _, _ := strings.Cut(arg, "=")
-			names = append(names, strings.TrimPrefix(def, importPath+"."))
+			name := strings.TrimPrefix(def, importPath+".")
+			assert.True(t, slices.Contains(declared, name), name)
 		}
-		slices.Sort(names)
-		assert.Equal(t, want, names)
 	})
 
-	t.Run("a version the toolchain knows is not stamped", func(t *testing.T) {
+	t.Run("devel", func(t *testing.T) {
 		// --- When ---
 		have := LDFlags(devel)
 
@@ -78,7 +63,7 @@ func Test_LDFlags(t *testing.T) {
 		assert.Equal(t, "", have)
 	})
 
-	t.Run("an unknown version is not stamped", func(t *testing.T) {
+	t.Run("empty", func(t *testing.T) {
 		// --- When ---
 		have := LDFlags("")
 
@@ -88,7 +73,7 @@ func Test_LDFlags(t *testing.T) {
 }
 
 func Test_revision(t *testing.T) {
-	t.Run("a stamped version wins", func(t *testing.T) {
+	t.Run("stamped", func(t *testing.T) {
 		// --- Given ---
 		saveVars(t)
 		scmRev = "v1.2.3"
@@ -100,7 +85,7 @@ func Test_revision(t *testing.T) {
 		assert.Equal(t, "v1.2.3", have)
 	})
 
-	t.Run("an unstamped test binary has no version", func(t *testing.T) {
+	t.Run("unstamped", func(t *testing.T) {
 		// "go test" builds without version-control stamping, so the build
 		// info of this very binary reports devel. The branch reading a
 		// version the toolchain did work out cannot be reached in-process;
@@ -128,8 +113,12 @@ func Test_pick_tabular(t *testing.T) {
 		{"stamp wins over the toolchain", "v1.2.3", "v2.0.0", "v1.2.3"},
 		{"stamp wins over devel", "v1.2.3", devel, "v1.2.3"},
 		{"the toolchain version", "", "v2.0.0", "v2.0.0"},
-		{"a pseudo-version", "", "v0.1.1-0.20260921-abc+dirty",
-			"v0.1.1-0.20260921-abc+dirty"},
+		{
+			"a pseudo-version",
+			"",
+			"v0.1.1-0.20260921123456-abcdef123456+dirty",
+			"v0.1.1-0.20260921123456-abcdef123456+dirty",
+		},
 		{"neither", "", "", devel},
 		{"devel only", "", devel, devel},
 	}

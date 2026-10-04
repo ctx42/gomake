@@ -28,11 +28,11 @@ func Line(cmd string) string {
 }
 
 // LDFlags returns the "go build" linker flags stamping ver into the binary
-// being built. It returns an empty string for a version the Go toolchain
-// works out on its own, leaving that value to stand; a caller passes the
-// version only for a build made outside the module's repository, where the
-// toolchain has nothing to read. No quoting is needed because a module
-// version holds no whitespace or quotes.
+// being built. It returns an empty string for an empty ver or devel: an
+// installer reporting devel builds from the repository, where the toolchain
+// versions the build itself. A caller passes a module version for a build
+// made from the module cache, which has no repository to read. No quoting is
+// needed because a module version holds no whitespace or quotes.
 func LDFlags(ver string) string {
 	if ver == "" || ver == devel {
 		return ""
@@ -58,6 +58,10 @@ func revision() string {
 // Go toolchain recorded for it. A stamp wins, being a deliberate statement by
 // whoever built the binary. The toolchain reports devel when it had nothing
 // to work from, which counts as no version at all.
+//
+// The result keys the makefile binary cache, so it must change whenever the
+// gomake source does: a stamp has to encode the tree state (a plain commit
+// hides uncommitted edits), and every devel build shares one cache key.
 func pick(stamped, built string) string {
 	if stamped != "" {
 		return stamped
