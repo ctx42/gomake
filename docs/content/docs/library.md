@@ -37,15 +37,15 @@ helpers operate on those values.
 
 ## What's in the toolkit
 
-| Area                | Helpers                                                                                                               |
-|---------------------|-----------------------------------------------------------------------------------------------------------------------|
-| Target context      | `TargetName`, `WithTargetName`                                                                                        |
-| Configuration       | `TargetConfig`, `Config`, `GetCfg`, `GetCfgDefault`, `Has`, `ConfigMetaKey`, `ErrMiss`, `ErrType`                     |
-| Module & paths      | `Root`, `PathExists`, `FileExists`, `DirExists`, `ReadFile`                                                           |
-| Environment         | `Getenv`, `LookupEnv`, `GetGOOS`, `GetGOARCH`, `EnvSplit`, `EnvJoin`, `EnvSplitOrdered`, `Expander`, `PrettyPrintEnv` |
-| Interactive input   | `ReadLine`, `ReadChar`                                                                                                |
-| Errors & exit codes | `ExitStatus`, `HasRun`, `ErrNoGoMod`                                                                                  |
-| Constants           | `ProjectDirEnvKey`, `VersionEnvKey`                                                                                   |
+| Area                | Helpers                                                                                                                   |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------|
+| Target context      | `TargetName`, `WithTargetName`                                                                                            |
+| Configuration       | `TargetConfig`, `Config`, `GetCfg`, `GetCfgDefault`, `Has`, `ConfigMetaKey`, `ErrMiss`, `ErrType`, `ErrPath`, `ErrConfig` |
+| Module & paths      | `Root`, `PathExists`, `FileExists`, `DirExists`, `ReadFile`                                                               |
+| Environment         | `Getenv`, `LookupEnv`, `GetGOOS`, `GetGOARCH`, `EnvSplit`, `EnvJoin`, `EnvSplitOrdered`, `Expander`, `PrettyPrintEnv`     |
+| Interactive input   | `ReadLine`, `ReadChar`                                                                                                    |
+| Errors & exit codes | `ExitStatus`, `HasRun`, `ErrNoGoMod`                                                                                      |
+| Constants           | `ProjectDirEnvKey`, `VersionEnvKey`                                                                                       |
 
 ## Using the helpers in a target
 

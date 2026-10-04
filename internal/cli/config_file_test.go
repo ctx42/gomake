@@ -5,6 +5,7 @@ package cli
 
 import (
 	"flag"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -348,9 +349,15 @@ func Test_moduleImportPath(t *testing.T) {
 	})
 
 	t.Run("error - unreadable go.mod", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root ignores file permissions")
+		}
+
 		// --- Given ---
 		dir := t.TempDir()
-		oskit.MkdirAll(t, dir, "go.mod")
+		mod := oskit.Write(t, "module example.com/m\n", dir, "go.mod")
+		must.Nil(os.Chmod(mod, 0o000))
+		t.Cleanup(func() { _ = os.Chmod(mod, 0o644) })
 
 		// --- When ---
 		_, err := moduleImportPath(dir)

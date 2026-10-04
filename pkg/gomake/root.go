@@ -25,16 +25,18 @@ func Root(pth string, elem ...string) (string, error) {
 	}
 	start := pth
 	for {
-		_, err := os.Stat(filepath.Join(pth, "go.mod"))
-		if err == nil {
+		// Only a regular file counts; a directory named go.mod does not.
+		fi, err := os.Stat(filepath.Join(pth, "go.mod"))
+		if err == nil && fi.Mode().IsRegular() {
 			break
 		}
-		if !errors.Is(err, fs.ErrNotExist) {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return "", fmt.Errorf("gomake: root: %w", err)
 		}
 		parent := filepath.Dir(pth)
 		if parent == pth {
-			return "", fmt.Errorf("%w starting at %s", ErrNoGoMod, start)
+			format := "gomake: root: %w starting at %s"
+			return "", fmt.Errorf(format, ErrNoGoMod, start)
 		}
 		pth = parent
 	}

@@ -219,6 +219,24 @@ func Test_ReadChar(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "é", have)
 	})
+
+	t.Run("invalid continuation", func(t *testing.T) {
+		// --- When ---
+		have, err := ReadChar(bytes.NewReader([]byte("\xC3A")))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "\xC3A", have)
+	})
+
+	t.Run("invalid lead byte", func(t *testing.T) {
+		// --- When ---
+		have, err := ReadChar(bytes.NewReader([]byte("\x80b")))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "\x80", have)
+	})
 }
 
 func Test_ReadLine(t *testing.T) {

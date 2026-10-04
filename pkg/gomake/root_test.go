@@ -9,6 +9,7 @@ import (
 
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
+	"github.com/ctx42/testkit/pkg/oskit"
 )
 
 func Test_Root(t *testing.T) {
@@ -30,7 +31,20 @@ func Test_Root(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrNoGoMod, err)
-		assert.ErrorContain(t, dir, err)
+		assert.ErrorRegexp(t, "^gomake: root: .* starting at "+dir, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - go.mod is a directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, "go.mod")
+
+		// --- When ---
+		have, err := Root(dir)
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrNoGoMod, err)
 		assert.Equal(t, "", have)
 	})
 

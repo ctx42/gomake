@@ -5,6 +5,7 @@ package gomake
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -35,6 +36,17 @@ func Test_ExitStatus(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 123, have)
+	})
+
+	t.Run("negative ExitStatus", func(t *testing.T) {
+		// --- Given ---
+		ter := tError{Err: "test error", ExStatus: -1}
+
+		// --- When ---
+		have := ExitStatus(ter)
+
+		// --- Then ---
+		assert.Equal(t, 1, have)
 	})
 
 	t.Run("is ExitError instance", func(t *testing.T) {
@@ -112,6 +124,14 @@ func Test_HasRun(t *testing.T) {
 		assert.False(t, have)
 	})
 
+	t.Run("wait delay", func(t *testing.T) {
+		// --- When ---
+		have := HasRun(fmt.Errorf("wait: %w", exec.ErrWaitDelay))
+
+		// --- Then ---
+		assert.True(t, have)
+	})
+
 	t.Run("not run", func(t *testing.T) {
 		// --- Given ---
 		c := exec.Command("not-known-command")
@@ -160,15 +180,11 @@ func Test_HasRun(t *testing.T) {
 
 func Test_GetGOOS(t *testing.T) {
 	t.Run("GOOS from runtime", func(t *testing.T) {
-		// --- Given ---
-		want := runtime.GOOS
-		var env []string
-
 		// --- When ---
-		have := GetGOOS(env)
+		have := GetGOOS(nil)
 
 		// --- Then ---
-		assert.Equal(t, want, have)
+		assert.Equal(t, runtime.GOOS, have)
 	})
 
 	t.Run("GOOS from environment", func(t *testing.T) {
@@ -181,19 +197,23 @@ func Test_GetGOOS(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, "your-os", have)
 	})
+
+	t.Run("GOOS set empty", func(t *testing.T) {
+		// --- When ---
+		have := GetGOOS([]string{"GOOS="})
+
+		// --- Then ---
+		assert.Equal(t, runtime.GOOS, have)
+	})
 }
 
 func Test_GetGOARCH(t *testing.T) {
 	t.Run("GOARCH from runtime", func(t *testing.T) {
-		// --- Given ---
-		want := runtime.GOARCH
-		env := make([]string, 0)
-
 		// --- When ---
-		have := GetGOARCH(env)
+		have := GetGOARCH(nil)
 
 		// --- Then ---
-		assert.Equal(t, want, have)
+		assert.Equal(t, runtime.GOARCH, have)
 	})
 
 	t.Run("GOARCH from environment", func(t *testing.T) {
@@ -205,6 +225,14 @@ func Test_GetGOARCH(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, "your-arch", have)
+	})
+
+	t.Run("GOARCH set empty", func(t *testing.T) {
+		// --- When ---
+		have := GetGOARCH([]string{"GOARCH="})
+
+		// --- Then ---
+		assert.Equal(t, runtime.GOARCH, have)
 	})
 }
 
@@ -222,6 +250,7 @@ func Test_LookupEnv_tabular(t *testing.T) {
 		{"partial", []string{"key0=val0", "key1=val1"}, "key", "", false},
 		{"empty env", []string{}, "key", "", false},
 		{"empty key", []string{"key0=val0", "key1=val1"}, "", "", false},
+		{"empty name entry", []string{`=C:=C:\work`}, "", "", false},
 		{
 			"last value counts",
 			[]string{"key0=val0", "key1=val1", "key0=abc"},

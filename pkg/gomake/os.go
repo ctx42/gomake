@@ -24,7 +24,10 @@ func ExitStatus(err error) int {
 
 	var es status
 	if errors.As(err, &es) {
-		return es.ExitStatus()
+		if code := es.ExitStatus(); code >= 0 {
+			return code
+		}
+		return 1
 	}
 
 	var ee *exec.ExitError
@@ -48,36 +51,37 @@ func ExitStatus(err error) int {
 
 // HasRun examines the error to determine if it was generated as a result of a
 // command running via [exec.Command]. If the error is nil, or the command
-// started (including a non-zero exit or a signal kill from a deadline), HasRun
-// reports true. If the error is an unrecognized type, or it is an error from
-// [exec.Command] that says the command failed to start (usually due to the
-// command not existing or not being executable), it reports false.
+// started (including a non-zero exit, a signal kill from a deadline, or an
+// [exec.ErrWaitDelay] after it exited), HasRun reports true. If the error is
+// an unrecognized type, or it is an error from [exec.Command] that says the
+// command failed to start (usually due to the command not existing or not
+// being executable), it reports false.
 func HasRun(err error) bool {
-	if err == nil {
+	if err == nil || errors.Is(err, exec.ErrWaitDelay) {
 		return true
 	}
 	var ee *exec.ExitError
 	return errors.As(err, &ee)
 }
 
-// GetGOOS returns the GOOS value from env; if unset, it returns
-// [runtime.GOOS]. When the key appears more than once, the last value wins.
+// GetGOOS returns the GOOS value from env; if unset or empty, as the Go
+// toolchain treats it, it returns [runtime.GOOS]. When the key appears more
+// than once, the last value wins.
 func GetGOOS(env []string) string {
-	ret := runtime.GOOS
-	if val, exists := LookupEnv(env, "GOOS"); exists {
-		ret = val
+	if val, _ := LookupEnv(env, "GOOS"); val != "" {
+		return val
 	}
-	return ret
+	return runtime.GOOS
 }
 
-// GetGOARCH returns the GOARCH value from env; if unset, it returns
-// [runtime.GOARCH]. When the key appears more than once, the last value wins.
+// GetGOARCH returns the GOARCH value from env; if unset or empty, as the Go
+// toolchain treats it, it returns [runtime.GOARCH]. When the key appears more
+// than once, the last value wins.
 func GetGOARCH(env []string) string {
-	ret := runtime.GOARCH
-	if val, exists := LookupEnv(env, "GOARCH"); exists {
-		ret = val
+	if val, _ := LookupEnv(env, "GOARCH"); val != "" {
+		return val
 	}
-	return ret
+	return runtime.GOARCH
 }
 
 // LookupEnv retrieves the value of the environment variable named by the key.
@@ -89,8 +93,9 @@ func LookupEnv(env []string, key string) (string, bool) {
 	var exists bool
 	var value string
 	for _, val := range env {
+		// An empty name, like the Windows "=C:" entries, never matches.
 		name, v, ok := strings.Cut(val, "=")
-		if !ok || name != key {
+		if !ok || name == "" || name != key {
 			continue
 		}
 		value = v

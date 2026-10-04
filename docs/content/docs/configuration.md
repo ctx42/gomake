@@ -259,10 +259,11 @@ value as `T`:
   it has no fractional part, a value of the wrong JSON kind is rejected, and
   JSON `null` yields `ErrType` for a concrete `T` (so `GetCfgDefault` does
   not treat null as a typed zero value).
-- **Errors.** `ErrMiss` when the path is absent, out of range, or empty;
-  `ErrType` on a type mismatch, a JSON null, or a failed duration parse. Use
-  `errors.Is(err, gomake.ErrMiss)` to treat an optional key as a default, and
-  `cfg.Has(path)` to test presence without an error.
+- **Errors.** `ErrMiss` when the path is absent or out of range; `ErrPath`
+  when it is malformed (empty, an unterminated quote, or a quote not at a
+  segment boundary); `ErrType` on a type mismatch, a JSON null, or a failed
+  duration parse. Use `errors.Is(err, gomake.ErrMiss)` to treat an optional
+  key as a default, and `cfg.Has(path)` to test presence without an error.
 
 Because Go methods cannot be generic, `GetCfg` is a package-level function
 taking the `*Config` as its first argument, not a method on `Config`.

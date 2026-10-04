@@ -101,7 +101,7 @@ func Test_ensureSymlink(t *testing.T) {
 	})
 }
 
-// tError is a test structure implementing error and exitStatus interfaces.
+// tError is a test error with an ExitStatus() int method.
 type tError struct {
 	Err      string
 	ExStatus int

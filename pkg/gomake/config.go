@@ -24,29 +24,38 @@ const ConfigMetaKey = "github.com/ctx42/gomake/pkg/gomake.targetConfig"
 // Configuration lookup errors.
 var (
 	// ErrMiss indicates a path that does not resolve to a value: an absent
-	// key, an out-of-range or non-numeric array index, or an empty path.
+	// key or an out-of-range or non-numeric array index.
 	ErrMiss = errors.New("config path not found")
 
 	// ErrType indicates a value that cannot be represented as the requested
 	// type, including descending through a scalar leaf.
 	ErrType = errors.New("config type mismatch")
+
+	// ErrConfig indicates a configuration block that is not a single valid
+	// JSON object.
+	ErrConfig = errors.New("invalid target config")
+
+	// ErrPath indicates a malformed path: an empty path, an unterminated
+	// quote, or a quote not at a segment boundary.
+	ErrPath = errors.New("config path malformed")
 )
 
 // Config is the running target's configuration block, decoded from the JSON
 // gomake stored in the ring meta store under [ConfigMetaKey]. It is an
 // immutable snapshot; read values with [GetCfg] and [Config.Has]. The zero
-// value is safe and behaves like an empty block.
+// value and a nil *Config are safe and behave like an empty block.
 type Config struct {
 	data map[string]any
 }
 
 // TargetConfig decodes the running target's configuration block from the ring
 // meta store and returns it. The block comes from the target's entry in a
-// gomake.yaml file. gomake stores it as a string; a []byte is also accepted so
-// a caller that embeds gomake and sets the meta value itself may use either.
-// When the target has no configuration, which includes a meta value present
-// but neither string nor []byte, it returns an empty [Config] and a nil error;
-// it returns an error only when a present block is not valid JSON.
+// gomake.yaml file. gomake stores it as a string; a []byte or json.RawMessage
+// is also accepted so a caller that embeds gomake and sets the meta value
+// itself may use either. When the target has no configuration, which includes
+// a meta value of any other type, it returns an empty [Config] and a nil
+// error; it returns [ErrConfig] only when a present block is not a single valid
+// JSON object.
 func TargetConfig(rng *ring.Ring) (*Config, error) {
 	cfg := &Config{data: map[string]any{}}
 	raw, ok := rng.MetaLookup(ConfigMetaKey)
@@ -71,7 +80,7 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.UseNumber()
 	if err := dec.Decode(&cfg.data); err != nil {
-		return nil, fmt.Errorf("gomake: target config: %w", err)
+		return nil, fmt.Errorf("gomake: %w: %w", ErrConfig, err)
 	}
 	// Decoder.More is false when the next byte is ] or }, so a second
 	// decode is what rejects trailing values. Only io.EOF means the block
@@ -79,9 +88,9 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 	var extra any
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err == nil {
-			return nil, errors.New("gomake: target config: trailing data")
+			return nil, fmt.Errorf("gomake: %w: trailing data", ErrConfig)
 		}
-		return nil, fmt.Errorf("gomake: target config: %w", err)
+		return nil, fmt.Errorf("gomake: %w: %w", ErrConfig, err)
 	}
 	if cfg.data == nil {
 		// A JSON null root leaves data nil; treat it as an empty object.
@@ -101,16 +110,20 @@ func (cfg *Config) Has(path string) bool {
 }
 
 // resolve walks path through the configuration block and returns the value it
-// names. It returns [ErrMiss] for an absent key, an out-of-range or
-// non-numeric index, an empty path, or a malformed quoted segment, and
-// [ErrType] when a segment descends through a scalar leaf.
+// names. It returns [ErrMiss] for an absent key or an out-of-range or
+// non-numeric index, [ErrPath] for a malformed path, and [ErrType] when a
+// segment descends through a scalar leaf.
 func (cfg *Config) resolve(path string) (any, error) {
 	segs, err := splitPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var cur any = cfg.data
+	var data map[string]any // A nil Config behaves like an empty block.
+	if cfg != nil {
+		data = cfg.data
+	}
+	var cur any = data
 	for _, seg := range segs {
 		switch node := cur.(type) {
 		case map[string]any:
@@ -121,8 +134,8 @@ func (cfg *Config) resolve(path string) (any, error) {
 			cur = val
 
 		case []any:
-			idx, err := strconv.Atoi(seg)
-			if err != nil || idx < 0 || idx >= len(node) {
+			idx, ok := arrayIndex(seg)
+			if !ok || idx >= len(node) {
 				return nil, fmt.Errorf("%w: %q", ErrMiss, path)
 			}
 			cur = node[idx]
@@ -134,17 +147,36 @@ func (cfg *Config) resolve(path string) (any, error) {
 	return cur, nil
 }
 
+// arrayIndex parses seg as a zero-based array index written in decimal digits
+// without a sign or a leading zero, so "1" and "0" are indexes but "+1", "-0"
+// and "01" are not.
+func arrayIndex(seg string) (int, bool) {
+	if seg == "" || (len(seg) > 1 && seg[0] == '0') {
+		return 0, false
+	}
+	for _, r := range seg {
+		if r < '0' || r > '9' {
+			return 0, false
+		}
+	}
+	idx, err := strconv.Atoi(seg)
+	if err != nil { // Overflow.
+		return 0, false
+	}
+	return idx, true
+}
+
 // splitPath cuts a dot-separated configuration path into its segments. A
 // segment wrapped in single quotes is emitted verbatim, so the dots inside it
 // are part of the key rather than separators: the path
 // modules.'github.com/acme/app'.package names three segments. A single quote
 // is significant only as the first character of a segment, and its closing
 // quote must end that segment, being followed by a dot or the end of the path;
-// elsewhere a quote is an ordinary character. splitPath returns [ErrMiss] for
+// elsewhere a quote is an ordinary character. splitPath returns [ErrPath] for
 // an empty path, an unterminated quote, or a quote not at a segment boundary.
 func splitPath(path string) ([]string, error) {
 	if path == "" {
-		return nil, fmt.Errorf("%w: empty path", ErrMiss)
+		return nil, fmt.Errorf("%w: empty path", ErrPath)
 	}
 
 	var segs []string
@@ -153,12 +185,12 @@ func splitPath(path string) ([]string, error) {
 			end := strings.IndexByte(path[i+1:], '\'')
 			if end < 0 {
 				format := "%w: unterminated quote: %q"
-				return nil, fmt.Errorf(format, ErrMiss, path)
+				return nil, fmt.Errorf(format, ErrPath, path)
 			}
 			end += i + 1
 			if end != len(path)-1 && path[end+1] != '.' {
 				format := "%w: quote not at segment boundary: %q"
-				return nil, fmt.Errorf(format, ErrMiss, path)
+				return nil, fmt.Errorf(format, ErrPath, path)
 			}
 			segs = append(segs, path[i+1:end])
 			i = end + 2 // Step past the closing quote and the dot, if any.
@@ -187,8 +219,8 @@ func splitPath(path string) ([]string, error) {
 // nanosecond count, or from a string parsed with [time.ParseDuration]; and T of
 // any yields the raw decoded value.
 //
-// GetCfg returns [ErrMiss] when path does not resolve and [ErrType] when the
-// value cannot be represented as T.
+// GetCfg returns [ErrMiss] when path does not resolve, [ErrPath] when it is
+// malformed, and [ErrType] when the value cannot be represented as T.
 func GetCfg[T any](cfg *Config, path string) (T, error) {
 	var out T
 	raw, err := cfg.resolve(path)
@@ -238,8 +270,9 @@ func GetCfg[T any](cfg *Config, path string) (T, error) {
 // GetCfgDefault returns the value at path from cfg decoded as T, or def when
 // cfg omits path. It is a convenience over [GetCfg] for the common case of
 // reading a single optional setting: an absent path yields def and a nil
-// error, so a target needs no [ErrMiss] handling of its own. A value present
-// but not representable as T is returned as an error. See [GetCfg] for the
+// error, so a target needs no [ErrMiss] handling of its own. A malformed path
+// ([ErrPath]) or a value present but not representable as T is returned as an
+// error. See [GetCfg] for the
 // path grammar and the supported types.
 func GetCfgDefault[T any](cfg *Config, path string, def T) (T, error) {
 	val, err := GetCfg[T](cfg, path)

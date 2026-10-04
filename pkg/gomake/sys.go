@@ -55,7 +55,9 @@ func ReadFile(pth string) (string, error) {
 
 // ReadChar reads one rune from the reader and returns it as a string. It
 // returns [io.EOF] when the reader is empty. A second call continues at the
-// next rune.
+// next rune. Bytes that do not form a valid UTF-8 sequence are returned as
+// read, so no input is lost: an invalid lead byte alone, and a lead byte with
+// a malformed continuation together with the bytes read after it.
 func ReadChar(r io.Reader) (string, error) {
 	var buf [utf8.UTFMax]byte
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
@@ -74,8 +76,7 @@ func ReadChar(r io.Reader) (string, error) {
 			return "", fmt.Errorf("read rune: %w", err)
 		}
 	}
-	char, _ := utf8.DecodeRune(buf[:need])
-	return string(char), nil
+	return string(buf[:need]), nil
 }
 
 // runeSize reports how many bytes a UTF-8 lead byte starts. An invalid lead

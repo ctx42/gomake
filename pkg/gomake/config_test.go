@@ -85,6 +85,7 @@ func Test_TargetConfig(t *testing.T) {
 		have, err := TargetConfig(rng)
 
 		// --- Then ---
+		assert.ErrorIs(t, ErrConfig, err)
 		assert.ErrorContain(t, "invalid character", err)
 		assert.Nil(t, have)
 	})
@@ -98,6 +99,7 @@ func Test_TargetConfig(t *testing.T) {
 		have, err := TargetConfig(rng)
 
 		// --- Then ---
+		assert.ErrorIs(t, ErrConfig, err)
 		assert.ErrorContain(t, "']'", err)
 		assert.Nil(t, have)
 	})
@@ -111,6 +113,7 @@ func Test_TargetConfig(t *testing.T) {
 		have, err := TargetConfig(rng)
 
 		// --- Then ---
+		assert.ErrorIs(t, ErrConfig, err)
 		assert.ErrorContain(t, "'}'", err)
 		assert.Nil(t, have)
 	})
@@ -124,6 +127,7 @@ func Test_TargetConfig(t *testing.T) {
 		have, err := TargetConfig(rng)
 
 		// --- Then ---
+		assert.ErrorIs(t, ErrConfig, err)
 		assert.ErrorContain(t, "trailing data", err)
 		assert.Nil(t, have)
 	})
@@ -175,6 +179,10 @@ func Test_Config_Has_tabular(t *testing.T) {
 		{"scalar key", "region", true},
 		{"nested key", "lint.file", true},
 		{"array index", "hosts.1", true},
+		{"array index zero", "hosts.0", true},
+		{"signed index", "hosts.+1", false},
+		{"negative zero index", "hosts.-0", false},
+		{"leading zero index", "hosts.01", false},
 		{"quoted key with dots", "'github.com/acme/app'.package", true},
 		{"quoted then nested", "modules.'github.com/acme/app'.package", true},
 		{"absent key", "nope", false},
@@ -193,6 +201,49 @@ func Test_Config_Has_tabular(t *testing.T) {
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_Config_resolve(t *testing.T) {
+	t.Run("nil config", func(t *testing.T) {
+		// --- Given ---
+		var cfg *Config
+
+		// --- When ---
+		have, err := cfg.resolve("region")
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrMiss, err)
+		assert.Nil(t, have)
+	})
+}
+
+func Test_arrayIndex_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		seg  string
+		want int
+		wOk  bool
+	}{
+		{"zero", "0", 0, true},
+		{"digits", "12", 12, true},
+		{"empty", "", 0, false},
+		{"sign", "+1", 0, false},
+		{"leading zero", "01", 0, false},
+		{"letters", "1a", 0, false},
+		{"overflow", "99999999999999999999", 0, false},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have, hOk := arrayIndex(tc.seg)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+			assert.Equal(t, tc.wOk, hOk)
 		})
 	}
 }
@@ -243,10 +294,19 @@ func Test_splitPath_error_tabular(t *testing.T) {
 	tt := []struct {
 		name string
 		path string
+		wMsg string
 	}{
-		{"error - empty path", ""},
-		{"error - unterminated quote", "'github.com/acme"},
-		{"error - quote not at boundary", "'github.com'x.package"},
+		{"error - empty path", "", "empty path"},
+		{
+			"error - unterminated quote",
+			"'github.com/acme",
+			"unterminated quote",
+		},
+		{
+			"error - quote not at boundary",
+			"'github.com'x.package",
+			"quote not at segment boundary",
+		},
 	}
 
 	for _, tc := range tt {
@@ -255,7 +315,8 @@ func Test_splitPath_error_tabular(t *testing.T) {
 			_, err := splitPath(tc.path)
 
 			// --- Then ---
-			assert.ErrorIs(t, ErrMiss, err)
+			assert.ErrorIs(t, ErrPath, err)
+			assert.ErrorContain(t, tc.wMsg, err)
 		})
 	}
 }
@@ -468,7 +529,8 @@ func Test_GetCfg(t *testing.T) {
 		_, err := GetCfg[string](cfg, "'github.com/acme")
 
 		// --- Then ---
-		assert.ErrorIs(t, ErrMiss, err)
+		assert.ErrorIs(t, ErrPath, err)
+		assert.ErrorContain(t, "unterminated quote", err)
 	})
 
 	t.Run("error - miss", func(t *testing.T) {
@@ -513,6 +575,7 @@ func Test_GetCfg(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
+		assert.ErrorContain(t, "time: invalid duration", err)
 	})
 
 	t.Run("duration from number", func(t *testing.T) {
@@ -538,6 +601,7 @@ func Test_GetCfg(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrType, err)
+		assert.ErrorContain(t, "cannot unmarshal number 3.5", err)
 	})
 
 	t.Run("error - descend scalar", func(t *testing.T) {
@@ -553,6 +617,18 @@ func Test_GetCfg(t *testing.T) {
 }
 
 func Test_GetCfgDefault(t *testing.T) {
+	t.Run("error - malformed path", func(t *testing.T) {
+		// --- Given ---
+		cfg := configFrom(t, `{"timeout":"5m"}`)
+
+		// --- When ---
+		have, err := GetCfgDefault(cfg, "'timeout", "1m")
+
+		// --- Then ---
+		assert.ErrorIs(t, ErrPath, err)
+		assert.Equal(t, "", have)
+	})
+
 	t.Run("returns the delivered value", func(t *testing.T) {
 		// --- Given ---
 		cfg := configFrom(t, `{"timeout":"5m"}`)
