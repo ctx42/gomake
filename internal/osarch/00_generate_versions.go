@@ -8,9 +8,10 @@
 // values are only added in newer releases, so the list is populated from the
 // latest Go reported by https://go.dev/VERSION (a safe superset).
 //
-// Set GOMAKE_GO_VERSION (e.g. "1.28") to pin the Go version used to populate
-// the list instead of querying go.dev. The matching toolchain is downloaded on
-// demand via GOTOOLCHAIN. Run it with: go generate ./internal/osarch
+// Set GOMAKE_GO_VERSION to a major.minor (e.g. "1.28") to pin the Go version
+// used to populate the list instead of querying go.dev. The matching toolchain
+// is downloaded on demand via GOTOOLCHAIN. Run it with:
+// go generate ./internal/osarch
 package main
 
 import (
@@ -88,7 +89,28 @@ func run() error {
 		return err
 	}
 	dst := filepath.Join(root, "internal", "osarch", "versions_gen.go")
-	if err = os.WriteFile(dst, src, 0o644); err != nil {
+	return writeAtomic(dst, src)
+}
+
+// writeAtomic writes data to a temporary file beside dst and renames it over
+// dst, so an interrupted run never leaves a truncated file behind.
+func writeAtomic(dst string, data []byte) error {
+	tmp, err := os.CreateTemp(filepath.Dir(dst), filepath.Base(dst)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	defer func() { _ = os.Remove(tmp.Name()) }()
+	if _, err = tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	if err = tmp.Close(); err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	if err = os.Chmod(tmp.Name(), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	if err = os.Rename(tmp.Name(), dst); err != nil {
 		return fmt.Errorf("write %s: %w", dst, err)
 	}
 	return nil
@@ -100,8 +122,11 @@ func run() error {
 func target(localVer string) (ver, toolchain string, err error) {
 	if env := strings.TrimSpace(os.Getenv("GOMAKE_GO_VERSION")); env != "" {
 		ver = majorMinor(env)
-		if ver == "" {
-			return "", "", fmt.Errorf("invalid GOMAKE_GO_VERSION %q", env)
+		// Only the major.minor selects the toolchain (its ".0" release), so
+		// a patch would be silently ignored.
+		if ver == "" || strings.TrimPrefix(env, "go") != ver {
+			format := "invalid GOMAKE_GO_VERSION %q: want major.minor"
+			return "", "", fmt.Errorf(format, env)
 		}
 		return ver, toolchainFor(ver, localVer, runtime.Version()), nil
 	}
@@ -134,7 +159,7 @@ func latestGo() (full, mm string, err error) {
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, versionURL, nil)
 	if err != nil {
-		return "", "", err
+		return "", "", fmt.Errorf("build request: %w", err)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -145,7 +170,9 @@ func latestGo() (full, mm string, err error) {
 		format := "fetch %s: HTTP %d"
 		return "", "", fmt.Errorf(format, versionURL, resp.StatusCode)
 	}
-	body, err := io.ReadAll(resp.Body)
+	// The version is a single short line; cap what a misbehaving server can
+	// make the generator read.
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
 	if err != nil {
 		return "", "", fmt.Errorf("read %s: %w", versionURL, err)
 	}
@@ -167,6 +194,9 @@ func distList(toolchain string) (goos, goarch []string, err error) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "go", "tool", "dist", "list")
 	cmd.Env = append(os.Environ(), "GOTOOLCHAIN="+toolchain)
+	// Outside any module, so a go.mod requiring a newer patch than the
+	// pinned toolchain cannot make the go command refuse to run.
+	cmd.Dir = os.TempDir()
 	out, err := cmd.Output()
 	if err != nil {
 		if e, ok := errors.AsType[*exec.ExitError](err); ok {
@@ -256,7 +286,7 @@ func moduleRoot() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", fmt.Errorf("gomake module root not found")
+			return "", errors.New("gomake module root not found")
 		}
 		dir = parent
 	}
@@ -266,11 +296,11 @@ func moduleRoot() (string, error) {
 func goModVersion(pth string) (string, error) {
 	data, err := os.ReadFile(pth)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("go.mod: %w", err)
 	}
 	mf, err := modfile.ParseLax(pth, data, nil)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("go.mod: %w", err)
 	}
 	if mf.Go != nil {
 		if mm := majorMinor(mf.Go.Version); mm != "" {
@@ -281,10 +311,13 @@ func goModVersion(pth string) (string, error) {
 }
 
 // majorMinor normalizes a Go version such as "go1.26.3", "1.26.3", "1.26",
-// or a prerelease like "go1.26rc1" / "go1.26beta1" to "1.26". It returns an
-// empty string when the input has no major.minor.
+// a prerelease like "go1.26rc1" / "go1.26beta1", or a development toolchain's
+// "devel go1.27-abc ..." to "1.26" (or "1.27"). It returns an empty string
+// when the input has no major.minor.
 func majorMinor(v string) string {
-	v = strings.TrimPrefix(v, "go")
+	if i := strings.Index(v, "go"); i >= 0 {
+		v = v[i+len("go"):]
+	}
 	parts := strings.Split(v, ".")
 	if len(parts) < 2 {
 		return ""
@@ -292,17 +325,16 @@ func majorMinor(v string) string {
 	if _, err := strconv.Atoi(parts[0]); err != nil {
 		return ""
 	}
-	// Strip prerelease suffix from the minor (rc1, beta1, …).
-	min := parts[1]
+	// Strip prerelease or devel suffix from the minor (rc1, beta1, -abc…).
+	minor := parts[1]
 	i := 0
-	for i < len(min) && min[i] >= '0' && min[i] <= '9' {
+	for i < len(minor) && minor[i] >= '0' && minor[i] <= '9' {
 		i++
 	}
 	if i == 0 {
 		return ""
 	}
-	min = min[:i]
-	return parts[0] + "." + min
+	return parts[0] + "." + minor[:i]
 }
 
 // verLess reports whether major.minor version a is older than b.
@@ -315,13 +347,13 @@ func verLess(a, b string) bool {
 	return aMin < bMin
 }
 
-func splitVer(v string) (maj, min int) {
+func splitVer(v string) (maj, minor int) {
 	parts := strings.Split(v, ".")
 	if len(parts) > 0 {
 		maj, _ = strconv.Atoi(parts[0])
 	}
 	if len(parts) > 1 {
-		min, _ = strconv.Atoi(parts[1])
+		minor, _ = strconv.Atoi(parts[1])
 	}
-	return maj, min
+	return maj, minor
 }

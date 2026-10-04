@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/ctx42/testing/pkg/assert"
-	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
 )
 
@@ -119,7 +118,12 @@ func Test_generateVersions(t *testing.T) {
 // distList returns the unique GOOS and GOARCH values from `go tool dist list`.
 func distList(t tester.T) (goos, goarch []string) {
 	t.Helper()
-	out := must.Value(exec.Command("go", "tool", "dist", "list").Output())
+	cmd := exec.CommandContext(t.Context(), "go", "tool", "dist", "list")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+		return nil, nil
+	}
 
 	osSet := map[string]struct{}{}
 	archSet := map[string]struct{}{}
