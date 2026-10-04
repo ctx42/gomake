@@ -46,7 +46,10 @@ func main() {
 			Namespace: ent.Namespace,
 		})
 	}
-	if err = builtin.GenImports(imports); err != nil {
+	// Relative import paths keep the committed targets.go free of this
+	// machine's checkout location.
+	rootOF := builtin.WithGenImpPathRoot(modRoot)
+	if err = builtin.GenImports(imports, rootOF); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}

@@ -4,11 +4,15 @@
 package builtin
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/goldy"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 
@@ -402,6 +406,28 @@ func Test_GenImports(t *testing.T) {
 		assert.Contain(t, want, text)
 	})
 
+	t.Run("error - data dir not writable", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root ignores file permissions")
+		}
+
+		// --- Given ---
+		prj := clitest.NewProject(t)
+		prj.Close()
+
+		oskit.Write(t, "old", prj.Root(), targetsFN)
+		data := oskit.MkdirAll(t, prj.Root(), "data")
+		must.Nil(os.Chmod(data, 0o555))
+		t.Cleanup(func() { _ = os.Chmod(data, 0o755) })
+
+		// --- When ---
+		err := GenImports(nil, WithGenDst(prj.Root()))
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrPermission, err)
+		assert.Equal(t, "old", oskit.ReadFileStr(t, prj.Path(targetsFN)))
+	})
+
 	t.Run("error - package name is not an identifier", func(t *testing.T) {
 		// --- Given ---
 		prj := clitest.NewProject(t)
@@ -415,5 +441,83 @@ func Test_GenImports(t *testing.T) {
 		// --- Then ---
 		assert.ErrorContain(t, name, err)
 		assert.NoFileExist(t, prj.Path(targetsFN))
+	})
+}
+
+func Test_writeFiles(t *testing.T) {
+	t.Run("writes every file", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		files := []genFile{
+			{dst: filepath.Join(dir, "a.go"), code: []byte("a")},
+			{dst: filepath.Join(dir, "b.go"), code: []byte("b")},
+		}
+
+		// --- When ---
+		err := writeFiles(files)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "a", oskit.ReadFileStr(t, dir, "a.go"))
+		assert.Equal(t, "b", oskit.ReadFileStr(t, dir, "b.go"))
+		info := must.Value(os.Stat(filepath.Join(dir, "a.go")))
+		assert.Equal(t, os.FileMode(0o644), info.Mode().Perm())
+		assert.Len(t, 2, oskit.List(t, dir))
+	})
+
+	t.Run("error - missing directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		files := []genFile{
+			{dst: filepath.Join(dir, "a.go"), code: []byte("a")},
+			{dst: filepath.Join(dir, "none", "b.go"), code: []byte("b")},
+		}
+
+		// --- When ---
+		err := writeFiles(files)
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+		assert.Len(t, 0, oskit.List(t, dir))
+	})
+}
+
+func Test_relImpPath(t *testing.T) {
+	t.Run("dot dot named dir under root", func(t *testing.T) {
+		// --- Given ---
+		root := t.TempDir()
+		tgt := &mkf.Target{ImpPath: filepath.Join(root, "..cache", "pkg")}
+
+		// --- When ---
+		relImpPath(root)(nil, tgt)
+
+		// --- Then ---
+		assert.Equal(t, "..cache/pkg", tgt.ImpPath)
+	})
+
+	t.Run("outside root", func(t *testing.T) {
+		// --- Given ---
+		root := filepath.Join(t.TempDir(), "root")
+		pth := filepath.Join(filepath.Dir(root), "other", "pkg")
+		tgt := &mkf.Target{ImpPath: pth}
+
+		// --- When ---
+		relImpPath(root)(nil, tgt)
+
+		// --- Then ---
+		assert.Equal(t, pth, tgt.ImpPath)
+	})
+
+	t.Run("relative root", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		t.Chdir(dir)
+		tgt := &mkf.Target{ImpPath: filepath.Join(dir, "sub", "pkg")}
+
+		// --- When ---
+		relImpPath(".")(nil, tgt)
+
+		// --- Then ---
+		assert.Equal(t, "sub/pkg", tgt.ImpPath)
 	})
 }

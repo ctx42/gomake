@@ -223,7 +223,7 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	}
 
 	// Generate every file before writing any of them, so a generation
-	// failure writes nothing.
+	// failure writes nothing; writeFiles extends that to write failures.
 	tgs, err := parser.TargetsFromImports(
 		opts.rng,
 		opts.dir,
@@ -272,22 +272,62 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 	if err = os.MkdirAll(filepath.Join(opts.dst, "data"), 0o750); err != nil {
 		return fmt.Errorf("creating destination tree: %w", err)
 	}
-	for _, fil := range files {
-		if err = parser.CreateFile(fil.dst, fil.code); err != nil {
-			return err
+	return writeFiles(files)
+}
+
+// writeFiles writes every file to a temporary file beside its destination
+// before renaming any into place, so failing to write one file leaves every
+// destination untouched.
+func writeFiles(files []genFile) error {
+	tmps := make([]string, len(files))
+	defer func() {
+		for _, tmp := range tmps {
+			if tmp != "" {
+				_ = os.Remove(tmp)
+			}
 		}
+	}()
+	for i, fil := range files {
+		name := filepath.Base(fil.dst) + ".*.tmp"
+		tmp, err := os.CreateTemp(filepath.Dir(fil.dst), name)
+		if err != nil {
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+		tmps[i] = tmp.Name()
+		_, err = tmp.Write(fil.code)
+		if cerr := tmp.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil {
+			err = os.Chmod(tmp.Name(), 0o644)
+		}
+		if err != nil {
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+	}
+	for i, fil := range files {
+		if err := os.Rename(tmps[i], fil.dst); err != nil {
+			return fmt.Errorf("writing %s: %w", fil.dst, err)
+		}
+		tmps[i] = ""
 	}
 	return nil
 }
 
 // relImpPath returns a [parser.Targets.Map] callback making each target's
-// ImpPath relative to root when it lies under root.
+// ImpPath relative to root when it lies under root. A relative root is
+// resolved against the working directory.
 func relImpPath(root string) parser.TgsMapCB {
+	if abs, err := filepath.Abs(root); err == nil {
+		root = abs
+	}
 	return func(_ *parser.Targets, tgt *mkf.Target) {
 		rel, err := filepath.Rel(root, tgt.ImpPath)
-		if err == nil && !strings.HasPrefix(rel, "..") {
-			tgt.ImpPath = filepath.ToSlash(rel)
+		if err != nil || rel == ".." ||
+			strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return
 		}
+		tgt.ImpPath = filepath.ToSlash(rel)
 	}
 }
 
