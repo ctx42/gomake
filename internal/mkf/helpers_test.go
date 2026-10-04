@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime"
 	"strings"
@@ -32,10 +33,11 @@ func Test_ExitCode_tabular(t *testing.T) {
 		want int
 	}{
 		{"nil err", nil, 0},
-		{"deadline exceeded", context.DeadlineExceeded, 125},
+		{"timeout", fmt.Errorf("%w: x", errTimeout), 125},
+		{"deadline exceeded", context.DeadlineExceeded, 1},
 		{"pick target", ErrPickTarget, 126},
 		{"unknown target", ErrUnkTarget, 127},
-		{"interrupted", interruptedError(200), 200},
+		{"interrupted", interruptedError{sig: syscall.SIGTERM}, 143},
 		{"generic", errors.New("test error"), 1},
 	}
 
@@ -44,6 +46,43 @@ func Test_ExitCode_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, ExitCode(tc.in))
 		})
 	}
+}
+
+// reraiseEnv makes a Test_Reraise helper process re-raise SIGTERM.
+const reraiseEnv = "GOMAKE_TEST_RERAISE"
+
+func Test_Reraise(t *testing.T) {
+	if os.Getenv(reraiseEnv) != "" {
+		signal.Notify(make(chan os.Signal, 1), syscall.SIGTERM)
+		err := interruptedError{sig: syscall.SIGTERM}
+		Reraise(err)
+		os.Exit(ExitCode(err))
+	}
+
+	t.Run("interrupted", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("signals cannot be sent to a process on windows")
+		}
+
+		// --- Given ---
+		args := []string{"-test.run=^Test_Reraise$"}
+		cmd := exec.CommandContext(t.Context(), os.Args[0], args...)
+		cmd.Env = append(os.Environ(), reraiseEnv+"=1")
+
+		// --- When ---
+		err := cmd.Run()
+
+		// --- Then ---
+		assert.Error(t, err)
+		sts := cmd.ProcessState.Sys().(syscall.WaitStatus)
+		assert.True(t, sts.Signaled())
+		assert.Equal(t, syscall.SIGTERM, sts.Signal())
+	})
+
+	t.Run("not interrupted", func(t *testing.T) {
+		// --- When ---
+		Reraise(errors.New("test error"))
+	})
 }
 
 func Test_RecoverError(t *testing.T) {
@@ -217,7 +256,7 @@ func Test_runTarget(t *testing.T) {
 		// --- Then ---
 		var ier interruptedError
 		assert.True(t, errors.As(err, &ier))
-		assert.Equal(t, exitCodeSignal+int(syscall.SIGTERM), ier.Signal())
+		assert.Equal(t, syscall.SIGTERM, ier.sig)
 	})
 
 	t.Run("execute target", func(t *testing.T) {
@@ -351,7 +390,7 @@ func Test_runTarget(t *testing.T) {
 		<-have // Goroutine exited.
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
-		assert.Equal(t, 128+2, ier.Signal())
+		assert.Equal(t, syscall.SIGINT, ier.sig)
 		assert.Equal(t, "started context canceled exited", tst.Stdout())
 		assert.Equal(t, "", tst.Stderr())
 	})
@@ -387,7 +426,80 @@ func Test_runTarget(t *testing.T) {
 		<-have
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
-		assert.Equal(t, 128+int(syscall.SIGTERM), ier.Signal())
+		assert.Equal(t, syscall.SIGTERM, ier.sig)
+	})
+
+	t.Run("error - target calls Goexit", func(t *testing.T) {
+		// --- Given ---
+		sig := make(chan os.Signal, 1)
+		defer signal.Stop(sig)
+		wd := must.Value(os.Getwd())
+
+		fn := func(_ context.Context, _ *ring.Ring) error {
+			runtime.Goexit()
+			return nil
+		}
+
+		// --- When ---
+		err := runTarget(t.Context(), sig, fn, wd, ringtest.New(t).Ring())
+
+		// --- Then ---
+		assert.ErrorEqual(t, "target exited without returning", err)
+	})
+
+	t.Run("target cleanup runs after signal", func(t *testing.T) {
+		// --- Given ---
+		tst := ringtest.New(t).WetStdout()
+		sig := make(chan os.Signal, 1)
+		defer signal.Stop(sig)
+		wd := must.Value(os.Getwd())
+
+		started := make(chan struct{})
+		fn := func(ctx context.Context, rng *ring.Ring) error {
+			close(started)
+			<-ctx.Done()
+			time.Sleep(50 * time.Millisecond) // Cleanup.
+			_, _ = fmt.Fprint(rng.Stdout(), "cleaned")
+			return ctx.Err()
+		}
+		go func() { <-started; sig <- syscall.SIGINT }()
+
+		// --- When ---
+		err := runTarget(t.Context(), sig, fn, wd, tst.Ring())
+
+		// --- Then ---
+		var ier interruptedError
+		assert.ErrorAs(t, &ier, err)
+		assert.Equal(t, "cleaned", tst.Stdout())
+	})
+
+	t.Run("second signal skips cleanup wait", func(t *testing.T) {
+		// --- Given ---
+		tst := ringtest.New(t)
+		sig := make(chan os.Signal, 1)
+		defer signal.Stop(sig)
+		wd := must.Value(os.Getwd())
+
+		release := make(chan struct{})
+		defer close(release)
+		started := make(chan struct{})
+		fn := func(_ context.Context, _ *ring.Ring) error {
+			close(started)
+			<-release // Ignores the canceled context.
+			return nil
+		}
+		go func() {
+			<-started
+			sig <- syscall.SIGINT
+			sig <- syscall.SIGINT
+		}()
+
+		// --- When ---
+		err := runTarget(t.Context(), sig, fn, wd, tst.Ring())
+
+		// --- Then ---
+		var ier interruptedError
+		assert.ErrorAs(t, &ier, err)
 	})
 
 	t.Run("cwd restored after timeout", func(t *testing.T) {
@@ -569,6 +681,94 @@ func Test_runTarget(t *testing.T) {
 		assert.Equal(t, wd, must.Value(os.Getwd()))
 		assert.Equal(t, fmt.Sprintf("changed to %s", cwd), tst.Stdout())
 		assert.Empty(t, tst.Stderr())
+	})
+}
+
+func Test_timedOut(t *testing.T) {
+	t.Run("timeout deadline", func(t *testing.T) {
+		// --- Given ---
+		ctx, cxl := context.WithTimeoutCause(t.Context(), 0, errTimeout)
+		defer cxl()
+
+		// --- When ---
+		err := timedOut(ctx, context.DeadlineExceeded)
+
+		// --- Then ---
+		assert.ErrorIs(t, errTimeout, err)
+		assert.ErrorIs(t, context.DeadlineExceeded, err)
+	})
+
+	t.Run("other deadline", func(t *testing.T) {
+		// --- Given ---
+		ctx, cxl := context.WithTimeout(t.Context(), 0)
+		defer cxl()
+
+		// --- When ---
+		err := timedOut(ctx, context.DeadlineExceeded)
+
+		// --- Then ---
+		assert.ErrorIsNot(t, errTimeout, err)
+		assert.ErrorIs(t, context.DeadlineExceeded, err)
+	})
+
+	t.Run("not a deadline", func(t *testing.T) {
+		// --- Given ---
+		ctx, cxl := context.WithTimeoutCause(t.Context(), 0, errTimeout)
+		defer cxl()
+		want := errors.New("test error")
+
+		// --- When ---
+		err := timedOut(ctx, want)
+
+		// --- Then ---
+		assert.Same(t, want, err)
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		// --- When ---
+		err := timedOut(t.Context(), nil)
+
+		// --- Then ---
+		assert.NoError(t, err)
+	})
+}
+
+func Test_awaitDone(t *testing.T) {
+	t.Run("done closed", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error, 1)
+		done <- nil
+		close(done)
+
+		// --- When ---
+		awaitDone(done, make(chan os.Signal), time.Hour)
+
+		// --- Then ---
+		_, open := <-done
+		assert.False(t, open)
+	})
+
+	t.Run("second signal", func(t *testing.T) {
+		// --- Given ---
+		sig := make(chan os.Signal, 1)
+		sig <- syscall.SIGINT
+
+		// --- When ---
+		awaitDone(make(chan error), sig, time.Hour)
+
+		// --- Then ---
+		assert.Len(t, 0, sig)
+	})
+
+	t.Run("grace elapsed", func(t *testing.T) {
+		// --- Given ---
+		start := time.Now()
+
+		// --- When ---
+		awaitDone(make(chan error), make(chan os.Signal), time.Millisecond)
+
+		// --- Then ---
+		assert.True(t, time.Since(start) < time.Hour)
 	})
 }
 

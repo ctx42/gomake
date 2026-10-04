@@ -93,10 +93,10 @@ gomake --tmp /fast/tmp build
 |---------|----------------------------------------------------------------|
 | `0`     | Success                                                        |
 | `1`     | General error (config, I/O, or target failure)                 |
+| `124`   | Makefile or generated code failed to compile                   |
 | `125`   | Target exceeded the `--timeout` deadline                       |
 | `126`   | No target given and no default target is set (`ErrPickTarget`) |
 | `127`   | Unknown target name (`ErrUnkTarget`)                           |
-| `129`   | Makefile or generated code failed to compile                   |
 | `128+n` | Terminated by fatal signal `n`                                 |
 
 ---

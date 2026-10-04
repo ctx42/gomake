@@ -279,3 +279,9 @@ func TgtChdir() *Target {
 		},
 	}
 }
+
+// tstSignal is an [os.Signal] without a signal number.
+type tstSignal struct{}
+
+func (tstSignal) String() string { return "test signal" }
+func (tstSignal) Signal()        {}

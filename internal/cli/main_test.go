@@ -138,7 +138,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 	t.Run("print version", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStderr()
+		tst := ringtest.New(t).WetStdout()
 		relPath := "testdata/projects/no_makefiles/project"
 		absPath := modkit.Path(relPath)
 
@@ -161,7 +161,7 @@ func mainNoMakefileInWD(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, mkf.ExitCodeOK, have)
-		assert.Equal(t, "1.2.3\n", tst.Stderr())
+		assert.Equal(t, "1.2.3\n", tst.Stdout())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -951,7 +951,7 @@ func mainCases(t *testing.T) {
 
 	t.Run("show version", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStderr()
+		tst := ringtest.New(t).WetStdout()
 
 		relPath := "testdata/projects/showcase_imports/project"
 		absPath := modkit.Path(relPath)
@@ -975,13 +975,13 @@ func mainCases(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, 0, have)
-		assert.Equal(t, "1.2.3\n", tst.Stderr())
+		assert.Equal(t, "1.2.3\n", tst.Stdout())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
 	t.Run("list targets", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStderr()
+		tst := ringtest.New(t).WetStdout()
 		relPath := "testdata/projects/showcase_targets/project"
 		absPath := modkit.Path(relPath)
 
@@ -1005,7 +1005,7 @@ func mainCases(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, 0, have)
 		gfp := filepath.Join(absPath, "list_with_builtin.no_trim.gld")
-		assert.Equal(t, goldy.Open(t, gfp).String(), tst.Stderr())
+		assert.Equal(t, goldy.Open(t, gfp).String(), tst.Stdout())
 		assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 	})
 
@@ -1189,7 +1189,8 @@ func mainTargetTimeouts(t *testing.T) {
 
 			// --- Then ---
 			assert.Equal(t, 125, have)
-			assert.Equal(t, "context deadline exceeded\n", tst.Stderr())
+			want := "target exceeded the timeout: context deadline exceeded\n"
+			assert.Equal(t, want, tst.Stderr())
 			assert.Len(t, 0, oskit.List(t, prj.TempDir()))
 		})
 }
@@ -1770,7 +1771,7 @@ func Test_Main_nestedTmp(t *testing.T) {
 	// --- Given ---
 	// Nested --tmp must create missing parents (MkdirAll). --list runs past
 	// tmp setup without requiring a makefile.
-	tst := ringtest.New(t).WetStderr()
+	tst := ringtest.New(t).WetStdout()
 	tmp := filepath.Join(t.TempDir(), "a", "b", "c")
 	src := t.TempDir()
 	rng := tst.Ring("--list", "--tmp", tmp, "--src", src)
@@ -1781,7 +1782,7 @@ func Test_Main_nestedTmp(t *testing.T) {
 	// --- Then ---
 	assert.Equal(t, 0, have)
 	assert.True(t, must.Value(os.Stat(tmp)).IsDir())
-	_ = tst.Stderr() // empty or target list; just drain WetStderr
+	_ = tst.Stdout() // empty or target list; just drain WetStderr
 }
 
 func Test_Main_targetConfig(t *testing.T) {
@@ -1822,7 +1823,7 @@ func Test_Main_targetConfig(t *testing.T) {
 func Test_Main_setsContractEnv(t *testing.T) {
 	// --- Given ---
 	// --version returns early after EnvSet of the public contract keys.
-	tst := ringtest.New(t).WetStderr()
+	tst := ringtest.New(t).WetStdout()
 	tmp := t.TempDir()
 	src := t.TempDir()
 	rng := tst.Ring("--version", "--tmp", tmp, "--src", src)
@@ -1833,7 +1834,7 @@ func Test_Main_setsContractEnv(t *testing.T) {
 
 	// --- Then ---
 	assert.Equal(t, 0, have)
-	assert.Equal(t, ver+"\n", tst.Stderr())
+	assert.Equal(t, ver+"\n", tst.Stdout())
 	assert.Equal(t, ver, rng.EnvGet(gomake.VersionEnvKey))
 	assert.Equal(t, src, rng.EnvGet(gomake.ProjectDirEnvKey))
 	assert.Equal(t, ver, rng.MetaGet(gomake.VersionEnvKey))

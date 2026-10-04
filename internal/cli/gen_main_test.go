@@ -79,7 +79,7 @@ func Test_genMain(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		want := "no targets\n"
-		assert.Equal(t, want, exekit.New(t).ExeStderr(prj.Compile(), "--list"))
+		assert.Equal(t, want, exekit.New(t).ExeStdout(prj.Compile(), "--list"))
 	})
 
 	t.Run("no targets print version", func(t *testing.T) {
@@ -94,8 +94,8 @@ func Test_genMain(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		want := "1.2.3\n"
-		stderr := exekit.New(t).ExeStderr(prj.Compile(), "--version")
-		assert.Equal(t, want, stderr)
+		stdout := exekit.New(t).ExeStdout(prj.Compile(), "--version")
+		assert.Equal(t, want, stdout)
 	})
 
 	t.Run("makefile without targets print help", func(t *testing.T) {
@@ -137,7 +137,7 @@ func Test_genMain(t *testing.T) {
 			"is a test target with help message\n" +
 			"ns:pkg1\n" +
 			"pkg0                           is an example target\n"
-		assert.Equal(t, want, exekit.New(t).ExeStderr(prj.Compile(), "--list"))
+		assert.Equal(t, want, exekit.New(t).ExeStdout(prj.Compile(), "--list"))
 	})
 
 	t.Run("run local target", func(t *testing.T) {

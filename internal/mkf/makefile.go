@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -42,18 +43,30 @@ var (
 	// ErrPickTarget is an error returned when makefile has no default target
 	// and none was provided.
 	ErrPickTarget = errors.New("pick a target to execute")
+
+	// errTimeout is the cancellation cause of a target run that exceeded the
+	// --timeout deadline.
+	errTimeout = errors.New("target exceeded the timeout")
 )
 
-// interruptedError wraps signal code and is returned when target execution has
-// been interrupted by an OS signal.
-type interruptedError int
+// interruptedError is returned when target execution has been interrupted by
+// an OS signal.
+type interruptedError struct {
+	sig os.Signal // The signal that interrupted the target.
+}
 
-var _ error = interruptedError(0)
+var _ error = interruptedError{}
 
 func (ier interruptedError) Error() string { return "target interrupted" }
 
-// Signal returns signal code.
-func (ier interruptedError) Signal() int { return int(ier) }
+// ExitCode returns 128+n for the signal number n, or [ExitCodeErr] when the
+// signal has no number.
+func (ier interruptedError) ExitCode() int {
+	if num, ok := ier.sig.(syscall.Signal); ok {
+		return exitCodeSignal + int(num)
+	}
+	return ExitCodeErr
+}
 
 // WithMakefileVersion is the [NewMakefile] option setting the [Makefile]
 // version.
@@ -63,19 +76,25 @@ func WithMakefileVersion(version string) func(*Makefile) {
 
 // WithMakefileArgs is the [NewMakefile] option setting the [Makefile]
 // arguments. If you call this function without arguments, the [Makefile]
-// arguments are set to an empty slice instead of [os.Args].
+// arguments are set to an empty slice instead of [os.Args]. The arguments
+// replace the ring's own, whatever the order of the options.
 func WithMakefileArgs(args ...string) func(*Makefile) {
 	return func(cmf *Makefile) {
 		if args == nil {
 			args = []string{}
 		}
-		cmf.rng = cmf.rng.SetArgs(args)
+		cmf.args = args
 	}
 }
 
-// WithMakefileRing is the [NewMakefile] option setting ring to use.
+// WithMakefileRing is the [NewMakefile] option setting ring to use. A nil
+// ring is ignored.
 func WithMakefileRing(rng *ring.Ring) func(*Makefile) {
-	return func(cmf *Makefile) { cmf.rng = rng }
+	return func(cmf *Makefile) {
+		if rng != nil {
+			cmf.rng = rng
+		}
+	}
 }
 
 // Makefile runs targets.
@@ -97,6 +116,9 @@ type Makefile struct {
 	// Makefile environment and I/O streams.
 	rng *ring.Ring
 
+	// Arguments set by [WithMakefileArgs]; nil keeps the ring's arguments.
+	args []string
+
 	// Makefile version.
 	version string
 
@@ -114,7 +136,7 @@ type Makefile struct {
 func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 	wd, err := os.Getwd()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("working directory: %w", err)
 	}
 
 	cmf := &Makefile{
@@ -124,6 +146,9 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 	}
 	for _, opt := range opts {
 		opt(cmf)
+	}
+	if cmf.args != nil {
+		cmf.rng = cmf.rng.SetArgs(cmf.args)
 	}
 	cmf.fs = xflag.NewFlagSet("makefile", flag.ContinueOnError)
 	cmf.fs.SetOutput(io.Discard)
@@ -176,9 +201,11 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 // command.
 //
 // Execute may change the working directory. On normal completion it restores
-// the original working directory before returning. On timeout or signal
-// cancellation it returns immediately while the target goroutine restores the
-// directory asynchronously, so the restore may not be visible on return.
+// the original working directory before returning. On a signal it cancels the
+// target's context and waits up to 5 seconds, or until a second signal, for
+// the target to finish its cleanup. On timeout it returns immediately while
+// the target goroutine restores the directory asynchronously, so the restore
+// may not be visible on return.
 //
 // Execute is single-flight. It changes the process working directory and
 // installs process-wide signal handlers, so two calls must not run at once.
@@ -216,7 +243,7 @@ func (cmf *Makefile) Execute(ctx context.Context) error {
 
 	var cxl context.CancelFunc
 	if cmf.timeout > 0 {
-		ctx, cxl = context.WithTimeout(ctx, cmf.timeout)
+		ctx, cxl = context.WithTimeoutCause(ctx, cmf.timeout, errTimeout)
 	} else {
 		ctx, cxl = context.WithCancel(ctx)
 	}
@@ -231,7 +258,7 @@ func (cmf *Makefile) Execute(ctx context.Context) error {
 // fTgtVersion returns an option target that prints the version.
 func fTgtVersion(version string) targetFn {
 	return func(_ context.Context, rng *ring.Ring) error {
-		_, _ = fmt.Fprintln(rng.Stderr(), version)
+		_, _ = fmt.Fprintln(rng.Stdout(), version)
 		return nil
 	}
 }
@@ -239,7 +266,7 @@ func fTgtVersion(version string) targetFn {
 // fTgtList returns an option target that prints the list of available targets.
 func fTgtList(tgs []*Target) targetFn {
 	return func(_ context.Context, rng *ring.Ring) error {
-		_, _ = fmt.Fprint(rng.Stderr(), HelpTargets(tgs, 0))
+		_, _ = fmt.Fprint(rng.Stdout(), HelpTargets(tgs, 0))
 		return nil
 	}
 }

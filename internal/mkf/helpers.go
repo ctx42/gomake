@@ -14,6 +14,7 @@ import (
 	"strings"
 	"syscall"
 	"text/tabwriter"
+	"time"
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/xflag/pkg/xflag"
@@ -29,7 +30,13 @@ const (
 	// ExitCodeErr is exit code for a general error.
 	ExitCodeErr = 1
 
-	// exitCodeDeadline is exit code used when target exceeded given timeout.
+	// ExitCodeCompile is exit code used when compilation of the makefiles and
+	// generated files failed. It sits below the 128+n signal range, so a
+	// compile failure is never mistaken for a SIGHUP (129).
+	ExitCodeCompile = 124
+
+	// exitCodeDeadline is exit code used when target exceeded the --timeout
+	// deadline.
 	exitCodeDeadline = 125
 
 	// ExitCodePickTarget is the exit code used with [ErrPickTarget] error.
@@ -41,10 +48,17 @@ const (
 	// exitCodeSignal is the base number to which signal number which stopped
 	// the gomake is added (128+n).
 	exitCodeSignal = 128
+)
 
-	// ExitCodeCompile is exit code used when compilation of the makefiles and
-	// generated files failed.
-	ExitCodeCompile = 129
+// Signal handling timings.
+const (
+	// signalGrace is how long a target interrupted by a signal has to finish
+	// its cleanup before the makefile exits.
+	signalGrace = 5 * time.Second
+
+	// reraiseWait is how long [Reraise] waits for a re-raised signal to end
+	// the process.
+	reraiseWait = time.Second
 )
 
 // ExitCode returns an exit code associated with the given error. If the error
@@ -53,7 +67,7 @@ func ExitCode(err error) int {
 	switch {
 	case err == nil:
 		return ExitCodeOK
-	case errors.Is(err, context.DeadlineExceeded):
+	case errors.Is(err, errTimeout):
 		return exitCodeDeadline
 	case errors.Is(err, ErrPickTarget):
 		return ExitCodePickTarget
@@ -61,10 +75,32 @@ func ExitCode(err error) int {
 		return ExitCodeUnkTarget
 	default:
 		if e, ok := errors.AsType[interruptedError](err); ok {
-			return e.Signal()
+			return e.ExitCode()
 		}
 		return ExitCodeErr
 	}
+}
+
+// Reraise makes the process die by the signal that interrupted the target
+// run err reports, as it would without the makefile's handler, so a parent
+// shell sees a signal death. It returns when err reports no signal or the
+// signal cannot be re-raised; the caller then exits with [ExitCode].
+func Reraise(err error) {
+	ier, ok := errors.AsType[interruptedError](err)
+	if !ok {
+		return
+	}
+	signal.Reset(ier.sig)
+	prc, err := os.FindProcess(os.Getpid())
+	if err != nil {
+		return
+	}
+	if err = prc.Signal(ier.sig); err != nil {
+		return
+	}
+	// The default action ends the process asynchronously. A signal the
+	// process inherited as ignored has no effect, so give up after a while.
+	time.Sleep(reraiseWait)
 }
 
 // RecoverError takes value returned from recovery function and based on its
@@ -149,22 +185,25 @@ func runTarget(
 		// Remember the working directory before running the target.
 		cwd, err := os.Getwd()
 		if err != nil {
-			done <- err
+			done <- fmt.Errorf("working directory: %w", err)
 			close(done)
 			return
 		}
 
 		var tgtErr error
+		var returned bool // The target returned rather than calling Goexit.
 		defer func() {
 			if v := recover(); v != nil {
 				err = RecoverError(v)
 				tgtErr = fmt.Errorf("target panicked with: %w", err)
+			} else if !returned && tgtErr == nil {
+				tgtErr = errors.New("target exited without returning")
 			}
 			if err = os.Chdir(cwd); err != nil {
 				if tgtErr != nil {
 					done <- fmt.Errorf("%w (restore cwd: %w)", tgtErr, err)
 				} else {
-					done <- err
+					done <- fmt.Errorf("restore cwd: %w", err)
 				}
 			} else {
 				done <- tgtErr
@@ -180,6 +219,7 @@ func runTarget(
 
 		// This is where the target is actually run.
 		tgtErr = fn(ctx, rng)
+		returned = true
 	}()
 
 	// Handle interrupt and termination (containers send SIGTERM).
@@ -194,30 +234,62 @@ func runTarget(
 		select {
 		case itf := <-sig:
 			cxl() // Notify the running target the context has been canceled.
-			// Prefer a finished result, but not a cooperative cancel that
-			// only mirrors our signal — keep the 128+n interrupt exit code.
+			// Prefer a result that raced the signal, but not a cooperative
+			// cancel that only mirrors it — keep the 128+n interrupt code.
 			if err, ok := recvDone(done); ok {
 				if err == nil || !errors.Is(err, context.Canceled) {
 					return err
 				}
+			} else {
+				// Let the target run its deferred cleanup (killing its
+				// subprocesses) before the process exits; a second signal
+				// stops the wait.
+				awaitDone(done, sig, signalGrace)
 			}
-			if i, ok := itf.(syscall.Signal); ok {
-				return interruptedError(exitCodeSignal + int(i))
-			}
-			return interruptedError(1)
+			return interruptedError{sig: itf}
 
 		case <-ctx.Done():
 			if err, ok := recvDone(done); ok {
-				return err
+				return timedOut(ctx, err)
 			}
-			return ctx.Err()
+			return timedOut(ctx, ctx.Err())
 
 		case err, open := <-done:
 			if !open {
 				// Closed without a prior result (should not happen).
 				return nil
 			}
-			return drainDone(done, err)
+			return timedOut(ctx, drainDone(done, err))
+		}
+	}
+}
+
+// timedOut marks err with errTimeout when the --timeout deadline canceled ctx
+// and err reports that deadline, so only gomake's own timeout maps to
+// exitCodeDeadline. Any other error is returned unchanged.
+func timedOut(ctx context.Context, err error) error {
+	if !errors.Is(err, context.DeadlineExceeded) ||
+		!errors.Is(context.Cause(ctx), errTimeout) {
+		return err
+	}
+	return fmt.Errorf("%w: %w", errTimeout, err)
+}
+
+// awaitDone waits until done is closed, a second signal arrives on sig, or
+// grace elapses, whichever comes first.
+func awaitDone(done <-chan error, sig <-chan os.Signal, grace time.Duration) {
+	tmr := time.NewTimer(grace)
+	defer tmr.Stop()
+	for {
+		select {
+		case _, open := <-done:
+			if !open {
+				return
+			}
+		case <-sig:
+			return
+		case <-tmr.C:
+			return
 		}
 	}
 }

@@ -256,7 +256,7 @@ func Test_goMake_Compile(t *testing.T) {
 func Test_goMake_Execute(t *testing.T) {
 	t.Run("show version", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStderr()
+		tst := ringtest.New(t).WetStdout()
 
 		relPth := "testdata/projects/showcase_imports/project"
 		absPth := modkit.Path(relPth)
@@ -282,7 +282,7 @@ func Test_goMake_Execute(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "1.2.3\n", tst.Stderr())
+		assert.Equal(t, "1.2.3\n", tst.Stdout())
 	})
 
 	t.Run("show env", func(t *testing.T) {

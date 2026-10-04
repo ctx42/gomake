@@ -79,7 +79,7 @@ func Main(
 	rng.MetaSet(gomake.ProjectDirEnvKey, cfg.src)
 
 	if cfg.showVersion {
-		_, _ = fmt.Fprintln(rng.Stderr(), ver)
+		_, _ = fmt.Fprintln(rng.Stdout(), ver)
 		return 0
 	}
 
@@ -137,7 +137,7 @@ func Main(
 		if err != nil {
 			return fail(err, mkf.ExitCode(err))
 		}
-		_, _ = fmt.Fprint(rng.Stderr(), mkf.HelpTargets(all, 0))
+		_, _ = fmt.Fprint(rng.Stdout(), mkf.HelpTargets(all, 0))
 		return 0
 	}
 
@@ -221,6 +221,7 @@ func Main(
 		}
 		if code, err = runWithoutCompile(ctx, rng, ver, tgs); err != nil {
 			writeErr(err)
+			mkf.Reraise(err)
 		}
 		return code
 

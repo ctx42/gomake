@@ -109,6 +109,7 @@ func run(ctx context.Context, rng *ring.Ring) (ec int) {
 	err = mf.Execute(ctx)
 	if err != nil {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
+		Reraise(err)
 		return ExitCode(err)
 	}
 	return 0

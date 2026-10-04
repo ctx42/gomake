@@ -1082,10 +1082,10 @@ on stderr only when an operation takes longer than 500 ms, keeping fast
 |---------|-----------------|----------------------------------------------|
 | `0`     | —               | Success                                      |
 | `1`     | —               | General error                                |
+| `124`   | —               | Makefile or generated code failed to compile |
 | `125`   | —               | Target exceeded the `--timeout` deadline     |
 | `126`   | `ErrPickTarget` | No target given and no default target is set |
 | `127`   | `ErrUnkTarget`  | Unknown target name                          |
-| `129`   | —               | Makefile or generated code failed to compile |
 | `128+n` | —               | Terminated by fatal signal `n`               |
 
 ---
