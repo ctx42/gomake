@@ -35,7 +35,20 @@ func Test_rejectArgs(t *testing.T) {
 		err := rejectArgs(fs)
 
 		// --- Then ---
-		assert.ErrorContain(t, "unexpected argument: some/path", err)
+		want := `gomake: unexpected argument: "some/path"`
+		assert.ErrorEqual(t, want, err)
+	})
+
+	t.Run("error - empty positional", func(t *testing.T) {
+		// --- Given ---
+		fs := xflag.NewFlagSet("install", flag.ContinueOnError)
+		must.Nil(fs.Parse([]string{""}))
+
+		// --- When ---
+		err := rejectArgs(fs)
+
+		// --- Then ---
+		assert.ErrorEqual(t, `gomake: unexpected argument: ""`, err)
 	})
 }
 

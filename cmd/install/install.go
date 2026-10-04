@@ -17,6 +17,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -30,14 +31,15 @@ import (
 )
 
 func main() {
+	rng := ring.New()
 	fs := xflag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	usage := "path or URL to a targets.yaml file"
-	targets := fs.String("targets", "", usage)
+	fs.SetOutput(rng.Stderr())
+	targets := fs.String("targets", "", "path or URL to a targets.yaml file")
 	_ = fs.Parse(os.Args[1:])
 
-	rng := ring.New()
 	if err := rejectArgs(fs); err != nil {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
+		fs.Usage()
 		os.Exit(2)
 	}
 
@@ -52,7 +54,7 @@ func main() {
 	}
 
 	info, _ := debug.ReadBuildInfo()
-	if err := install.Main(rng, info, tgs); err != nil {
+	if err := install.Main(context.Background(), rng, info, tgs); err != nil {
 		_, _ = fmt.Fprintln(rng.Stderr(), err)
 		os.Exit(1)
 	}
@@ -65,7 +67,7 @@ func rejectArgs(fs *xflag.FlagSet) error {
 	if len(args) == 0 {
 		return nil
 	}
-	return fmt.Errorf("unexpected argument: %s", args[0])
+	return fmt.Errorf("gomake: unexpected argument: %q", args[0])
 }
 
 // emptyTargetsNote returns the note to print when --targets was set on fs with

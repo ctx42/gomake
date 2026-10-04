@@ -378,6 +378,47 @@ func Test_LoadExternalTargets(t *testing.T) {
 	})
 }
 
+func Test_ExpandTargetsPath(t *testing.T) {
+	t.Run("home relative", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "/ring/home")
+		rng.EnvSet("USERPROFILE", "/ring/home")
+		rng.EnvSet("home", "/ring/home")
+
+		// --- When ---
+		have, err := ExpandTargetsPath(rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join("/ring/home", "targets.yaml"), have)
+	})
+
+	t.Run("absolute", func(t *testing.T) {
+		// --- When ---
+		have, err := ExpandTargetsPath(ring.New(), "/abs/targets.yaml")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "/abs/targets.yaml", have)
+	})
+
+	t.Run("error - home unset", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "")
+		rng.EnvSet("USERPROFILE", "")
+		rng.EnvSet("home", "")
+
+		// --- When ---
+		have, err := ExpandTargetsPath(rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
+		assert.Equal(t, "", have)
+	})
+}
+
 func Test_fetchExternalTargets(t *testing.T) {
 	t.Run("returns parsed config and raw bytes on 200", func(t *testing.T) {
 		// --- Given ---

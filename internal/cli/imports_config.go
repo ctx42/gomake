@@ -147,18 +147,28 @@ func LoadExternalTargets(
 	if isURL {
 		return fetchExternalTargets(ctx, tgs)
 	}
-	if strings.HasPrefix(tgs, "~") {
-		home, err := homeDir(rng)
-		if err != nil {
-			return nil, err
-		}
-		tgs = expandHome(tgs, home)
+	tgs, err := ExpandTargetsPath(rng, tgs)
+	if err != nil {
+		return nil, err
 	}
 	cfg, err := readExternalTargets(tgs)
 	if errors.Is(err, os.ErrNotExist) {
 		return &ImportsConfig{}, nil
 	}
 	return cfg, err
+}
+
+// ExpandTargetsPath expands a leading "~" in a local targets path to the
+// user's home directory read from env. It returns any other path unchanged.
+func ExpandTargetsPath(env ring.Environ, tgs string) (string, error) {
+	if !strings.HasPrefix(tgs, "~") {
+		return tgs, nil
+	}
+	home, err := homeDir(env)
+	if err != nil {
+		return "", err
+	}
+	return expandHome(tgs, home), nil
 }
 
 // fetchExternalTargets performs an HTTP GET for url, parses the response body

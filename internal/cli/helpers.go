@@ -40,10 +40,10 @@ func expandHome(pth, home string) string {
 	return pth
 }
 
-// homeDir returns the user's home directory from rng. It reads USERPROFILE
+// homeDir returns the user's home directory from env. It reads USERPROFILE
 // on Windows, home on Plan 9, and HOME otherwise. Android and iOS use the
 // platform default when that variable is unset.
-func homeDir(rng *ring.Ring) (string, error) {
+func homeDir(env ring.Environ) (string, error) {
 	key, unset := "HOME", "$HOME"
 	switch runtime.GOOS {
 	case "windows":
@@ -51,7 +51,7 @@ func homeDir(rng *ring.Ring) (string, error) {
 	case "plan9":
 		key, unset = "home", "$home"
 	}
-	if v := rng.EnvGet(key); v != "" {
+	if v := env.EnvGet(key); v != "" {
 		return v, nil
 	}
 	switch runtime.GOOS {

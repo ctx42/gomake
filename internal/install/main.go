@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -30,13 +31,19 @@ import (
 // and standard streams; info is the [debug.BuildInfo] embedded by the
 // toolchain, which supplies both the version to record and the installation
 // mode ("(devel)" for `go run ./cmd/install`, an actual version for
-// `go run ...@version`).
-func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
+// `go run ...@version`). The ctx bounds fetching a --targets URL.
+func Main(
+	ctx context.Context,
+	rng *ring.Ring,
+	info *debug.BuildInfo,
+	tgs string,
+) error {
+
 	dst, err := cli.GoBinPath(rng)
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
-	return installTo(rng, info, dst, tgs)
+	return installTo(ctx, rng, info, dst, tgs)
 }
 
 // installTo builds the gomake binary and installs it into dst. It is the
@@ -58,6 +65,7 @@ func Main(rng *ring.Ring, info *debug.BuildInfo, tgs string) error {
 //
 //nolint:cyclop,gocognit
 func installTo(
+	ctx context.Context,
 	rng *ring.Ring,
 	info *debug.BuildInfo,
 	dst string,
@@ -77,7 +85,9 @@ func installTo(
 	}
 
 	// Isolate go tool invocations from the caller's ambient workspace;
-	// setupWorkspace may override with a private workfile when needed.
+	// setupWorkspace may override with a private workfile when needed. The
+	// caller's value is restored on return.
+	defer restoreEnv(rng, "GOWORK")()
 	rng.EnvSet("GOWORK", "off")
 
 	// Resolve the read-only source: module root for a devel build (not CWD),
@@ -98,7 +108,7 @@ func installTo(
 
 	// Resolve the effective imports: a --targets file (path or URL) overrides
 	// the source targets.yaml.
-	cfg, err := effectiveImports(rng, src, tgs)
+	cfg, err := effectiveImports(ctx, rng, src, tgs)
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
@@ -120,11 +130,7 @@ func installTo(
 			if err != nil {
 				return err
 			}
-			defer func() {
-				if rerr := restore(); err == nil {
-					err = rerr
-				}
-			}()
+			defer func() { err = joinRestore(err, restore) }()
 		}
 		return build(rng, src, dst, ldflags)
 	}
@@ -133,7 +139,7 @@ func installTo(
 	// the effective targets.yaml into it, then go get + regenerate builtins.
 	buildDir := src
 	if !devel {
-		tmp, cleanup, cerr := copyToTemp(src)
+		tmp, cleanup, cerr := copyToTemp(rng, src)
 		if cerr != nil {
 			return cerr
 		}
@@ -152,15 +158,7 @@ func installTo(
 		if err != nil {
 			return fmt.Errorf("gomake: %w", err)
 		}
-		defer func() {
-			if rerr := restore(); rerr != nil {
-				if err != nil {
-					err = errors.Join(err, rerr)
-				} else {
-					err = fmt.Errorf("gomake: restore generated: %w", rerr)
-				}
-			}
-		}()
+		defer func() { err = joinRestore(err, restore) }()
 	}
 
 	// Local --targets in a Go module: resolve that module from disk via a
@@ -190,6 +188,7 @@ func installTo(
 // directly; otherwise the source targets.yaml in srcDir is used. A missing
 // source file returns an empty config. A missing --targets file is an error.
 func effectiveImports(
+	ctx context.Context,
 	rng *ring.Ring,
 	srcDir string,
 	tgs string,
@@ -199,7 +198,7 @@ func effectiveImports(
 	if tgs != "" {
 		pth = tgs
 	}
-	cfg, err := cli.LoadExternalTargets(context.Background(), rng, pth)
+	cfg, err := cli.LoadExternalTargets(ctx, rng, pth)
 	if err != nil {
 		return nil, err
 	}
@@ -214,7 +213,7 @@ func effectiveImports(
 func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	// A neutral directory keeps a go.mod in the process working directory
 	// from changing which module is downloaded.
-	dir, err := os.MkdirTemp("", "gomake-mod-*")
+	dir, err := os.MkdirTemp(tempRoot(env), "gomake-mod-*")
 	if err != nil {
 		return "", fmt.Errorf("module download temp: %w", err)
 	}
@@ -266,8 +265,9 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 //
 // It returns an empty module path and a no-op cleanup when tgs is empty, is a
 // URL, or its directory is not inside a module: the caller then falls back to
-// `go get`. The returned cleanup removes the workspace file and unsets GOWORK;
-// it is always safe to call.
+// `go get`. While the workspace is active GOFLAGS loses any "-mod=mod", which
+// workspace mode rejects. The returned cleanup removes the workspace file,
+// sets GOWORK back to "off" and restores GOFLAGS; it is always safe to call.
 func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 	string,
 	func(),
@@ -281,6 +281,10 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 		strings.HasPrefix(lower, "https://") {
 		return "", noop, nil
 	}
+	tgs, err := cli.ExpandTargetsPath(env, tgs)
+	if err != nil {
+		return "", noop, err
+	}
 	mod, root, ok, err := moduleAt(env, filepath.Dir(tgs))
 	if err != nil {
 		return "", noop, err
@@ -289,21 +293,38 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 		return "", noop, nil
 	}
 
-	wsDir, err := os.MkdirTemp("", "gomake-work-*")
+	wsDir, err := os.MkdirTemp(tempRoot(env), "gomake-work-*")
 	if err != nil {
 		return "", noop, err
 	}
+	restoreFlags := restoreEnv(env, "GOFLAGS")
 	cleanup := func() {
 		// Restore isolation, not the caller's ambient GOWORK.
 		env.EnvSet("GOWORK", "off")
+		restoreFlags()
 		_ = os.RemoveAll(wsDir)
 	}
 	env.EnvSet("GOWORK", filepath.Join(wsDir, "go.work"))
+	// Workspace mode rejects -mod=mod; the workspace resolves modules itself.
+	if flags, ok := env.EnvLookup("GOFLAGS"); ok {
+		env.EnvSet("GOFLAGS", withoutModMod(flags))
+	}
 	if err = goWorkInit(env, wsDir, buildDir, root); err != nil {
 		cleanup()
 		return "", noop, err
 	}
 	return mod, cleanup, nil
+}
+
+// withoutModMod returns the GOFLAGS value flags without its "-mod=mod" flags.
+func withoutModMod(flags string) string {
+	var kept []string
+	for _, flag := range strings.Fields(flags) {
+		if flag != "-mod=mod" && flag != "--mod=mod" {
+			kept = append(kept, flag)
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // moduleAt reports the Go module that dir belongs to, returning the module's
@@ -366,6 +387,33 @@ func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
 		return fmt.Errorf("go work init: %w: %s", err, msg)
 	}
 	return nil
+}
+
+// restoreEnv returns a function restoring env's variable key to its current
+// value, or unsetting it when it is unset now.
+func restoreEnv(env ring.Environ, key string) func() {
+	val, set := env.EnvLookup(key)
+	return func() {
+		if set {
+			env.EnvSet(key, val)
+			return
+		}
+		env.EnvUnset(key)
+	}
+}
+
+// joinRestore runs restore and folds its error into err: joined to a failure,
+// wrapped with context after a success.
+func joinRestore(err error, restore func() error) error {
+	rerr := restore()
+	switch {
+	case rerr == nil:
+		return err
+	case err != nil:
+		return errors.Join(err, rerr)
+	default:
+		return fmt.Errorf("gomake: restore generated: %w", rerr)
+	}
 }
 
 // snapshotGenerated records the current contents of the files a full in-source
@@ -431,13 +479,14 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 	}, nil
 }
 
-// copyToTemp copies the read-only module source at srcDir into a fresh temp
-// directory the caller owns, so go get and codegen can write into it. It
-// returns the temp path and a cleanup the caller must defer. On error it
-// removes any temp directory it created and returns a no-op cleanup.
-func copyToTemp(src string) (string, func(), error) {
+// copyToTemp copies the read-only module source at src into a fresh temp
+// directory under tempRoot(env) the caller owns, so go get and codegen can
+// write into it. It returns the temp path and a cleanup the caller must defer.
+// On error it removes any temp directory it created and returns a no-op
+// cleanup.
+func copyToTemp(env ring.Environ, src string) (string, func(), error) {
 	noop := func() {}
-	tempDir, err := os.MkdirTemp("", "gomake-install-*")
+	tempDir, err := os.MkdirTemp(tempRoot(env), "gomake-install-*")
 	if err != nil {
 		return "", noop, err
 	}
@@ -447,6 +496,22 @@ func copyToTemp(src string) (string, func(), error) {
 		return "", noop, err
 	}
 	return tempDir, cleanup, nil
+}
+
+// tempRoot returns the directory for temporary files named by env, as
+// [os.TempDir] does for the process environment: TMPDIR on Unix, TMP or TEMP
+// on Windows. It falls back to [os.TempDir] when env names none.
+func tempRoot(env ring.Environ) string {
+	keys := []string{"TMPDIR"}
+	if runtime.GOOS == "windows" {
+		keys = []string{"TMP", "TEMP"}
+	}
+	for _, key := range keys {
+		if dir := env.EnvGet(key); dir != "" {
+			return dir
+		}
+	}
+	return os.TempDir()
 }
 
 // copyDir recursively copies src into dst. Files are written with mode 0o600

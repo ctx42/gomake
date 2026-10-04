@@ -56,7 +56,8 @@ func buildMain(env ring.Environ, dir, out, mainPkg, ldflags string) error {
 	cmd.Dir = dir
 	outBytes, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(outBytes)))
+		detail := strings.TrimSpace(string(outBytes))
+		return fmt.Errorf("go build: %w: %s", err, detail)
 	}
 	return nil
 }

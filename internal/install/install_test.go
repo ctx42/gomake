@@ -10,6 +10,7 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/oskit"
 )
 
@@ -93,14 +94,21 @@ func Test_buildMain(t *testing.T) {
 		env := ring.New()
 		dir := t.TempDir()
 		out := filepath.Join(dir, "bin")
-		mainGo := oskit.Write(t, src, dir, "main.go")
+		prog := "" +
+			"package main\n" +
+			"\n" +
+			"var v string\n" +
+			"\n" +
+			"func main() { print(v) }\n"
+		mainGo := oskit.Write(t, prog, dir, "main.go")
 
 		// --- When ---
-		err := buildMain(env, dir, out, mainGo, "-s -w")
+		err := buildMain(env, dir, out, mainGo, "-X main.v=stamped")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.FileExist(t, out)
+		have := must.Value(exec.Command(out).CombinedOutput())
+		assert.Equal(t, "stamped", string(have))
 	})
 
 	t.Run("error - build fails", func(t *testing.T) {
@@ -116,6 +124,7 @@ func Test_buildMain(t *testing.T) {
 		// --- Then ---
 		var ee *exec.ExitError
 		assert.ErrorAs(t, &ee, err)
+		assert.ErrorRegexp(t, "^go build: exit status 1: ", err)
 		assert.NoFileExist(t, out)
 	})
 }
