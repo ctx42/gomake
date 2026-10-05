@@ -1,3 +1,40 @@
+## v0.28.0 (Mon, 05 Oct 2026 16:58:14 UTC)
+- fix(gomake): harden config, env, file, and reader helpers.
+- fix: wrap errors with %w.
+- refactor(version): rename Version to Line.
+- fix(parser): fix target discovery and go list caching.
+- fix(mkf): harden target lookup, help, timeout, and ring checks.
+- fix(cli): fix binary cache keys, module edits, and interrupts.
+- fix(install): validate input and keep the caller's tree intact.
+- fix(osarch): guard the dist list and go.mod parsing.
+- fix(builtin): validate generator input and write files safely.
+- fix(clitest,builtintest): fix test helper edge cases.
+- test: assert the cause and output of each error path.
+- docs: complete and correct godoc.
+- test: restructure tests around Given, When, and Then.
+- refactor: return command errors and accept nil targets.
+- test: cover missed error returns.
+- style: tidy names, line length, and constant groups.
+- deps: update ring to v0.8.0 and xflag to v0.11.0.
+- fix: stop package loads when the context ends.
+- style: tidy tests and drop redundant code.
+- refactor: drop context from source analysis and go edits.
+- fix: let gomake die on a signal and simplify internals.
+- fix: put the generated-code header above the package clause.
+- refactor: parse go.mod and go.work with x/mod/modfile.
+- fix(gomake)!: fix ReadChar, config paths, env, and exit codes.
+- fix(mkf)!: fix exit codes, signal handling, and option order.
+- fix(install): fix workspace, environment, and error handling.
+- fix(cli): fix cache keying, config errors, and generated main.
+- fix(parser)!: fix import resolution, namespaces, and Default.
+- fix(builtin): fix generated import paths and file writes.
+- fix(clitest,builtintest): fix test helper failures.
+- fix(osarch): run the version generator on any toolchain.
+- docs(version): state what the version must encode for the cache.
+- style: tidy code, godoc, and tests.
+- docs: describe signal exits, cache key inputs, and skipped targets.
+- ci(docs): deploy GitHub Pages only on version tags.
+
 ## v0.27.1 (Thu, 24 Sep 2026 11:46:05 UTC)
 - build(deps): bump testkit to v0.15.0.
 
