@@ -33,11 +33,9 @@ func Test_getFile(t *testing.T) {
 		// --- Given ---
 		tspy := tester.New(t, 1)
 		tspy.ExpectError()
-
 		wMsg := "" +
 			"expected map to have a file:\n" +
 			"  path: dir/file2.go"
-
 		tspy.ExpectLogContain(wMsg)
 		tspy.Close()
 

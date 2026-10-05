@@ -21,10 +21,6 @@ import (
 	"github.com/goccy/go-yaml"
 )
 
-// TargetsFile is the YAML config file name for external target imports. It
-// lives at the gomake source root and is committed to the repo.
-const TargetsFile = "targets.yaml"
-
 // Remote targets file limits.
 const (
 	// fetchTimeout bounds an HTTP fetch of an external targets file.
@@ -132,11 +128,11 @@ func (cfg *ImportsConfig) importLines() []string {
 	return lines
 }
 
-// LoadExternalTargets loads a targets.yaml from pathOrURL. If pathOrURL begins
-// with "http://" or "https://" the file is fetched over HTTP; otherwise it is
-// read from the local filesystem, with a leading "~" or "~/" expanded using
-// the home directory from rng. A missing local file returns an empty config
-// without error. The context cancels in-flight HTTP fetches; local reads
+// LoadExternalTargets loads a targets.yaml from tgs, a path or URL. If tgs
+// begins with "http://" or "https://" the file is fetched over HTTP; otherwise
+// it is read from the local filesystem, with a leading "~" or "~/" expanded
+// using the home directory from rng. A missing local file returns an empty
+// config without error. The context cancels in-flight HTTP fetches; local reads
 // ignore it except for a pre-check of ctx.Err().
 func LoadExternalTargets(
 	ctx context.Context,
@@ -179,7 +175,7 @@ func ExpandTargetsPath(env ring.Environ, tgs string) (string, error) {
 
 // fetchExternalTargets performs an HTTP GET for url, parses the response body
 // as targets.yaml, and returns the config with Raw set to the response body.
-// The GET is bounded by the shorter of [fetchTimeout] and ctx.
+// The GET is bounded by the shorter of fetchTimeout and ctx.
 func fetchExternalTargets(
 	ctx context.Context,
 	url string,
@@ -237,7 +233,7 @@ func readExternalTargets(pth string) (*ImportsConfig, error) {
 
 // parseExternalTargets decodes the YAML content of a targets.yaml file and
 // returns the import config. It rejects unknown fields and invalid YAML with
-// [errInvConfig] and duplicate import paths with [errDupImportPath].
+// errInvConfig and duplicate import paths with errDupImportPath.
 func parseExternalTargets(data []byte) (*ImportsConfig, error) {
 	imports, err := decodeTargetsYAML(data)
 	if err != nil {
@@ -251,7 +247,7 @@ func parseExternalTargets(data []byte) (*ImportsConfig, error) {
 
 // decodeTargetsYAML decodes the YAML content of targets.yaml and returns the
 // import entries. Each entry must have a non-empty "import" field. Unknown
-// fields and invalid YAML are rejected with [errInvConfig]. An empty document
+// fields and invalid YAML are rejected with errInvConfig. An empty document
 // has no entries.
 func decodeTargetsYAML(data []byte) ([]ImportEntry, error) {
 	var raw struct {
@@ -286,7 +282,7 @@ func decodeTargetsYAML(data []byte) ([]ImportEntry, error) {
 	return entries, nil
 }
 
-// validateNoDupPaths returns [errDupImportPath] when any path string appears
+// validateNoDupPaths returns errDupImportPath when any path string appears
 // more than once in imports.
 func validateNoDupPaths(imports []ImportEntry) error {
 	seen := make(map[string]struct{}, len(imports))

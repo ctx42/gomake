@@ -85,11 +85,6 @@ func NewTestHelper(
 	return tst
 }
 
-// Funcs returns documentation for all functions.
-func (tst *TestHelper) Funcs() []*doc.Func {
-	return tst.docPkg.Funcs
-}
-
 // Func returns documentation for function with given name.
 func (tst *TestHelper) Func(name string) *doc.Func {
 	tst.t.Helper()
@@ -114,11 +109,6 @@ func (tst *TestHelper) Method(rcv, name string) (*doc.Func, []string) {
 	}
 	tst.t.Errorf("method `%s.%s` not found", rcv, name)
 	return nil, nil
-}
-
-// Types returns all types.
-func (tst *TestHelper) Types() []*doc.Type {
-	return tst.docPkg.Types
 }
 
 // Type returns type by name.
@@ -165,9 +155,6 @@ func (tst *TestHelper) ImportSpecs(name string) []*ast.ImportSpec {
 	}
 	return specs
 }
-
-// Values returns package declared variables / constants.
-func (tst *TestHelper) Values() []*doc.Value { return tst.docPkg.Vars }
 
 // goFilesIn returns the paths of the non-directory *.go entries in dir. It
 // panics when dir cannot be read.

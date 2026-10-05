@@ -11,6 +11,7 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
+	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/oskit"
 )
 
@@ -18,7 +19,7 @@ func Test_build(t *testing.T) {
 	const mainSrc = "package main\n\nfunc main() {}\n"
 	const goMod = "module example.test\n\ngo 1.24\n"
 
-	setup := func(t *testing.T) (root, cmdDir string) {
+	setup := func(t tester.T) (root, cmdDir string) {
 		t.Helper()
 		root = t.TempDir()
 		oskit.Write(t, goMod, root, "go.mod")
@@ -26,15 +27,15 @@ func Test_build(t *testing.T) {
 		return root, cmdDir
 	}
 
-	t.Run("creates dstDir and builds cmd/gomake", func(t *testing.T) {
+	t.Run("creates dstDir", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		root, cmdDir := setup(t)
 		oskit.Write(t, mainSrc, cmdDir, "main.go")
 		dst := filepath.Join(t.TempDir(), "out")
 
 		// --- When ---
-		err := build(env, root, dst, "")
+		err := build(rng, root, dst, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -43,27 +44,27 @@ func Test_build(t *testing.T) {
 
 	t.Run("builds into an existing dstDir", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		root, cmdDir := setup(t)
 		oskit.Write(t, mainSrc, cmdDir, "main.go")
 		dst := t.TempDir() // already exists
 
 		// --- When ---
-		err := build(env, root, dst, "")
+		err := build(rng, root, dst, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.FileExist(t, filepath.Join(dst, gomakeBinName))
 	})
 
-	t.Run("error - cmd/gomake is missing", func(t *testing.T) {
+	t.Run("error - missing main package", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		root, _ := setup(t)
 		dst := t.TempDir()
 
 		// --- When ---
-		err := build(env, root, dst, "")
+		err := build(rng, root, dst, "")
 
 		// --- Then ---
 		var ee *exec.ExitError
@@ -76,13 +77,13 @@ func Test_buildMain(t *testing.T) {
 
 	t.Run("builds a main package", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		dir := t.TempDir()
 		out := filepath.Join(dir, "bin")
 		mainGo := oskit.Write(t, src, dir, "main.go")
 
 		// --- When ---
-		err := buildMain(env, dir, out, mainGo, "")
+		err := buildMain(rng, dir, out, mainGo, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -91,7 +92,7 @@ func Test_buildMain(t *testing.T) {
 
 	t.Run("passes ldflags", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		dir := t.TempDir()
 		out := filepath.Join(dir, "bin")
 		prog := "" +
@@ -103,7 +104,7 @@ func Test_buildMain(t *testing.T) {
 		mainGo := oskit.Write(t, prog, dir, "main.go")
 
 		// --- When ---
-		err := buildMain(env, dir, out, mainGo, "-X main.v=stamped")
+		err := buildMain(rng, dir, out, mainGo, "-X main.v=stamped")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -113,13 +114,13 @@ func Test_buildMain(t *testing.T) {
 
 	t.Run("error - build fails", func(t *testing.T) {
 		// --- Given ---
-		env := ring.New()
+		rng := ring.New()
 		dir := t.TempDir()
 		out := filepath.Join(dir, "bin")
 		missing := filepath.Join(dir, "does-not-exist.go")
 
 		// --- When ---
-		err := buildMain(env, dir, out, missing, "")
+		err := buildMain(rng, dir, out, missing, "")
 
 		// --- Then ---
 		var ee *exec.ExitError

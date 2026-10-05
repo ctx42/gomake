@@ -11,9 +11,6 @@ import (
 	"path/filepath"
 )
 
-// ErrNoGoMod is returned when [Root] cannot find the project root directory.
-var ErrNoGoMod = errors.New("cannot find \"go.mod\" file")
-
 // Root returns the absolute path to a module root directory, found by walking
 // up from pth until a "go.mod" file is located; the optional elem segments are
 // appended to the result. On failure it returns an empty string and an error,

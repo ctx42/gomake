@@ -25,28 +25,28 @@ import (
 func Test_PrepareTargets(t *testing.T) {
 	t.Run("the absent file succeeds and prints nothing", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := PrepareTargets(t.Context(), rng.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), tst.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
 	})
 
-	t.Run("invalid config returns error", func(t *testing.T) {
+	t.Run("error - invalid config", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := PrepareTargets(t.Context(), rng.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), tst.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -68,13 +68,13 @@ func Test_PrepareTargets(t *testing.T) {
 func Test_prepareExternalTargets(t *testing.T) {
 	t.Run("an absent file generates empty targets", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -82,25 +82,25 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Stat(t, dir, "internal", "builtin", "targets.go")
 	})
 
-	t.Run("invalid config", func(t *testing.T) {
+	t.Run("error - invalid config", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
 	})
 
-	t.Run("go get fails", func(t *testing.T) {
+	t.Run("error - go get fails", func(t *testing.T) {
 		// --- Given ---
 		// No go.mod in dir so go get fails before touching the network.
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -108,7 +108,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), rng.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
 
 		// --- Then ---
 		assert.ErrorRegexp(t,
@@ -150,7 +150,7 @@ func Test_underModule_tabular(t *testing.T) {
 func Test_regenBuiltins(t *testing.T) {
 	t.Run("empty specs", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -158,7 +158,7 @@ func Test_regenBuiltins(t *testing.T) {
 		cfg := &ImportsConfig{}
 
 		// --- When ---
-		err := regenBuiltins(rng.Ring(), dir, cfg)
+		err := regenBuiltins(tst.Ring(), dir, cfg)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -166,9 +166,9 @@ func Test_regenBuiltins(t *testing.T) {
 		oskit.Stat(t, dir, "internal", "builtin", "targets.go")
 	})
 
-	t.Run("invalid import spec", func(t *testing.T) {
+	t.Run("error - invalid import spec", func(t *testing.T) {
 		// --- Given ---
-		rng := ringtest.New(t)
+		tst := ringtest.New(t)
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -178,80 +178,81 @@ func Test_regenBuiltins(t *testing.T) {
 		}
 
 		// --- When ---
-		err := regenBuiltins(rng.Ring(), dir, cfg)
+		err := regenBuiltins(tst.Ring(), dir, cfg)
 
 		// --- Then ---
 		want := `^codegen builtins: .*malformed import path "not-a-valid-`
 		assert.ErrorRegexp(t, want, err)
 	})
-}
 
-func Test_regenBuiltins_writesToCompiledPackage(t *testing.T) {
-	// regenBuiltins must regenerate the built-in targets into the same package
-	// directory the gomake binary compiles. When the two drift apart (as when
-	// the built-in package moved from pkg/builtin to internal/builtin but
-	// regenBuiltins kept writing to pkg/builtin) external targets silently
-	// never reach the installed binary. This pins regenBuiltins to the package
-	// cmd/gomake actually imports and calls Generated() on.
+	t.Run("writes to compiled package", func(t *testing.T) {
+		// regenBuiltins must regenerate the built-in targets into the same
+		// package directory the gomake binary compiles. When the two drift
+		// apart (as when the built-in package moved from pkg/builtin to
+		// internal/builtin but regenBuiltins kept writing to pkg/builtin)
+		// external targets silently never reach the installed binary. This pins
+		// regenBuiltins to the package cmd/gomake actually imports and calls
+		// Generated() on.
 
-	// --- Given ---
-	root := goList(t, "-m", "-f", "{{.Dir}}", "github.com/ctx42/gomake")
-	gomakeSrc := filepath.Join(root, "cmd", "gomake", "gomake.go")
-	pkgDir := goList(t, "-f", "{{.Dir}}", builtinImportPath(t, gomakeSrc))
-	rel, err := filepath.Rel(root, pkgDir)
-	must.Nil(err)
-	parts := strings.Split(rel, string(filepath.Separator))
+		// --- Given ---
+		root := goList(t, "-m", "-f", "{{.Dir}}", "github.com/ctx42/gomake")
+		gomakeSrc := filepath.Join(root, "cmd", "gomake", "gomake.go")
+		pkgDir := goList(t, "-f", "{{.Dir}}", builtinImportPath(t, gomakeSrc))
+		rel := must.Value(filepath.Rel(root, pkgDir))
+		parts := strings.Split(rel, string(filepath.Separator))
 
-	// A fresh, empty build tree; regenBuiltins creates the destination dir.
-	wd := t.TempDir()
-	rng := ringtest.New(t)
+		// A fresh, empty build tree; regenBuiltins creates the destination dir.
+		wd := t.TempDir()
+		tst := ringtest.New(t)
 
-	cfg := &ImportsConfig{}
+		cfg := &ImportsConfig{}
 
-	// --- When ---
-	err = regenBuiltins(rng.Ring(), wd, cfg)
+		// --- When ---
+		err := regenBuiltins(tst.Ring(), wd, cfg)
 
-	// --- Then ---
-	assert.NoError(t, err)
+		// --- Then ---
+		assert.NoError(t, err)
 
-	oskit.Stat(t, wd, append(append([]string{}, parts...), "targets.go")...)
-}
+		oskit.Stat(t, wd, append(append([]string{}, parts...), "targets.go")...)
+	})
 
-func Test_regenBuiltins_resolvesImportFromBuildDir(t *testing.T) {
-	// A published install copies the module source to a temp build tree and
-	// runs from an unrelated working directory. regenBuiltins must resolve each
-	// import spec against the build tree's go.mod, not the process working
-	// directory, or `go list` reports "no required module provides package".
+	t.Run("resolves import from build dir", func(t *testing.T) {
+		// A published install copies the module source to a temp build tree and
+		// runs from an unrelated working directory. regenBuiltins must resolve
+		// each import spec against the build tree's go.mod, not the process
+		// working directory, or `go list` reports "no required module provides
+		// package".
 
-	// --- Given ---
-	rng := ringtest.New(t)
+		// --- Given ---
+		tst := ringtest.New(t)
 
-	wd := t.TempDir()
-	oskit.MkdirAll(t, wd, "fakepkg")
-	oskit.Write(t, "module example.com/fakepkg\n\ngo 1.24\n", wd, "fakepkg",
-		"go.mod")
-	oskit.Write(t, "package fakepkg\n", wd, "fakepkg", "fakepkg.go")
-	gomod := "module test.example.com\n\ngo 1.24\n\n" +
-		"require example.com/fakepkg v0.0.0\n\n" +
-		"replace example.com/fakepkg => ./fakepkg\n"
-	oskit.Write(t, gomod, wd, "go.mod")
-	oskit.MkdirAll(t, wd, "internal", "builtin", "data")
+		wd := t.TempDir()
+		oskit.MkdirAll(t, wd, "fakepkg")
+		oskit.Write(t, "module example.com/fakepkg\n\ngo 1.24\n", wd, "fakepkg",
+			"go.mod")
+		oskit.Write(t, "package fakepkg\n", wd, "fakepkg", "fakepkg.go")
+		gomod := "module test.example.com\n\ngo 1.24\n\n" +
+			"require example.com/fakepkg v0.0.0\n\n" +
+			"replace example.com/fakepkg => ./fakepkg\n"
+		oskit.Write(t, gomod, wd, "go.mod")
+		oskit.MkdirAll(t, wd, "internal", "builtin", "data")
 
-	// A working directory with no go.mod, mimicking a published install run
-	// from wherever `go run ...@latest` was invoked.
-	t.Chdir(t.TempDir())
+		// A working directory with no go.mod, mimicking a published install run
+		// from wherever `go run ...@latest` was invoked.
+		t.Chdir(t.TempDir())
 
-	cfg := &ImportsConfig{
-		imports: []ImportEntry{{Path: "example.com/fakepkg"}},
-	}
+		cfg := &ImportsConfig{
+			imports: []ImportEntry{{Path: "example.com/fakepkg"}},
+		}
 
-	// --- When ---
-	err := regenBuiltins(rng.Ring(), wd, cfg)
+		// --- When ---
+		err := regenBuiltins(tst.Ring(), wd, cfg)
 
-	// --- Then ---
-	assert.NoError(t, err)
+		// --- Then ---
+		assert.NoError(t, err)
 
-	oskit.Stat(t, wd, "internal", "builtin", "targets.go")
+		oskit.Stat(t, wd, "internal", "builtin", "targets.go")
+	})
 }
 
 func Test_runGoInDir(t *testing.T) {
@@ -266,7 +267,7 @@ func Test_runGoInDir(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("error with output", func(t *testing.T) {
+	t.Run("error - with output", func(t *testing.T) {
 		// --- Given ---
 		env := ring.New()
 		sub := "this-subcmd-does-not-exist"
@@ -278,26 +279,25 @@ func Test_runGoInDir(t *testing.T) {
 		// go echoes the unknown subcommand
 		assert.ErrorContain(t, "this-subcmd-does-not-exist", err)
 	})
-}
 
-func Test_runGoInDir_error_no_output(t *testing.T) {
-	// --- Given ---
-	env := ring.New()
-	// A non-existent dir triggers a chdir failure before go runs; no output is
-	// captured, so the function returns the bare exec error (the msg == ""
-	// branch).
-	dir := filepath.Join(t.TempDir(), "nonexistent")
+	t.Run("error - no output", func(t *testing.T) {
+		// --- Given ---
+		env := ring.New()
+		// A non-existent dir triggers a chdir failure before go runs; no output
+		// is captured, so the function returns the bare exec error (the msg ==
+		// "" branch).
+		dir := filepath.Join(t.TempDir(), "nonexistent")
 
-	// --- When ---
-	err := runGoInDir(t.Context(), env, dir, "version")
+		// --- When ---
+		err := runGoInDir(t.Context(), env, dir, "version")
 
-	// --- Then ---
-	assert.ErrorIs(t, os.ErrNotExist, err)
+		// --- Then ---
+		assert.ErrorIs(t, os.ErrNotExist, err)
+	})
 }
 
 // goList runs `go list` with args from the module tree and returns the
 // single-trimmed line it prints, failing the test on error.
-
 func goList(t tester.T, args ...string) string {
 	t.Helper()
 	cmd := exec.Command("go", append([]string{"list"}, args...)...)
@@ -311,7 +311,6 @@ func goList(t tester.T, args ...string) string {
 // builtinImportPath parses the gomake command source at path and returns the
 // import path of the package whose Generated() it calls to load the built-in
 // targets, failing the test when no such call is found.
-
 func builtinImportPath(t tester.T, path string) string {
 	t.Helper()
 	f, err := goparser.ParseFile(token.NewFileSet(), path, nil, 0)

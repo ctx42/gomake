@@ -21,8 +21,8 @@ func Test_TargetName_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 		ctx   context.Context
-		want  string
-		ok    bool
+		wName string
+		wOk   bool
 	}{
 		{
 			"unset",
@@ -47,11 +47,11 @@ func Test_TargetName_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have, hOk := TargetName(tc.ctx)
+			hName, hOk := TargetName(tc.ctx)
 
 			// --- Then ---
-			assert.Equal(t, tc.want, have)
-			assert.Equal(t, tc.ok, hOk)
+			assert.Equal(t, tc.wName, hName)
+			assert.Equal(t, tc.wOk, hOk)
 		})
 	}
 }

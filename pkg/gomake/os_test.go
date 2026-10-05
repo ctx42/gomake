@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/exekit"
 	"github.com/ctx42/testkit/pkg/iokit"
 )
@@ -94,8 +95,8 @@ func Test_ExitStatus(t *testing.T) {
 		}
 		// --- Given ---
 		cmd := exec.Command("sleep", "60")
-		assert.NoError(t, cmd.Start())
-		assert.NoError(t, cmd.Process.Kill())
+		must.Nil(cmd.Start())
+		must.Nil(cmd.Process.Kill())
 		err := cmd.Wait()
 
 		// --- When ---
@@ -149,7 +150,7 @@ func Test_HasRun(t *testing.T) {
 	t.Run("forced exit", func(t *testing.T) {
 		// --- Given ---
 		// CommandContext kill still started the process → HasRun true.
-		ctx, cxl := context.WithTimeout(context.Background(), time.Second)
+		ctx, cxl := context.WithTimeout(t.Context(), time.Second)
 		defer cxl()
 
 		c := exec.CommandContext(ctx, "sleep", "2")
@@ -240,10 +241,10 @@ func Test_LookupEnv_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
-		env        []string
-		findKey    string
-		wantValue  string
-		wantExists bool
+		env     []string
+		findKey string
+		wValue  string
+		wExists bool
 	}{
 		{"found", []string{"key0=val0", "key1=val1"}, "key1", "val1", true},
 		{"not found", []string{"key0=val0", "key1=val1"}, "key9", "", false},
@@ -276,14 +277,12 @@ func Test_LookupEnv_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-
 			// --- When ---
 			hValue, hExists := LookupEnv(tc.env, tc.findKey)
 
 			// --- Then ---
-			assert.Equal(t, tc.wantValue, hValue)
-			assert.Equal(t, tc.wantExists, hExists)
+			assert.Equal(t, tc.wValue, hValue)
+			assert.Equal(t, tc.wExists, hExists)
 		})
 	}
 }
@@ -292,9 +291,9 @@ func Test_Getenv_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
-		env       []string
-		findKey   string
-		wantValue string
+		env     []string
+		findKey string
+		want    string
 	}{
 		{"found", []string{"key0=val0", "key1=val1"}, "key1", "val1"},
 		{"not found", []string{"key0=val0", "key1=val1"}, "key9", ""},
@@ -311,13 +310,11 @@ func Test_Getenv_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			// --- Given ---
-
 			// --- When ---
 			have := Getenv(tc.env, tc.findKey)
 
 			// --- Then ---
-			assert.Equal(t, tc.wantValue, have)
+			assert.Equal(t, tc.want, have)
 		})
 	}
 }

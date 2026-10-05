@@ -17,12 +17,16 @@ import (
 	"github.com/ctx42/gomake/pkg/gomake"
 )
 
-// binName represents name of the gomake binary.
+// TargetsFile is the YAML config file name for external target imports. It
+// lives at the gomake source root and is committed to the repo.
+const TargetsFile = "targets.yaml"
+
+// binName represents the name of the gomake binary.
 const binName = "gomake"
 
 // GoMake errors.
 var (
-	// errNoMakefile represents an error when project directory contains no
+	// errNoMakefile represents an error when the project directory contains no
 	// makefiles.
 	errNoMakefile = errors.New("no makefile found")
 
@@ -35,7 +39,7 @@ var (
 	// errGoWorkEdit is an error returned when go.work file editing fails.
 	errGoWorkEdit = errors.New("editing \"go.work\" file")
 
-	// errBinExists represents error returned when path to binary makefile
+	// errBinExists represents the error returned when the path to the binary
 	// already exists.
 	errBinExists = errors.New("path to makefile binary exists")
 )
@@ -47,7 +51,8 @@ type goMake struct {
 	targets *parser.Targets // User targets.
 }
 
-// newGoMake returns a new goMake.
+// newGoMake prepares the out-of-source build directory for the project in
+// cfg and parses its targets. The build directory is removed on error.
 func newGoMake(rng *ring.Ring, cfg *config) (gmk *goMake, err error) {
 	gmk = &goMake{cfg: cfg}
 	rng.EnvSet("GOOS", cfg.goos)

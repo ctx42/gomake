@@ -12,6 +12,7 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/modkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 )
@@ -135,7 +136,7 @@ func Test_importDir(t *testing.T) {
 	})
 }
 
-func importDirFixture(t *testing.T) string {
+func importDirFixture(t tester.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	oskit.Write(t, "package p\n", dir, "plain.go")
@@ -276,18 +277,18 @@ func Test_importSpec_tabular(t *testing.T) {
 		want    string
 	}{
 		{
-			testN:   "module root",
-			modSpec: "example.com/mod",
-			root:    "/src/mod",
-			dir:     "/src/mod",
-			want:    "example.com/mod",
+			"module root",
+			"example.com/mod",
+			"/src/mod",
+			"/src/mod",
+			"example.com/mod",
 		},
 		{
-			testN:   "sub package",
-			modSpec: "example.com/mod",
-			root:    "/src/mod",
-			dir:     "/src/mod/a/b",
-			want:    "example.com/mod/a/b",
+			"sub package",
+			"example.com/mod",
+			"/src/mod",
+			"/src/mod/a/b",
+			"example.com/mod/a/b",
 		},
 	}
 

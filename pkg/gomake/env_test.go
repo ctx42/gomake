@@ -19,11 +19,11 @@ func Test_EnvSplit_tabular(t *testing.T) {
 		env  []string
 		want map[string]string
 	}{
-		{"1", []string{}, map[string]string{}},
-		{"1a", []string{""}, map[string]string{}},
-		{"2", []string{"A=B"}, map[string]string{"A": "B"}},
-		{"3", []string{"A=B=C"}, map[string]string{"A": "B=C"}},
-		{"4", []string{"A="}, map[string]string{"A": ""}},
+		{"empty", []string{}, map[string]string{}},
+		{"empty entry", []string{""}, map[string]string{}},
+		{"pair", []string{"A=B"}, map[string]string{"A": "B"}},
+		{"value with equals", []string{"A=B=C"}, map[string]string{"A": "B=C"}},
+		{"empty value", []string{"A="}, map[string]string{"A": ""}},
 	}
 
 	for _, tc := range tt {
@@ -50,12 +50,12 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "val0",
 			"key1": "val1",
 			"key2": "val2",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key1", "key2"}, hOrder)
 	})
 
@@ -71,12 +71,12 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "val0",
 			"key1": "",
 			"key2": "val2",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key1", "key2"}, hOrder)
 	})
 
@@ -92,11 +92,11 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "val0",
 			"key2": "val2",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key2"}, hOrder)
 	})
 
@@ -112,11 +112,11 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "val0",
 			"key2": "val2",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key2"}, hOrder)
 	})
 
@@ -132,11 +132,11 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "last",
 			"key1": "first",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key1"}, hOrder)
 	})
 
@@ -152,11 +152,11 @@ func Test_EnvSplitOrdered(t *testing.T) {
 		hMap, hOrder := EnvSplitOrdered(env)
 
 		// --- Then ---
-		wantMap := map[string]string{
+		want := map[string]string{
 			"key0": "val0",
 			"key2": "val2",
 		}
-		assert.Equal(t, wantMap, hMap)
+		assert.Equal(t, want, hMap)
 		assert.Equal(t, []string{"key0", "key2"}, hOrder)
 	})
 }
@@ -168,12 +168,12 @@ func Test_EnvJoin_tabular(t *testing.T) {
 		env  map[string]string
 		want []string
 	}{
-		{"1", map[string]string{}, []string{}},
-		{"2", map[string]string{"A": "B"}, []string{"A=B"}},
-		{"3", map[string]string{"A": "B=C"}, []string{"A=B=C"}},
-		{"4", map[string]string{"A": ""}, []string{"A="}},
+		{"empty", map[string]string{}, []string{}},
+		{"pair", map[string]string{"A": "B"}, []string{"A=B"}},
+		{"value with equals", map[string]string{"A": "B=C"}, []string{"A=B=C"}},
+		{"empty value", map[string]string{"A": ""}, []string{"A="}},
 		{
-			"5",
+			"sorted",
 			map[string]string{"B": "2", "A": "1"},
 			[]string{"A=1", "B=2"},
 		},

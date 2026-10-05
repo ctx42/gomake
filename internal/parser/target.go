@@ -35,10 +35,6 @@ var (
 	// names context.Context or *ring.Ring through an import alias. It is not
 	// registered.
 	errAliased = errors.New("aliased context or ring parameter")
-
-	// ErrDupTarget is an error indicating a target (name) is a duplicate
-	// of already existing target.
-	ErrDupTarget = errors.New("duplicated target")
 )
 
 // newTarget returns new Target instance based on function / method

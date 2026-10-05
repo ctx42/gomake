@@ -28,6 +28,7 @@ func runComplete(rng *ring.Ring) (string, error) {
 			return "", err
 		}
 		return setupBashCompletion(home)
+
 	default:
 		format := "gomake --complete: no completion script " +
 			"for %q (supported: bash)\n"

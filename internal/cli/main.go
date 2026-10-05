@@ -298,6 +298,7 @@ func watchBuildDir(dir string) (stop func()) {
 			if err != nil {
 				os.Exit(1) // The signal cannot be re-raised on this OS.
 			}
+
 		case <-done:
 		}
 	}()
@@ -321,7 +322,7 @@ func compileExit(err error) int {
 	return mkf.ExitCode(err)
 }
 
-// applyExternalTargetMeta loads [gomake.TargetsFile] from srcDir and sets
+// applyExternalTargetMeta loads [TargetsFile] from srcDir and sets
 // Ring.meta for each entry that has a "config" field. The meta-key is the
 // entry's namespace or the last path segment of the import path. Two configs
 // that resolve to the same key return errDupMetaKey.

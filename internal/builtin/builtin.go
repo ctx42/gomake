@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Package builtin provides built-in gomake targets and code generation for
-// wiring external targets into a compiled binary. Use CLI flags --help,
-// --list, and --version for help, listing, and version output.
+// wiring external targets into a compiled binary.
 //
 //go:generate go run 00_generate_main.go
 package builtin
@@ -11,7 +10,6 @@ package builtin
 import (
 	_ "embed"
 	"fmt"
-	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -25,18 +23,18 @@ import (
 
 // Filenames.
 const (
-	// targetsFN represents filename to which code for built-in targets is
+	// targetsFN represents the filename to which code for built-in targets is
 	// generated. The code, once generated, becomes part of this (BuiltIn)
 	// package.
 	targetsFN = "targets.go"
 
-	// mainFN represents filename to which code for built-in targets is
+	// mainFN represents the filename to which code for built-in targets is
 	// generated. The code, once generated, may be used in "main" package.
 	mainFN = "targets_main.go_"
 
-	// mainEmptyFN represents filename to which code defining empty built-in
-	// targets is generated. The code, once generated, may be used in "main"
-	// package.
+	// mainEmptyFN represents the filename to which code defining empty
+	// built-in targets is generated. The code, once generated, may be used in
+	// "main" package.
 	mainEmptyFN = "targets_main_empty.go_"
 )
 
@@ -53,15 +51,16 @@ var tgsMainEmptySrc []byte
 //go:embed data/targets_main.go_
 var tgsMainSrc []byte
 
-// Provider provides built-in targets and their code.
+// Provider provides built-in targets and their code. Each method returns a
+// copy the caller may modify.
 type Provider interface {
-	// Targets returns the built-in targets.
 	Targets() []*mkf.Target
 
-	// Source returns Go source code defining the built-in targets.
+	// Source returns the Go source code defining the targets, for the
+	// generated makefile's main package.
 	Source() []byte
 
-	// PreRuns returns a list of functions to run just before a target.
+	// PreRuns returns the functions to run just before a target.
 	PreRuns() []mkf.PreRunFn
 }
 
@@ -75,16 +74,16 @@ type targets struct {
 var _ Provider = (*targets)(nil) // Compile time check.
 
 // Empty returns a target provider with no targets.
-func Empty() *targets { return newTargets(nil, nil, nil) }
+func Empty() Provider { return newTargets(nil, nil, nil) }
 
-// Generated returns built-in targets from generated targets.go — the external
-// targets compiled in via [gomake.TargetsFile].
-func Generated() *targets {
+// Generated returns the built-in targets from the generated targets.go: the
+// external targets compiled in through the cli.TargetsFile config.
+func Generated() Provider {
 	return newTargets(targetsBuiltIn(), tgsMainSrc, nil)
 }
 
-// newTargets returns targets instance with given targets and Go source code
-// defining them.
+// newTargets returns a targets instance with the given targets and the Go
+// source code defining them.
 func newTargets(tgs []*mkf.Target, src []byte, pre []mkf.PreRunFn) *targets {
 	if len(tgs) == 0 {
 		src = tgsMainEmptySrc
@@ -108,7 +107,7 @@ func (tgs *targets) Source() []byte {
 	return slices.Clone(tgs.src)
 }
 
-// GenOption is the signature for [GenMain] options.
+// GenOption is the signature for [GenMain] and [GenImports] options.
 type GenOption func(*genOpts)
 
 // genOpts represents built-in generator options.
@@ -135,47 +134,40 @@ type genOpts struct {
 	root string
 }
 
-// WithGenName is option for [GenMain] setting package name to use for
-// generated code. By default, "builtin" is used.
+// WithGenName is an option for [GenImports] setting the package name to use
+// for generated code. By default, "builtin" is used.
 func WithGenName(name string) GenOption {
 	return func(opts *genOpts) { opts.name = name }
 }
 
-// validGoIdent reports whether name can be a Go package name.
-func validGoIdent(name string) bool {
-	if name == "_" || !token.IsIdentifier(name) {
-		return false
-	}
-	return !token.Lookup(name).IsKeyword()
-}
-
-// WithGenEnv is option for [GenMain] setting build environment to use.
+// WithGenEnv is an option for [GenImports] setting the build environment.
 // By default, [ring.New] is used.
 func WithGenEnv(rng *ring.Ring) GenOption {
 	return func(opts *genOpts) { opts.rng = rng }
 }
 
-// WithGenDst is option for [GenMain] setting destination directory where to
-// generate files. By default, empty string meaning current working directory.
+// WithGenDst is an option for [GenImports] setting the destination directory
+// for generated files. By default, the empty string means the current working
+// directory.
 func WithGenDst(dst string) GenOption {
 	return func(opts *genOpts) { opts.dst = dst }
 }
 
-// WithGenWorkDir is option for [GenMain] setting the directory whose go.mod
-// resolves the import specs. By default, empty string meaning the current
-// working directory.
+// WithGenWorkDir is an option for [GenImports] setting the directory whose
+// go.mod resolves the import specs. By default, the empty string means the
+// current working directory.
 func WithGenWorkDir(dir string) GenOption {
 	return func(opts *genOpts) { opts.dir = dir }
 }
 
-// WithGenImpPathRoot is option for [GenMain] making each target's ImpPath
+// WithGenImpPathRoot is an option for [GenImports] making each target's ImpPath
 // relative to root when it lies under root, so generated files carry no
 // machine-specific directory. By default, ImpPath stays absolute.
 func WithGenImpPathRoot(root string) GenOption {
 	return func(opts *genOpts) { opts.root = root }
 }
 
-// WithoutGenEmptySrc is option for [GenMain] turning off generating
+// WithoutGenEmptySrc is an option for [GenImports] turning off generating the
 // mainEmptyFN file.
 func WithoutGenEmptySrc(opts *genOpts) { opts.empty = false }
 
@@ -213,10 +205,7 @@ func GenImports(imports []parser.Import, options ...GenOption) error {
 		opt(&opts)
 	}
 	if !validGoIdent(opts.name) {
-		return fmt.Errorf(
-			"package name %q is not a Go identifier",
-			opts.name,
-		)
+		return fmt.Errorf("package name %q is not a Go identifier", opts.name)
 	}
 	if opts.rng == nil {
 		opts.rng = ring.New()

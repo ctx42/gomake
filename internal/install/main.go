@@ -23,6 +23,10 @@ import (
 	"github.com/ctx42/gomake/pkg/gomake"
 )
 
+// ErrNoBuildInfo is returned when the binary carries no build information,
+// which gives the installation mode.
+var ErrNoBuildInfo = errors.New("gomake: build info unavailable")
+
 // Main builds and installs the gomake binary into GOBIN, returning a non-nil
 // error if any step fails. The destination is resolved via [cli.GoBinPath]:
 // set GOBIN (or GOPATH) in the environment to control where the binary lands.
@@ -59,7 +63,7 @@ func Main(
 // the builtins, then compiles.
 //
 // When tgs is a local path inside a Go module, that module is resolved from
-// disk through a temporary Go workspace (see [setupWorkspace]) rather than
+// disk through a temporary Go workspace (see setupWorkspace) rather than
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
 //
@@ -76,7 +80,7 @@ func installTo(
 	// mode: "(devel)" for `go run ./cmd/install`, an actual version for
 	// `go run ...@version`. Reject a missing value before any env mutation.
 	if info == nil {
-		return errors.New("gomake: build info unavailable")
+		return ErrNoBuildInfo
 	}
 
 	wd, err := os.Getwd()
@@ -102,7 +106,7 @@ func installTo(
 	} else {
 		module := info.Main.Path + "@" + info.Main.Version
 		if src, err = moduleCacheDir(rng, module); err != nil {
-			return err
+			return fmt.Errorf("gomake: %w", err)
 		}
 	}
 
@@ -128,7 +132,7 @@ func installTo(
 			var restore func() error
 			restore, err = snapshotGenerated(src)
 			if err != nil {
-				return err
+				return fmt.Errorf("gomake: %w", err)
 			}
 			defer func() { err = joinRestore(err, restore) }()
 		}
@@ -141,7 +145,7 @@ func installTo(
 	if !devel {
 		tmp, cleanup, cerr := copyToTemp(rng, src)
 		if cerr != nil {
-			return cerr
+			return fmt.Errorf("gomake: copy source: %w", cerr)
 		}
 		defer cleanup()
 		buildDir = tmp
@@ -228,20 +232,13 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 		// go mod download -json puts the structured Error on stdout; stderr is
 		// often empty for module-resolution failures.
 		detail := strings.TrimSpace(string(out))
-		format := "module download %s: %w: %s"
-		if e, ok := errors.AsType[*exec.ExitError](err); ok {
-			if detail == "" {
-				detail = strings.TrimSpace(string(e.Stderr))
-			}
-			if detail != "" {
-				return "", fmt.Errorf(format, module, e, detail)
-			}
-			return "", fmt.Errorf("module download %s: %w", module, e)
+		if e, ok := errors.AsType[*exec.ExitError](err); ok && detail == "" {
+			detail = strings.TrimSpace(string(e.Stderr))
 		}
-		if detail != "" {
-			return "", fmt.Errorf(format, module, err, detail)
+		if detail == "" {
+			return "", fmt.Errorf("module download %s: %w", module, err)
 		}
-		return "", fmt.Errorf("module download %s: %w", module, err)
+		return "", fmt.Errorf("module download %s: %w: %s", module, err, detail)
 	}
 	info := struct {
 		Dir string `json:"Dir"`
@@ -268,11 +265,11 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 // `go get`. While the workspace is active GOFLAGS loses any "-mod=mod", which
 // workspace mode rejects. The returned cleanup removes the workspace file,
 // sets GOWORK back to "off" and restores GOFLAGS; it is always safe to call.
-func setupWorkspace(env ring.Environ, buildDir, tgs string) (
-	string,
-	func(),
-	error,
-) {
+func setupWorkspace(
+	env ring.Environ,
+	buildDir string,
+	tgs string,
+) (string, func(), error) {
 
 	noop := func() {}
 	lower := strings.ToLower(tgs)
@@ -295,7 +292,7 @@ func setupWorkspace(env ring.Environ, buildDir, tgs string) (
 
 	wsDir, err := os.MkdirTemp(tempRoot(env), "gomake-work-*")
 	if err != nil {
-		return "", noop, err
+		return "", noop, fmt.Errorf("workspace temp: %w", err)
 	}
 	restoreFlags := restoreEnv(env, "GOFLAGS")
 	cleanup := func() {
@@ -362,7 +359,9 @@ func moduleAt(
 	return "", "", false, nil
 }
 
-// notModule reports whether err is go list saying dir is outside a module.
+// notModule reports whether err is go list saying dir is outside a module. It
+// matches the go command's English messages, which may change between Go
+// releases.
 func notModule(err error) bool {
 	ee, ok := errors.AsType[*exec.ExitError](err)
 	if !ok {
@@ -488,7 +487,7 @@ func copyToTemp(env ring.Environ, src string) (string, func(), error) {
 	noop := func() {}
 	tempDir, err := os.MkdirTemp(tempRoot(env), "gomake-install-*")
 	if err != nil {
-		return "", noop, err
+		return "", noop, fmt.Errorf("install temp: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(tempDir) }
 	if err = copyDir(src, tempDir); err != nil {

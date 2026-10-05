@@ -20,7 +20,7 @@ import (
 // TgsMapCB is callback signature for [Targets.Map] method.
 type TgsMapCB func(*Targets, *mkf.Target)
 
-// Targets represent a collection of unique gomake targets.
+// Targets represents a collection of unique gomake targets.
 type Targets struct {
 	unique   map[string]struct{} // Map of target names (for uniqueness).
 	list     []*mkf.Target       // List of unique targets (sorted).
@@ -58,11 +58,11 @@ type Import struct {
 	Namespace string
 }
 
-// TargetsFromSpecs returns a list of targets in given import specs.
+// targetsFromSpecs returns a list of targets in given import specs.
 // For targets from each spec it applies provided call back function(s) and
 // then merges them into one list of targets. All targets are registered in the
 // root namespace; use [TargetsFromImports] to apply a namespace.
-func TargetsFromSpecs(
+func targetsFromSpecs(
 	rng *ring.Ring,
 	specs []string,
 	fns ...TgsMapCB,
@@ -87,7 +87,7 @@ func TargetsFromImports(
 	fns ...TgsMapCB,
 ) (*Targets, error) {
 
-	all := NewTargets()
+	tgs := NewTargets()
 	for _, imp := range imports {
 		pkg, err := NewPackage(
 			rng,
@@ -104,11 +104,11 @@ func TargetsFromImports(
 			return nil, err
 		}
 		pmf.Targets.Map(fns...)
-		if err = all.Add(pmf.Targets.List()...); err != nil {
+		if err = tgs.Add(pmf.Targets.List()...); err != nil {
 			return nil, err
 		}
 	}
-	return all, nil
+	return tgs, nil
 }
 
 // Len returns number of targets in the collection.
@@ -144,7 +144,7 @@ func (tgs *Targets) Add(ts ...*mkf.Target) error {
 }
 
 // Has returns true if target name exists in the collection.
-func (tgs *Targets) Has(name string) bool {
+func (tgs *Targets) has(name string) bool {
 	_, ok := tgs.unique[name]
 	return ok
 }
@@ -283,12 +283,9 @@ func (tgs *Targets) reportSkips(rng *ring.Ring) {
 	if rng == nil || len(tgs.skips) == 0 {
 		return
 	}
+	format := "gomake: skipping %s: aliased context or ring parameter\n"
 	for _, name := range tgs.skips {
-		_, _ = fmt.Fprintf(
-			rng.Stderr(),
-			"gomake: skipping %s: aliased context or ring parameter\n",
-			name,
-		)
+		_, _ = fmt.Fprintf(rng.Stderr(), format, name)
 	}
 }
 
@@ -299,8 +296,8 @@ func nsReachable(pkg *Package, typ *doc.Type) bool {
 	return pkg.Name == MainName || ast.IsExported(typ.Name)
 }
 
-// Sort sorts the internal list of targets.
-func (tgs *Targets) Sort() {
+// sort sorts the internal list of targets.
+func (tgs *Targets) sort() {
 	list := tgs.list
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].Name < list[j].Name
@@ -323,7 +320,7 @@ func (tgs *Targets) Get(tgtName string) *mkf.Target {
 // List returns alphabetically sorted list of targets by their names.
 func (tgs *Targets) List() []*mkf.Target {
 	if !tgs.sorted {
-		tgs.Sort()
+		tgs.sort()
 	}
 	list := make([]*mkf.Target, len(tgs.list))
 	copy(list, tgs.list)
@@ -340,12 +337,12 @@ func (tgs *Targets) Names() []string {
 	return names
 }
 
-// MarkDefault marks the first target whose DefRef matches as default and
+// markDefault marks the first target whose DefRef matches as default and
 // returns its name. A non-empty impSpec restricts the match to the targets
 // imported from that path. Returns empty string if DefRef does not match any
 // target. Other targets' Default flags are cleared so at most one default
 // remains.
-func (tgs *Targets) MarkDefault(impSpec, defRef string) string {
+func (tgs *Targets) markDefault(impSpec, defRef string) string {
 	def := ""
 	for _, tgt := range tgs.list {
 		tgt.Default = false
@@ -459,10 +456,10 @@ func uniqueImportAlias(
 	}
 }
 
-// GoImports returns unique imports tagged with a `gomake:import` comment.
+// goImports returns unique imports tagged with a `gomake:import` comment.
 // When two import paths declare the same package name, later imports get an
 // explicit alias (see importAliasMap).
-func (tgs *Targets) GoImports() string {
+func (tgs *Targets) goImports() string {
 	aliases := tgs.importAliasMap()
 	var lines []string
 	used := make(map[string]struct{}, 10)
@@ -511,10 +508,10 @@ func (tgs *Targets) codePkgName(
 	return tgt.PkgName
 }
 
-// GoCode returns Go source code defining the targets. If the qt is true the
+// goCode returns Go source code defining the targets. If the qt is true the
 // package qualifier is added to the Target references ("mkf.Target" vs
 // "Target"). Import package-name collisions use aliases from importAliasMap.
-func (tgs *Targets) GoCode(qt bool) string {
+func (tgs *Targets) goCode(qt bool) string {
 	corePkg := ""
 	if qt {
 		corePkg = "mkf."

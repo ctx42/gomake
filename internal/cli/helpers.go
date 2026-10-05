@@ -123,7 +123,7 @@ func validMakefileName(name string) bool {
 }
 
 // selectMakefiles splits files into the makefiles to compile (keep) and the
-// makefile-looking files rejected by [validMakefileName] (ignored, as base
+// makefile-looking files rejected by validMakefileName (ignored, as base
 // names). Files that do not look like makefiles at all are dropped silently, as
 // before. Input order is preserved.
 func selectMakefiles(files []string) (keep, ignored []string) {
@@ -132,6 +132,7 @@ func selectMakefiles(files []string) (keep, ignored []string) {
 		switch {
 		case validMakefileName(name):
 			keep = append(keep, fil)
+
 		case strings.HasPrefix(name, "makefile.") ||
 			strings.HasPrefix(name, "makefile_"):
 			ignored = append(ignored, name)
@@ -141,7 +142,7 @@ func selectMakefiles(files []string) (keep, ignored []string) {
 }
 
 // ignoreWarning formats the warning gomake prints for a makefile-looking
-// source file rejected by [validMakefileName].
+// source file rejected by validMakefileName.
 func ignoreWarning(name string) string {
 	format := "gomake: ignoring %q: only makefile.go and " +
 		"makefile_<GOOS>.go / makefile_<GOARCH>.go / " +
@@ -181,7 +182,7 @@ type compUnit struct {
 	// GOOS/GOARCH variants). Used for the binary cache key.
 	MkfNames []string
 
-	// Base names of makefile-looking sources rejected by [validMakefileName].
+	// Base names of makefile-looking sources rejected by validMakefileName.
 	// The entry point reports these to the user as a warning.
 	Ignored []string
 
@@ -523,9 +524,11 @@ func editGoWork(env ring.Environ, srcWork, dst, modRoot string) error {
 		switch {
 		case filepath.IsAbs(dp):
 			pth = filepath.Clean(dp)
+
 		case filepath.Clean(dp) == ".":
 			// "." is the workspace root (workDir), not the build dir.
 			pth = workDir
+
 		default:
 			pth = filepath.Clean(filepath.Join(workDir, dp))
 		}
@@ -730,7 +733,7 @@ const (
 )
 
 // xflagVersion returns the xflag module version gomake was built with, so the
-// generated makefile pins the same version. It falls back to [xflagFallbackVer]
+// generated makefile pins the same version. It falls back to xflagFallbackVer
 // when build information does not record the dependency.
 func xflagVersion() string {
 	bi, ok := debug.ReadBuildInfo()
@@ -761,11 +764,11 @@ func goEditErr(sentinel error, where, out string, err error) error {
 	return fmt.Errorf("%w at %s: %s: %w", sentinel, where, detail, err)
 }
 
-// compile compiles binary from given files by calling "go build" with given
-// environment and in given working directory. The compiled makefile will be
-// put in path defined by out. The returned error will always be of ErrCompile
-// type. GOWORK is pinned to wd/go.work when present, otherwise "off", so the
-// build never follows the caller's ambient workspace.
+// compile compiles files, or the package in the working directory wd when none
+// are given, by calling "go build" with the given environment, writing the
+// binary to out. A returned error is an *errCompile. GOWORK is pinned to
+// wd/go.work when present, otherwise "off", so the build never follows the
+// caller's ambient workspace.
 func compile(
 	ctx context.Context,
 	env []string,

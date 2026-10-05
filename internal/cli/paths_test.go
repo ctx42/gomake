@@ -96,11 +96,8 @@ func Test_goBinPath_success_tabular(t *testing.T) {
 
 func Test_goBinPath_error(t *testing.T) {
 	t.Run("error - GOBIN and GOPATH empty", func(t *testing.T) {
-		// --- Given ---
-		output := `{"GOBIN":"","GOPATH":""}`
-
 		// --- When ---
-		have, err := goBinPath(output)
+		have, err := goBinPath(`{"GOBIN":"","GOPATH":""}`)
 
 		// --- Then ---
 		want := "cannot determine bin directory: GOBIN and GOPATH unusable"
@@ -109,11 +106,8 @@ func Test_goBinPath_error(t *testing.T) {
 	})
 
 	t.Run("error - invalid json from go env", func(t *testing.T) {
-		// --- Given ---
-		output := `{"GOBIN": 42}`
-
 		// --- When ---
-		have, err := goBinPath(output)
+		have, err := goBinPath(`{"GOBIN": 42}`)
 
 		// --- Then ---
 		assert.ErrorContain(t, "cannot parse 'go env' output", err)

@@ -177,19 +177,6 @@ func TgtPanicString() *Target {
 	}
 }
 
-// TgtPanicError returns target panicking with error argument.
-func TgtPanicError() *Target {
-	return &Target{
-		Name:     "tgt-panic-error",
-		CodeRef:  "TgtPanicError",
-		Synopsis: "syn tgt-panic-error",
-		Doc:      "doc tgt-panic-error",
-		Run: func(context.Context, *ring.Ring) error {
-			panic(errors.New("panic error"))
-		},
-	}
-}
-
 // TgtPanicOther returns target panicking with integer argument.
 func TgtPanicOther() *Target {
 	return &Target{
@@ -231,7 +218,7 @@ func TgtWaiting() *Target {
 }
 
 // TgtListFiles returns target listing files in current working directory. It
-// prints file list to status to standard output and header to standard error.
+// prints the file list to standard output and a header to standard error.
 func TgtListFiles() *Target {
 	return &Target{
 		Name:     "tgt-list-files",

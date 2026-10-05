@@ -45,6 +45,16 @@ func ExampleGetCfg() {
 	// Output: v2.13.0
 }
 
+func ExampleGetCfgDefault() {
+	rng := ring.New()
+	rng.MetaSet(gomake.ConfigMetaKey, `{"lint":{"version":"v2.13.0"}}`)
+
+	cfg, _ := gomake.TargetConfig(rng)
+	timeout, _ := gomake.GetCfgDefault(cfg, "lint.timeout", "5m")
+	fmt.Println(timeout)
+	// Output: 5m
+}
+
 func ExampleExitStatus() {
 	fmt.Println(gomake.ExitStatus(nil))
 	fmt.Println(gomake.ExitStatus(errors.New("boom")))

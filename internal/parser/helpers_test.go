@@ -8,8 +8,10 @@ import (
 	"go/doc"
 	goparser "go/parser"
 	"go/token"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,7 +26,7 @@ import (
 	"github.com/ctx42/gomake/internal/mkf"
 )
 
-func Test_GenMakefileUser(t *testing.T) {
+func Test_genMakefileUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
@@ -67,9 +69,8 @@ func Test_GenMakefileUser(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
 
-		relPath := "testdata/projects/dup_imported/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/dup_imported/project"))
 		prj.GoModInit()
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
@@ -90,11 +91,10 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
-		relPath := "testdata/projects/no_targets/project"
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -116,8 +116,7 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 	t.Run("error - generating code", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
-		relPath := "testdata/projects/dup_imported/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/dup_imported/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -136,11 +135,10 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("error writing file", func(t *testing.T) {
+	t.Run("error - writing file", func(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/no_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -162,27 +160,46 @@ func Test_GenMakefileUserAndSave(t *testing.T) {
 	})
 }
 
-func Test_SetBuildTag_GetBuildTag_RemBuildTag(t *testing.T) {
+func Test_GetBuildTag(t *testing.T) {
+	t.Run("unset", func(t *testing.T) {
+		// --- When ---
+		have := GetBuildTag(ring.New())
+
+		// --- Then ---
+		assert.Empty(t, have)
+	})
+
+	t.Run("set", func(t *testing.T) {
+		// --- When ---
+		have := GetBuildTag(SetBuildTag(ring.New()))
+
+		// --- Then ---
+		assert.Equal(t, BuildTag, have)
+	})
+}
+
+func Test_SetBuildTag(t *testing.T) {
 	// --- Given ---
-	rng0 := ring.New()
-
-	// --- Then ---
-	assert.Empty(t, GetBuildTag(rng0))
+	rng := ring.New()
 
 	// --- When ---
-	hRng1 := SetBuildTag(rng0)
+	have := SetBuildTag(rng)
 
 	// --- Then ---
-	assert.Equal(t, rng0.MetaAll(), hRng1.MetaAll())
-	// --- Then ---
-	assert.Equal(t, BuildTag, GetBuildTag(hRng1))
+	assert.Equal(t, BuildTag, GetBuildTag(have))
+	assert.Equal(t, rng.MetaAll(), have.MetaAll())
+}
+
+func Test_RemBuildTag(t *testing.T) {
+	// --- Given ---
+	rng := SetBuildTag(ring.New())
 
 	// --- When ---
-	hRng2 := RemBuildTag(hRng1)
+	have := RemBuildTag(rng)
 
 	// --- Then ---
-	assert.Empty(t, GetBuildTag(hRng1))
-	assert.Empty(t, GetBuildTag(hRng2))
+	assert.Empty(t, GetBuildTag(have))
+	assert.Empty(t, GetBuildTag(rng))
 }
 
 func Test_toOneLine_tabular(t *testing.T) {
@@ -208,7 +225,7 @@ func Test_toOneLine_tabular(t *testing.T) {
 	}
 }
 
-func Test_removeNoLintComments_tabular(t *testing.T) {
+func Test_removeNoLintComments(t *testing.T) {
 	t.Run("doc string with nolint", func(t *testing.T) {
 		// --- When ---
 		have := removeNoLintComments("abc\ndef\nnolint:xxx\nghi")
@@ -349,14 +366,12 @@ func Test_targetSynopsis_tabular(t *testing.T) {
 }
 
 func Test_breadcrumbs(t *testing.T) {
-	t.Run("invalid type", func(t *testing.T) {
+	t.Run("broken type", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		relPath := "testdata/projects/ns_crossfile/project"
-		absPath := modkit.Path(relPath)
-		tst := NewTestHelper(t, rng, absPath)
+		absPath := modkit.Path("testdata/projects/ns_crossfile/project")
+		tst := NewTestHelper(t, ring.New(), absPath)
 
-		typ := tst.Types()[0]
+		typ := tst.docPkg.Types[0]
 		typ.Decl.Specs = typ.Decl.Specs[:0] // Break the type.
 
 		// --- When ---
@@ -368,10 +383,8 @@ func Test_breadcrumbs(t *testing.T) {
 }
 
 func Test_breadcrumbs_tabular(t *testing.T) {
-	rng := ring.New()
-	relPath := "testdata/projects/ns_crossfile/project"
-	absPath := modkit.Path(relPath)
-	tst := NewTestHelper(t, rng, absPath)
+	absPath := modkit.Path("testdata/projects/ns_crossfile/project")
+	tst := NewTestHelper(t, ring.New(), absPath)
 
 	tt := []struct {
 		testN string
@@ -379,19 +392,19 @@ func Test_breadcrumbs_tabular(t *testing.T) {
 		ns   string
 		want []string
 	}{
-		{"1", "NS0", []string{rootCrumb, "NS0"}},
-		{"2", "NS1", []string{rootCrumb, "NS0", "NS1"}},
-		{"3", "NS2", []string{rootCrumb, "NS0", "NS1", "NS2"}},
-		{"4", "NS3", []string{partCrumb, "NS0", "NS3"}},
-		{"5", "NS4", []string{partCrumb, "NS0", "NS3", "NS4"}},
-		{"6", "NOT0", nil},
-		{"7", "NOT1", nil},
-		{"8", "NOT2", nil},
-		{"9", "NOT3", nil},
-		{"10", "NOT4", nil},
-		{"11", "NOT5", []string{partCrumb, "NOT2", "NOT5"}},
-		{"12", "NOT6", nil},
-		{"13", "KebabCase", []string{rootCrumb, "KebabCase"}},
+		{"NS0", "NS0", []string{rootCrumb, "NS0"}},
+		{"NS1", "NS1", []string{rootCrumb, "NS0", "NS1"}},
+		{"NS2", "NS2", []string{rootCrumb, "NS0", "NS1", "NS2"}},
+		{"NS3", "NS3", []string{partCrumb, "NS0", "NS3"}},
+		{"NS4", "NS4", []string{partCrumb, "NS0", "NS3", "NS4"}},
+		{"NOT0", "NOT0", nil},
+		{"NOT1", "NOT1", nil},
+		{"NOT2", "NOT2", nil},
+		{"NOT3", "NOT3", nil},
+		{"NOT4", "NOT4", nil},
+		{"NOT5", "NOT5", []string{partCrumb, "NOT2", "NOT5"}},
+		{"NOT6", "NOT6", nil},
+		{"KebabCase", "KebabCase", []string{rootCrumb, "KebabCase"}},
 	}
 
 	for _, tc := range tt {
@@ -444,19 +457,15 @@ func Test_isNS(t *testing.T) {
 		}
 
 		// --- Given ---
-		exe := os.Args[0]
-		env := append(os.Environ(), "GOMAKE_ISNS_CYCLE=1")
+		args := []string{"-test.run=^Test_isNS$"}
+		cmd := exec.CommandContext(t.Context(), os.Args[0], args...)
+		cmd.Env = append(os.Environ(), "GOMAKE_ISNS_CYCLE=1")
 
 		// --- When ---
-		hCmd := exec.Command(exe, "-test.run=^Test_isNS$")
-		hCmd.Env = env
-		hOut, err := hCmd.CombinedOutput()
+		out, err := cmd.CombinedOutput()
 
 		// --- Then ---
-		if err != nil {
-			t.Log(string(hOut))
-		}
-		assert.NoError(t, err)
+		assert.NoError(t, err, string(out))
 	})
 }
 
@@ -637,7 +646,11 @@ func Test_toKebabCase_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.in, func(t *testing.T) {
-			assert.Equal(t, tc.want, toKebabCase(tc.in))
+			// --- When ---
+			have := toKebabCase(tc.in)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
 		})
 	}
 }
@@ -742,13 +755,84 @@ func Test_gmImpSpec(t *testing.T) {
 		assert.Equal(t, "", hNS)
 		assert.Equal(t, "", hSpec)
 	})
+
+	t.Run("above the spec", func(t *testing.T) {
+		// --- Given ---
+		src := "" +
+			"package p\n" +
+			"import (\n" +
+			"\t//gomake:import ns\n" +
+			"\t_ \"example.com/bar\"\n" +
+			")\n"
+		set := token.NewFileSet()
+		fil := must.Value(goparser.ParseFile(
+			set, "x.go", src, goparser.ParseComments,
+		))
+
+		// --- When ---
+		hNS, hSpec, err := gmImpSpec(fil.Imports[0])
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "ns", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
+	})
+
+	t.Run("line comment wins", func(t *testing.T) {
+		// --- Given ---
+		is := &ast.ImportSpec{
+			Path: &ast.BasicLit{Value: `"example.com/bar"`},
+			Doc: &ast.CommentGroup{List: []*ast.Comment{
+				{Text: "//gomake:import doc"},
+			}},
+			Comment: &ast.CommentGroup{List: []*ast.Comment{
+				{Text: "//gomake:import line"},
+			}},
+		}
+
+		// --- When ---
+		hNS, hSpec, err := gmImpSpec(is)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "line", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
+	})
+
+	t.Run("above a single import", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		src := "" +
+			"package p\n" +
+			"\n" +
+			"//gomake:import ns\n" +
+			"import _ \"example.com/bar\"\n"
+		pth := oskit.Write(t, src, dir, "p.go")
+		_, fls := must.Values(astFiles(dir, []string{pth}))
+
+		// --- When ---
+		hNS, hSpec, err := gmImpSpec(fls[pth].Imports[0])
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "ns", hNS)
+		assert.Equal(t, "example.com/bar", hSpec)
+	})
+
+	t.Run("nil spec", func(t *testing.T) {
+		// --- When ---
+		hNS, hSpec, err := gmImpSpec(nil)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "", hNS)
+		assert.Equal(t, "", hSpec)
+	})
 }
 
 func Test_gmImpSpec_tabular(t *testing.T) {
-	rng := ring.New()
-	relPath := "testdata/projects/showcase_imports/project"
-	absPath := modkit.Path(relPath)
-	iss := NewTestHelper(t, rng, absPath).
+	absPath := modkit.Path("testdata/projects/showcase_imports/project")
+	iss := NewTestHelper(t, ring.New(), absPath).
 		ImportSpecs(mkf.MakefileMain)
 
 	tt := []struct {
@@ -845,81 +929,6 @@ func Test_gmImpSpec_tabular(t *testing.T) {
 	}
 }
 
-func Test_gmImpSpec_doc(t *testing.T) {
-	t.Run("above the spec", func(t *testing.T) {
-		// --- Given ---
-		src := "" +
-			"package p\n" +
-			"import (\n" +
-			"\t//gomake:import ns\n" +
-			"\t_ \"example.com/bar\"\n" +
-			")\n"
-		set := token.NewFileSet()
-		fil := must.Value(goparser.ParseFile(
-			set, "x.go", src, goparser.ParseComments,
-		))
-
-		// --- When ---
-		hNS, hSpec, err := gmImpSpec(fil.Imports[0])
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "ns", hNS)
-		assert.Equal(t, "example.com/bar", hSpec)
-	})
-
-	t.Run("line comment wins", func(t *testing.T) {
-		// --- Given ---
-		is := &ast.ImportSpec{
-			Path: &ast.BasicLit{Value: `"example.com/bar"`},
-			Doc: &ast.CommentGroup{List: []*ast.Comment{
-				{Text: "//gomake:import doc"},
-			}},
-			Comment: &ast.CommentGroup{List: []*ast.Comment{
-				{Text: "//gomake:import line"},
-			}},
-		}
-
-		// --- When ---
-		hNS, hSpec, err := gmImpSpec(is)
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "line", hNS)
-		assert.Equal(t, "example.com/bar", hSpec)
-	})
-
-	t.Run("above a single import", func(t *testing.T) {
-		// --- Given ---
-		dir := t.TempDir()
-		src := "" +
-			"package p\n" +
-			"\n" +
-			"//gomake:import ns\n" +
-			"import _ \"example.com/bar\"\n"
-		pth := oskit.Write(t, src, dir, "p.go")
-		_, fls := must.Values(astFiles(dir, []string{pth}))
-
-		// --- When ---
-		hNS, hSpec, err := gmImpSpec(fls[pth].Imports[0])
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "ns", hNS)
-		assert.Equal(t, "example.com/bar", hSpec)
-	})
-
-	t.Run("nil spec", func(t *testing.T) {
-		// --- When ---
-		hNS, hSpec, err := gmImpSpec(nil)
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "", hNS)
-		assert.Equal(t, "", hSpec)
-	})
-}
-
 func Test_unquote_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
@@ -927,11 +936,11 @@ func Test_unquote_tabular(t *testing.T) {
 		val  string
 		want string
 	}{
-		{"1", "", ""},
-		{"2", `"str"`, "str"},
-		{"3", "`str`", "str"},
-		{"4", "`s`str`", "s`str"},
-		{"5", `"s"str"`, "s\"str"},
+		{"empty", "", ""},
+		{"double quotes", `"str"`, "str"},
+		{"backticks", "`str`", "str"},
+		{"inner backtick", "`s`str`", "s`str"},
+		{"inner quote", `"s"str"`, "s\"str"},
 	}
 
 	for _, tc := range tt {
@@ -1117,8 +1126,7 @@ func Test_findDefault(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
-		vls := NewTestHelper(t, rng, prj.Root()).Values()
+		vls := NewTestHelper(t, ring.New(), prj.Root()).docPkg.Vars
 
 		// --- When ---
 		have, hPos := findDefault(vls...)
@@ -1130,17 +1138,15 @@ func Test_findDefault(t *testing.T) {
 
 	t.Run("default target from local package", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/default_local/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/default_local/project"))
 		prj.GoModInit()
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
-		vls := NewTestHelper(t, rng, prj.Root()).Values()
+		vls := NewTestHelper(t, ring.New(), prj.Root()).docPkg.Vars
 
 		// --- When ---
 		have, hPos := findDefault(vls...)
@@ -1161,8 +1167,7 @@ func Test_findDefault(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
-		vls := NewTestHelper(t, rng, prj.Root()).Values()
+		vls := NewTestHelper(t, ring.New(), prj.Root()).docPkg.Vars
 
 		// --- When ---
 		have, hPos := findDefault(vls...)
@@ -1183,8 +1188,7 @@ func Test_findDefault(t *testing.T) {
 		prj.Close()
 		prj.Chdir()
 
-		rng := ring.New()
-		vls := NewTestHelper(t, rng, prj.Root()).Values()
+		vls := NewTestHelper(t, ring.New(), prj.Root()).docPkg.Vars
 
 		// --- When ---
 		have, hPos := findDefault(vls...)
@@ -1216,13 +1220,14 @@ func Test_findDefault(t *testing.T) {
 }
 
 func Test_codeRef_tabular(t *testing.T) {
-	rng := ring.New()
-	relPath := "testdata/projects/expressions/project"
-	absPath := modkit.Path(relPath)
-	tst := NewTestHelper(t, rng, absPath)
+	absPath := modkit.Path("testdata/projects/expressions/project")
+	tst := NewTestHelper(t, ring.New(), absPath)
 
-	// False positive lint error.
-	//nolint:forcetypeassert
+	specs := make([]*ast.ValueSpec, 3)
+	for i := range specs {
+		decl := tst.docPkg.Vars[i].Decl.Specs[0]
+		specs[i] = decl.(*ast.ValueSpec) //nolint:forcetypeassert
+	}
 	tt := []struct {
 		testN string
 
@@ -1230,25 +1235,29 @@ func Test_codeRef_tabular(t *testing.T) {
 		want []string
 	}{
 		{
-			"var A = Hello",
-			tst.Values()[0].Decl.Specs[0].(*ast.ValueSpec).Values[0],
+			"identifier",
+			specs[0].Values[0],
 			[]string{"Hello"},
 		},
 		{
-			"var B = pkg0.Pkg0",
-			tst.Values()[1].Decl.Specs[0].(*ast.ValueSpec).Values[0],
+			"package selector",
+			specs[1].Values[0],
 			[]string{"pkg0", "Pkg0"},
 		},
 		{
-			"var C = pkg4.NS.M0",
-			tst.Values()[2].Decl.Specs[0].(*ast.ValueSpec).Values[0],
+			"package namespace method",
+			specs[2].Values[0],
 			[]string{"pkg4", "NS", "M0"},
 		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			assert.Equal(t, tc.want, codeRef(tc.expr, nil))
+			// --- When ---
+			have := codeRef(tc.expr, nil)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
 		})
 	}
 }
@@ -1286,7 +1295,7 @@ func Test_qIdent(t *testing.T) {
 		assert.Equal(t, "[]string", have)
 	})
 
-	t.Run("time.Duration", func(t *testing.T) {
+	t.Run("time Duration", func(t *testing.T) {
 		// --- Given ---
 		expr := &ast.SelectorExpr{
 			X:   ast.NewIdent("time"),
@@ -1315,5 +1324,31 @@ func Test_qIdent(t *testing.T) {
 
 		// --- Then ---
 		assert.Equal(t, "", have)
+	})
+}
+
+func Test_CreateFile(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		// --- Given ---
+		dst := filepath.Join(t.TempDir(), "src.go")
+
+		// --- When ---
+		err := CreateFile(dst, []byte("content"))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "content", oskit.ReadFileStr(t, dst))
+	})
+
+	t.Run("error - parent directory missing", func(t *testing.T) {
+		// --- Given ---
+		dst := filepath.Join(t.TempDir(), "not_existing", "src.go")
+
+		// --- When ---
+		err := CreateFile(dst, []byte("content"))
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+		assert.NoFileExist(t, dst)
 	})
 }

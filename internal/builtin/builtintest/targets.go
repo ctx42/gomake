@@ -10,7 +10,6 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 
 	"github.com/ctx42/gomake/internal/mkf"
-
 	"github.com/ctx42/gomake/testdata/imports/pkg2"
 )
 

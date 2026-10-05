@@ -24,10 +24,13 @@ var errNoModule = errors.New("no module directive")
 // newLocalPackage fills pkg with package facts derived in-process for a local
 // absolute directory, avoiding the `go list` subprocess. The facts it resolves
 // (package name, build-constrained Go files, and the enclosing module) depend
-// only on the directory and its go.mod, never on the dependency graph, so the
-// result matches `go list` regardless of replace directives, vendoring, or
-// workspaces. It reports false when the directory cannot be resolved this way,
-// in which case the caller falls back to `go list`.
+// only on the directory and its go.mod, never on the dependency graph, so
+// replace directives, vendoring, and workspaces do not change it. File
+// selection uses gomake's own release tags with the GOOS, GOARCH, and build
+// tags from rng; GOEXPERIMENT, architecture feature levels, and a newer
+// toolchain's release tags are not applied, so it can differ from `go list`
+// there. It reports false when the directory cannot be resolved this way, in
+// which case the caller falls back to `go list`.
 func newLocalPackage(rng *ring.Ring, pkg *Package) bool {
 	root, err := gomake.Root(pkg.ImpPath)
 	if err != nil {
@@ -93,6 +96,7 @@ func goFlagsTags(goflags string) []string {
 		switch {
 		case strings.HasPrefix(f, "-tags="):
 			out = append(out, splitTags(strings.TrimPrefix(f, "-tags="))...)
+
 		case f == "-tags" || f == "--tags":
 			if i+1 < len(fields) {
 				i++

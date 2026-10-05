@@ -136,11 +136,10 @@ func Test_findMakefiles(t *testing.T) {
 		have := findMakefiles(tspy, "testdata")
 
 		// --- Then ---
-		want := []string{
+		assert.Equal(t, []string{
 			"makefile.go",
 			"makefile_helpers.go",
-		}
-		assert.Equal(t, want, have)
+		}, have)
 	})
 
 	t.Run("directory named like a makefile", func(t *testing.T) {

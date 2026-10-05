@@ -34,7 +34,7 @@ func Test_NewTarget(t *testing.T) {
 	assert.Equal(t, "", have.Doc)
 	assert.False(t, have.Hidden)
 	assert.NotNil(t, have.Run)
-	assert.NoError(t, have.Run(nil, &ring.Ring{}))
+	assert.NoError(t, have.Run(t.Context(), &ring.Ring{}))
 	assert.Fields(t, 16, have)
 }
 

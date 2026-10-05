@@ -4,8 +4,6 @@
 package parser
 
 import (
-	"io/fs"
-	"path/filepath"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -13,34 +11,7 @@ import (
 	"github.com/ctx42/testing/pkg/goldy"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
-	"github.com/ctx42/testkit/pkg/oskit"
 )
-
-func Test_CreateFile(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
-		// --- Given ---
-		dst := filepath.Join(t.TempDir(), "src.go")
-
-		// --- When ---
-		err := CreateFile(dst, []byte("content"))
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, "content", oskit.ReadFileStr(t, dst))
-	})
-
-	t.Run("error - parent directory missing", func(t *testing.T) {
-		// --- Given ---
-		dst := filepath.Join(t.TempDir(), "not_existing", "src.go")
-
-		// --- When ---
-		err := CreateFile(dst, []byte("content"))
-
-		// --- Then ---
-		assert.ErrorIs(t, fs.ErrNotExist, err)
-		assert.NoFileExist(t, dst)
-	})
-}
 
 func Test_WithGenNames(t *testing.T) {
 	// --- Given ---
@@ -98,8 +69,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, impSpecs, BuiltInCB))
+		tgs := must.Value(targetsFromSpecs(ring.New(), impSpecs, BuiltInCB))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))
@@ -143,8 +113,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, impSpecs, BuiltInCB))
+		tgs := must.Value(targetsFromSpecs(ring.New(), impSpecs, BuiltInCB))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate()
@@ -165,8 +134,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, impSpecs, BuiltInCB))
+		tgs := must.Value(targetsFromSpecs(ring.New(), impSpecs, BuiltInCB))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate(WithGenReg)
@@ -182,8 +150,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, nil))
+		tgs := must.Value(targetsFromSpecs(ring.New(), nil))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))
@@ -199,8 +166,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, nil))
+		tgs := must.Value(targetsFromSpecs(ring.New(), nil))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate()
@@ -220,8 +186,7 @@ func Test_Generator_Generate(t *testing.T) {
 		gfd := map[string]any{"prj_root": modkit.Root()}
 		gld := goldy.Open(t, gfp, goldy.WithData(gfd))
 
-		rng := ring.New()
-		tgs := must.Value(TargetsFromSpecs(rng, impSpecs, BuiltInCB))
+		tgs := must.Value(targetsFromSpecs(ring.New(), impSpecs, BuiltInCB))
 
 		// --- When ---
 		have, err := NewGenerator(tgs).Generate(WithGenNames("abc", "Abc"))

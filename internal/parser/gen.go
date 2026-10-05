@@ -7,22 +7,11 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"os"
+	"strings"
 	"text/template"
 
 	"github.com/ctx42/gomake/internal/mkf"
 )
-
-// MainName represents "main" package name.
-const MainName = "main"
-
-// CreateFile is a helper function writing code to file at given path.
-func CreateFile(dst string, code []byte) error {
-	if err := os.WriteFile(dst, code, 0600); err != nil {
-		return fmt.Errorf("write %s: %w", dst, err)
-	}
-	return nil
-}
 
 // GenOpt is signature for [Generator.Generate] option.
 type GenOpt func(*genOpts)
@@ -35,9 +24,6 @@ func WithGenNames(name, suffix string) GenOpt {
 		opts.suffix = suffix
 	}
 }
-
-// WithGenReg is [Generator.Generate] option to generate "init" function.
-var WithGenReg GenOpt = func(opts *genOpts) { opts.register = true }
 
 // genOpts represents Generator configuration options.
 type genOpts struct {
@@ -58,7 +44,7 @@ func defGenOpts() genOpts {
 // Generator knows how to generate code for file defining targets.
 //
 // The generated file will have a function returning definitions. When
-// constructor option WithGenReg is provided the generator will include code
+// option [WithGenReg] is provided the generator will include code
 // for init function registering the targets in global "targets" slice.
 type Generator struct {
 	tgs *Targets // Targets to generate code for.
@@ -108,13 +94,13 @@ func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 	data := map[string]any{
 		"package":             def.pkg,
 		"qualify":             qualifyPkg,
-		"imports":             tgs.GoImports(),
+		"imports":             tgs.goImports(),
 		"imports_render":      renderImps,
 		"imports_render_ctx":  renderImpCtx,
 		"imports_render_ring": renderImpRing,
 		"fn_name_suffix":      def.suffix,
 		"register_targets":    def.register,
-		"targets":             tgs.GoCode(qualifyPkg),
+		"targets":             tgs.goCode(qualifyPkg),
 	}
 	if err := tgsTplParsed.Execute(buf, data); err != nil {
 		return nil, fmt.Errorf("execute targets template: %w", err)
@@ -125,7 +111,12 @@ func (gen *Generator) Generate(opts ...GenOpt) ([]byte, error) {
 // tgsTplParsed represents parsed tgsTpl template.
 var tgsTplParsed = template.Must(
 	template.New("targets").
-		Funcs(map[string]any{"indent": mkf.Indent}).
+		Funcs(map[string]any{
+			"indent": mkf.Indent,
+			"trimnl": func(s string) string {
+				return strings.TrimPrefix(s, "\n")
+			},
+		}).
 		Parse(tgsTpl),
 )
 
@@ -145,19 +136,18 @@ import (
 {{ end -}}
 {{ if .qualify }}
 	"github.com/ctx42/gomake/internal/mkf"
-{{ end -}}
+{{ if .imports }}{{ .imports | trimnl | indent 1 }}{{ end }}
+{{- else -}}
 {{ .imports | indent 1 -}}
+{{ end -}}
 )
 {{ end }}
 {{- if .register_targets }}
 func init() { targets = append(targets, targets{{ .fn_name_suffix }}()...) }
 {{ end -}}
-{{ if .fn_name_suffix }}
+{{ "" }}
 // targets{{ .fn_name_suffix }} returns slice of targets named {{
 "" }}"{{ .fn_name_suffix }}".
-{{- else -}}
-// targets returns slice of targets.
-{{- end }}
 func targets{{ .fn_name_suffix }}() []*{{if .qualify }}mkf.{{end}}Target {
 {{ .targets | indent 1}}
 	return targets

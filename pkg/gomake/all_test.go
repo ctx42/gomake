@@ -61,43 +61,40 @@ func Test_ensureSymlink(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		link := filepath.Join(dir, "link")
-		target := "file0.txt"
 
 		// --- When ---
-		err := ensureSymlink(link, target)
+		err := ensureSymlink(link, "file0.txt")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, target, must.Value(os.Readlink(link)))
+		assert.Equal(t, "file0.txt", must.Value(os.Readlink(link)))
 	})
 
 	t.Run("keeps an existing symlink", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		link := filepath.Join(dir, "link")
-		kept := "kept.txt"
-		must.Nil(os.Symlink(kept, link))
+		must.Nil(os.Symlink("kept.txt", link))
 
 		// --- When ---
 		err := ensureSymlink(link, "other.txt")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, kept, must.Value(os.Readlink(link)))
+		assert.Equal(t, "kept.txt", must.Value(os.Readlink(link)))
 	})
 
 	t.Run("replaces a file", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		link := oskit.Create(t, "x", dir, "link")
-		target := "file0.txt"
 
 		// --- When ---
-		err := ensureSymlink(link, target)
+		err := ensureSymlink(link, "file0.txt")
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, target, must.Value(os.Readlink(link)))
+		assert.Equal(t, "file0.txt", must.Value(os.Readlink(link)))
 	})
 }
 

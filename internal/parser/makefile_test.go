@@ -20,8 +20,6 @@ import (
 func Test_NewMakefile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
 		relPath := "testdata/projects/showcase_imports/project"
 		prj := gmt.NewProject(t)
 		prj.ProjectFrom(modkit.Path(relPath))
@@ -32,7 +30,7 @@ func Test_NewMakefile(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		have, err := NewMakefile(rng, prj.Root())
+		have, err := NewMakefile(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -305,11 +303,11 @@ func Test_NewMakefile(t *testing.T) {
 		have := must.Value(NewMakefile(rng, dir))
 
 		// --- When ---
-		imports := have.Targets.GoImports()
+		imports := have.Targets.goImports()
 
 		// --- Then ---
 		assert.Equal(t, "\ngit2 \"example.com/mk/x/git\"\n", imports)
-		assert.Contain(t, "git2.Build", have.Targets.GoCode(false))
+		assert.Contain(t, "git2.Build", have.Targets.goCode(false))
 	})
 
 	t.Run("same import in two files", func(t *testing.T) {
@@ -534,9 +532,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 
-		relPath := "testdata/projects/default_local/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/default_local/project"))
 		prj.GoModInit()
 		prj.Close()
 
@@ -581,9 +578,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 
-		relPath := "testdata/projects/dup_imported/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/dup_imported/project"))
 		prj.GoModInit()
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
@@ -627,9 +623,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 
-		relPath := "testdata/projects/dup_local/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/dup_local/project"))
 		prj.GoModInit()
 		prj.Close()
 
@@ -648,9 +643,8 @@ func Test_MakefileFromPackage(t *testing.T) {
 		// --- Given ---
 		rng := ring.New()
 
-		relPath := "testdata/projects/dup_ns/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/dup_ns/project"))
 		prj.GoModInit()
 		prj.Close()
 

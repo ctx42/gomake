@@ -110,7 +110,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, hBase, hAlt)
 	})
 
-	t.Run("error - go.sum stat", func(t *testing.T) {
+	t.Run("error - go sum stat", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
@@ -136,7 +136,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		oskit.Write(t, "package main\n", root, "makefile.go")
 		pkgDir := oskit.MkdirAll(t, root, "lib")
 		libPath := filepath.Join(pkgDir, "lib.go")
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 1\n", libPath)
 
 		mkf := []string{"makefile.go"}
 
@@ -144,7 +144,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		hBefore := must.Value(binaryCacheKey(
 			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 2\n", libPath)
 		hAfter := must.Value(binaryCacheKey(
 			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
@@ -183,11 +183,11 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, hBefore, hAfter)
 	})
 
-	t.Run("changes when go.mod changes", func(t *testing.T) {
+	t.Run("changes when go mod changes", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
 		modPath := filepath.Join(root, "go.mod")
-		must.Nil(os.WriteFile(modPath, []byte("module example.com/m\n"), 0o600))
+		oskit.Create(t, "module example.com/m\n", modPath)
 
 		oskit.Write(t, "package main\n", root, "makefile.go")
 		mkf := []string{"makefile.go"}
@@ -196,7 +196,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		hBefore := must.Value(binaryCacheKey(
 			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
-		must.Nil(os.WriteFile(modPath, []byte("module example.com/m\ngo 1.22\n"), 0o600))
+		oskit.Create(t, "module example.com/m\ngo 1.22\n", modPath)
 		hAfter := must.Value(binaryCacheKey(
 			ring.New(), root, mkf, "1.0", "linux", "amd64", ""),
 		)
@@ -205,7 +205,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, hBefore, hAfter)
 	})
 
-	t.Run("changes when go.work appears", func(t *testing.T) {
+	t.Run("changes when go work appears", func(t *testing.T) {
 		// --- Given ---
 		root := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", root, "go.mod")
@@ -236,7 +236,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		oskit.Write(t, "go 1.22\nuse .\nuse ../other\n", proj, "go.work")
 		oskit.Write(t, "module example.com/other\n", other, "go.mod")
 		libPath := filepath.Join(other, "lib.go")
-		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 1\n"), 0o600))
+		oskit.Create(t, "package other\nconst V = 1\n", libPath)
 
 		mkf := []string{"makefile.go"}
 
@@ -244,7 +244,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		hBefore := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
-		must.Nil(os.WriteFile(libPath, []byte("package other\nconst V = 2\n"), 0o600))
+		oskit.Create(t, "package other\nconst V = 2\n", libPath)
 		hAfter := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
@@ -267,7 +267,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		oskit.Write(t, "module example.com/lib\n", lib, "go.mod")
 
 		libPath := filepath.Join(lib, "lib.go")
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 1\n", libPath)
 
 		mkf := []string{"makefile.go"}
 
@@ -275,7 +275,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		hBefore := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 2\n", libPath)
 		hAfter := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
@@ -284,7 +284,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		assert.NotEqual(t, hBefore, hAfter)
 	})
 
-	t.Run("changes when go.work replace tree changes", func(t *testing.T) {
+	t.Run("changes when go work replace tree changes", func(t *testing.T) {
 		// --- Given ---
 		base := t.TempDir()
 		proj := oskit.MkdirAll(t, base, "project")
@@ -300,7 +300,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		oskit.Write(t, "module example.com/lib\n", lib, "go.mod")
 
 		libPath := filepath.Join(lib, "lib.go")
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 1\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 1\n", libPath)
 
 		mkf := []string{"makefile.go"}
 
@@ -308,7 +308,7 @@ func Test_binaryCacheKey(t *testing.T) {
 		hBefore := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)
-		must.Nil(os.WriteFile(libPath, []byte("package lib\nconst V = 2\n"), 0o600))
+		oskit.Create(t, "package lib\nconst V = 2\n", libPath)
 		hAfter := must.Value(binaryCacheKey(
 			ring.New(), proj, mkf, "1.0", "linux", "amd64", ""),
 		)

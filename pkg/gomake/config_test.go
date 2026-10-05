@@ -470,12 +470,13 @@ func Test_GetCfg(t *testing.T) {
 
 		// --- When ---
 		have, err := GetCfg[any](cfg, "lint")
+
+		// --- Then ---
 		assert.NoError(t, err)
 		hM, hOk := have.(map[string]any)
 		assert.True(t, hOk)
-		hM["version"] = "mutated"
 
-		// --- Then ---
+		hM["version"] = "mutated"
 		assert.Equal(t, "v1", must.Value(GetCfg[string](cfg, "lint.version")))
 	})
 

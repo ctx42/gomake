@@ -294,7 +294,7 @@ func Test_genMain(t *testing.T) {
 		assert.Equal(t, want, stdout)
 	})
 
-	t.Run("target can read its own name via gomake.TargetName",
+	t.Run("target can read its own name via gomake TargetName",
 		func(t *testing.T) {
 			// --- Given ---
 			relPth := "testdata/projects/showcase_targets/project"
@@ -312,7 +312,7 @@ func Test_genMain(t *testing.T) {
 			assert.Equal(t, want, stdout)
 		})
 
-	t.Run("cannot create main file error", func(t *testing.T) {
+	t.Run("error - cannot create main file", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(t.TempDir(), "not_existing", mkf.MakefileMain)
 

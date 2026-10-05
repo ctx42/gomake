@@ -102,7 +102,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Equal(t, []string{"--timeout", "1s"}, have.args)
 	})
 
-	t.Run("error getting working dir", func(t *testing.T) {
+	t.Run("error - working dir", func(t *testing.T) {
 		if runtime.GOOS == "darwin" {
 			t.Skip("skipping test on darwin")
 		}
@@ -125,8 +125,8 @@ func Test_newConfig(t *testing.T) {
 		var args []string
 
 		dir := t.TempDir()
-		assert.NoError(t, os.Chdir(dir))
-		assert.NoError(t, os.Remove(dir))
+		must.Nil(os.Chdir(dir))
+		must.Nil(os.Remove(dir))
 
 		// --- When ---
 		have, err := newConfig("1.2.3", tst.Ring(args...))
@@ -194,7 +194,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Equal(t, "/dir", have.tmp)
 	})
 
-	t.Run("tmp dir set from option must be absolute path", func(t *testing.T) {
+	t.Run("error - relative tmp dir option", func(t *testing.T) {
 		// --- Given ---
 		env := make([]string, 0, 1)
 		tst := ringtest.New(t, ring.WithEnv(env))
@@ -291,7 +291,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Equal(t, pth, have.bin)
 	})
 
-	t.Run("option bin must point to not existing file", func(t *testing.T) {
+	t.Run("error - bin file exists", func(t *testing.T) {
 		// --- Given ---
 		pth := pathkit.AbsPath(t, "testdata/makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -306,7 +306,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("option bin cannot be used with -h", func(t *testing.T) {
+	t.Run("error - bin with h", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -320,7 +320,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("option bin cannot be used with --help", func(t *testing.T) {
+	t.Run("error - bin with help", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -334,7 +334,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("option bin cannot be used with --version", func(t *testing.T) {
+	t.Run("error - bin with version", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -348,7 +348,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("option bin cannot be used with --list", func(t *testing.T) {
+	t.Run("error - bin with list", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -362,7 +362,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("option bin cannot be used with target name", func(t *testing.T) {
+	t.Run("error - bin with target name", func(t *testing.T) {
 		// --- Given ---
 		pth := filepath.Join(os.TempDir(), "my-gomake-makefile")
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
@@ -389,7 +389,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Duration(t, "1m", have.timeout)
 	})
 
-	t.Run("option timeout invalid", func(t *testing.T) {
+	t.Run("error - invalid timeout", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 		args := []string{"--timeout", "abc"}
@@ -475,7 +475,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Equal(t, "target", have.target)
 	})
 
-	t.Run("unknown option before target name", func(t *testing.T) {
+	t.Run("error - unknown option before target", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 		args := []string{"--unknown", "target", "--arg0"}

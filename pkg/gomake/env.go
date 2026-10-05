@@ -11,26 +11,13 @@ import (
 	"text/tabwriter"
 )
 
-// Public gomake environment contract keys.
-const (
-	// VersionEnvKey is the environment variable carrying the gomake version
-	// string. The runtime sets it on the process environment (and ring meta)
-	// so a target can read the version of the gomake tool that invoked it.
-	VersionEnvKey = "GOMAKE_VERSION"
-
-	// ProjectDirEnvKey is the environment variable carrying the project
-	// directory (the --src path). The runtime sets it on the process
-	// environment (and ring meta) so a target can locate the project root.
-	ProjectDirEnvKey = "GOMAKE_PROJECT_DIR"
-)
-
-// EnvSplit parses [os.Environ] results and returns it as a key value map.
+// EnvSplit parses [os.Environ] results and returns them as a key value map.
 func EnvSplit(env []string) map[string]string {
 	m, _ := EnvSplitOrdered(env)
 	return m
 }
 
-// EnvSplitOrdered parses [os.Environ] results and returns it as a key value
+// EnvSplitOrdered parses [os.Environ] results and returns them as a key value
 // map and a slice with the order of first-seen keys. When a key appears more
 // than once, the map keeps the last value and the order list keeps a single
 // entry at the key's first occurrence.
@@ -81,11 +68,13 @@ func Expander(env []string) func(string) string {
 	}
 }
 
-// PrettyPrintEnv pretty prints environment variables to the writer, skipping
-// entries with empty values. It returns the first write error encountered.
-func PrettyPrintEnv(env []string, buf io.Writer) error {
+// PrettyPrintEnv pretty prints environment variables to w in two aligned
+// columns, skipping entries with empty values. Values are printed as they
+// are, so one holding a tab or a newline breaks the alignment. It returns the
+// first write error encountered.
+func PrettyPrintEnv(env []string, w io.Writer) error {
 	envMap, keys := EnvSplitOrdered(env)
-	tw := tabwriter.NewWriter(buf, 0, 8, 4, ' ', 0)
+	tw := tabwriter.NewWriter(w, 0, 8, 4, ' ', 0)
 	for _, name := range keys {
 		if envMap[name] == "" {
 			continue

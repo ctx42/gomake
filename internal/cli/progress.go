@@ -14,8 +14,8 @@ import (
 // progress output and stay deterministic regardless of compilation speed.
 var progressThreshold = 500 * time.Millisecond
 
-// withProgress runs fn and prints msg to w if fn takes longer than
-// progressThreshold (500ms).
+// withProgress runs action and prints msg to w if action takes longer than
+// progressThreshold.
 func withProgress(w io.Writer, msg string, action func() error) error {
 	done := make(chan struct{})
 	stopped := make(chan struct{})

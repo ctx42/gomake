@@ -13,8 +13,8 @@ import (
 	"unicode/utf8"
 )
 
-// PathExists reports whether the path exists. Any Stat error other than
-// existence (including permission errors) yields false.
+// PathExists reports whether the path exists. Any Stat error, a permission
+// error included, yields false.
 func PathExists(pth string) bool {
 	if _, err := os.Stat(pth); err != nil {
 		return false
@@ -34,7 +34,7 @@ func FileExists(pth string) bool {
 }
 
 // DirExists reports whether the path exists and is a directory. Any Stat
-// error other than existence yields false.
+// error yields false.
 func DirExists(pth string) bool {
 	fi, err := os.Stat(pth)
 	if err != nil {
@@ -43,8 +43,8 @@ func DirExists(pth string) bool {
 	return fi.IsDir()
 }
 
-// ReadFile is a wrapper around [os.ReadFile] returning string instead of byte
-// slice.
+// ReadFile is a wrapper around [os.ReadFile] returning a string instead of a
+// byte slice.
 func ReadFile(pth string) (string, error) {
 	content, err := os.ReadFile(pth)
 	if err != nil {
@@ -57,7 +57,9 @@ func ReadFile(pth string) (string, error) {
 // returns [io.EOF] when the reader is empty. A second call continues at the
 // next rune. Bytes that do not form a valid UTF-8 sequence are returned as
 // read, so no input is lost: an invalid lead byte alone, and a lead byte with
-// a malformed continuation together with the bytes read after it.
+// a malformed continuation together with the bytes read after it. A reader
+// ending inside a multi-byte rune yields [io.ErrUnexpectedEOF] and drops the
+// partial rune.
 func ReadChar(r io.Reader) (string, error) {
 	var buf [utf8.UTFMax]byte
 	if _, err := io.ReadFull(r, buf[:1]); err != nil {
@@ -77,23 +79,6 @@ func ReadChar(r io.Reader) (string, error) {
 		}
 	}
 	return string(buf[:need]), nil
-}
-
-// runeSize reports how many bytes a UTF-8 lead byte starts. An invalid lead
-// counts as one byte.
-func runeSize(b byte) int {
-	switch {
-	case b&0x80 == 0x00:
-		return 1
-	case b&0xE0 == 0xC0:
-		return 2
-	case b&0xF0 == 0xE0:
-		return 3
-	case b&0xF8 == 0xF0:
-		return 4
-	default:
-		return 1
-	}
 }
 
 // ReadLine reads a line delimited by "\n" from the reader. Leading and

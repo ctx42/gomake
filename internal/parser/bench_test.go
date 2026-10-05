@@ -68,10 +68,9 @@ func Benchmark_NewMakefile_small(b *testing.B) {
 	}
 }
 
-// Benchmark_TargetsFromSpecs measures the import-spec discovery path, which
+// Benchmark_targetsFromSpecs measures the import-spec discovery path, which
 // resolves each spec with its own `go list` subprocess before parsing.
-func Benchmark_TargetsFromSpecs(b *testing.B) {
-	rng := ring.New()
+func Benchmark_targetsFromSpecs(b *testing.B) {
 	specs := []string{
 		"github.com/ctx42/gomake/testdata/imports/pkg0",
 		"github.com/ctx42/gomake/testdata/imports/pkg1",
@@ -80,7 +79,7 @@ func Benchmark_TargetsFromSpecs(b *testing.B) {
 
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := TargetsFromSpecs(rng, specs); err != nil {
+		if _, err := targetsFromSpecs(ring.New(), specs); err != nil {
 			b.Fatal(err)
 		}
 	}

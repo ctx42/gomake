@@ -12,7 +12,6 @@ import (
 	"os/signal"
 	"sort"
 	"strings"
-	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -222,45 +221,39 @@ func runTarget(
 		returned = true
 	}()
 
-	// Handle interrupt and termination (containers send SIGTERM).
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
-	// Wait for signal, context cancel, or the target result. Once the result
-	// arrives, drain until the goroutine exits (deferred cwd restore) without
-	// re-selecting on ctx/sig — a finished target must not be reported as a
-	// deadline/signal error during that restore window. When cancel/signal
-	// races with completion, prefer a result already on done.
-	for {
-		select {
-		case itf := <-sig:
-			cxl() // Notify the running target the context has been canceled.
-			// Prefer a result that raced the signal, but not a cooperative
-			// cancel that only mirrors it — keep the 128+n interrupt code.
-			if err, ok := recvDone(done); ok {
-				if err == nil || !errors.Is(err, context.Canceled) {
-					return err
-				}
-			} else {
-				// Let the target run its deferred cleanup (killing its
-				// subprocesses) before the process exits; a second signal
-				// stops the wait.
-				awaitDone(done, sig, signalGrace)
+	// Wait for a signal on sig, a context cancel, or the target result. Once
+	// the result arrives, drain until the goroutine exits (deferred cwd
+	// restore) without re-selecting on ctx/sig — a finished target must not
+	// be reported as a deadline/signal error during that restore window. When
+	// cancel/signal races with completion, prefer a result already on done.
+	select {
+	case itf := <-sig:
+		cxl() // Notify the running target the context has been canceled.
+		// Prefer a result that raced the signal, but not a cooperative cancel
+		// that only mirrors it — keep the 128+n interrupt code.
+		if ok, err := recvDone(done); ok {
+			if err == nil || !errors.Is(err, context.Canceled) {
+				return err
 			}
-			return interruptedError{sig: itf}
-
-		case <-ctx.Done():
-			if err, ok := recvDone(done); ok {
-				return timedOut(ctx, err)
-			}
-			return timedOut(ctx, ctx.Err())
-
-		case err, open := <-done:
-			if !open {
-				// Closed without a prior result (should not happen).
-				return nil
-			}
-			return timedOut(ctx, drainDone(done, err))
+		} else {
+			// Let the target run its deferred cleanup (killing its
+			// subprocesses) before the process exits; a second signal stops
+			// the wait.
+			awaitDone(done, sig, signalGrace)
 		}
+		return interruptedError{sig: itf}
+
+	case <-ctx.Done():
+		if ok, err := recvDone(done); ok {
+			return timedOut(ctx, err)
+		}
+		return timedOut(ctx, ctx.Err())
+
+	case err, open := <-done:
+		if !open {
+			return errNoResult // The goroutine always sends before closing.
+		}
+		return timedOut(ctx, drainDone(done, err))
 	}
 }
 
@@ -295,17 +288,18 @@ func awaitDone(done <-chan error, sig <-chan os.Signal, grace time.Duration) {
 }
 
 // recvDone non-blocking-reads a finished target result from done. When a
-// value is present it drains the channel (cwd restore) and returns the
-// result with ok true. When the channel is empty, ok is false.
-func recvDone(done <-chan error) (err error, ok bool) {
+// value is present it drains the channel (cwd restore) and returns ok true
+// with the result. A closed channel yields ok true with errNoResult. When the
+// channel is empty, ok is false.
+func recvDone(done <-chan error) (ok bool, err error) {
 	select {
 	case err, open := <-done:
 		if !open {
-			return nil, true
+			return true, errNoResult
 		}
-		return drainDone(done, err), true
+		return true, drainDone(done, err)
 	default:
-		return nil, false
+		return false, nil
 	}
 }
 
@@ -337,7 +331,7 @@ func HelpTargets(tgs []*Target, padding int) string {
 	})
 
 	tw := tabwriter.NewWriter(buf, 0, 8, 4, ' ', 0)
-	var empty, core int
+	var user, core int
 	for _, tgt := range tgs {
 		if tgt.Hidden {
 			continue
@@ -349,10 +343,10 @@ func HelpTargets(tgs []*Target, padding int) string {
 		if tgt.Name != "" && tgt.Name[0] == ':' {
 			core++
 		} else {
-			if empty == 0 && core > 0 {
+			if user == 0 && core > 0 {
 				_, _ = fmt.Fprintf(tw, "%s%s\t%s\n", pad, "", "")
 			}
-			empty++
+			user++
 		}
 		_, _ = fmt.Fprintf(tw, "%s%s\t%s\n", pad, action, tgt.Synopsis)
 	}
@@ -369,10 +363,11 @@ func HelpTargets(tgs []*Target, padding int) string {
 
 // HelpUsage returns formatted help for the whole command or for a target. If
 // the args slice is not empty, it will show the help for the target whose name
-// is the first element in the slice. Otherwise, it will call [helpCommand].
+// is the first element in the slice. Otherwise, it returns the command help
+// built by helpCommand.
 //
-// Returns ErrUnkTarget error if target's, the help was requested for, does
-// not exist. The name argument is usually set to the name of a binary being
+// Returns [ErrUnkTarget] when the target the help was requested for does not
+// exist. The name argument is usually set to the name of a binary being
 // executed.
 func HelpUsage(
 	name string,
@@ -382,14 +377,14 @@ func HelpUsage(
 ) (string, error) {
 
 	if len(args) > 0 {
-		// Write help about the specific target to the standard error.
+		// Help about the specific target.
 		tgt, err := FindTarget(args[0], tgs)
 		if err != nil {
 			return "", err
 		}
-		return helpTarget(tgt), nil
+		return tgt.help(), nil
 	}
-	// Write general help to the standard error.
+	// General help.
 	return helpCommand(name, fs, tgs), nil
 }
 
@@ -407,8 +402,8 @@ func helpCommand(name string, fs *xflag.FlagSet, tgs []*Target) string {
 	return buf.String()
 }
 
-// helpTarget returns formatted help for a target.
-func helpTarget(tgt *Target) string {
+// help returns formatted help for a target.
+func (tgt *Target) help() string {
 	return fmt.Sprintf("%s\t%s\n", tgt.Name, tgt.Doc)
 }
 

@@ -4,6 +4,7 @@
 package parser
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/ctx42/testing/pkg/assert"
@@ -13,8 +14,7 @@ import (
 func Test_astFiles(t *testing.T) {
 	t.Run("error - empty directory", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/empty"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/empty")
 
 		// --- When ---
 		_, have, err := astFiles(absPath, goFilesIn(absPath))
@@ -40,8 +40,7 @@ func Test_astFiles(t *testing.T) {
 
 	t.Run("tagged files", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/simple_tagged/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/simple_tagged/project")
 
 		// --- When ---
 		_, have, err := astFiles(absPath, goFilesIn(absPath))
@@ -56,8 +55,7 @@ func Test_astFiles(t *testing.T) {
 
 	t.Run("file list", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/simple_tagged/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/simple_tagged/project")
 		files := []string{"makefile.go"}
 
 		// --- When ---
@@ -73,14 +71,11 @@ func Test_astFiles(t *testing.T) {
 
 	t.Run("error - empty file list does not scan dir", func(t *testing.T) {
 		// --- Given ---
-		// Directory has makefile.go; an explicit empty list must not fall
-		// back to scanning the directory (build-tag / go-list fidelity).
-		relPath := "testdata/projects/simple_untagged/project"
-		absPath := modkit.Path(relPath)
-		files := []string{}
+		// Directory has makefile.go, but only listed files are parsed.
+		absPath := modkit.Path("testdata/projects/simple_untagged/project")
 
 		// --- When ---
-		_, have, err := astFiles(absPath, files)
+		_, have, err := astFiles(absPath, make([]string, 0))
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAstEmpty, err)
@@ -90,8 +85,7 @@ func Test_astFiles(t *testing.T) {
 
 	t.Run("untagged files", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/simple_untagged/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/simple_untagged/project")
 
 		// --- When ---
 		_, have, err := astFiles(absPath, goFilesIn(absPath))
@@ -104,18 +98,16 @@ func Test_astFiles(t *testing.T) {
 		assert.Equal(t, "main", fil.Name.Name)
 	})
 
-	t.Run("multiple ast packages error", func(t *testing.T) {
+	t.Run("error - multiple packages", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/packages/multi"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/packages/multi")
 
 		// --- When ---
 		_, have, err := astFiles(absPath, goFilesIn(absPath))
 
 		// --- Then ---
 		assert.ErrorIs(t, errAstMultiPkg, err)
-		assert.ErrorContain(t, absPath, err)
-		assert.ErrorContain(t, "main, multi", err)
+		assert.ErrorRegexp(t, regexp.QuoteMeta(absPath)+".*main, multi", err)
 		assert.Nil(t, have)
 	})
 }
@@ -123,8 +115,7 @@ func Test_astFiles(t *testing.T) {
 func Test_astAndDocPkg(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/projects/simple_untagged/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/simple_untagged/project")
 
 		// --- When ---
 		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, goFilesIn(absPath))
@@ -140,10 +131,9 @@ func Test_astAndDocPkg(t *testing.T) {
 		assert.Equal(t, absPath, hDocPkg.ImportPath)
 	})
 
-	t.Run("error", func(t *testing.T) {
+	t.Run("error - multiple packages", func(t *testing.T) {
 		// --- Given ---
-		relPath := "testdata/packages/multi"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/packages/multi")
 
 		// --- When ---
 		hAstPkg, hDocPkg, err := astAndDocPkg(absPath, goFilesIn(absPath))

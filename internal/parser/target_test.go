@@ -11,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
-	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/modkit"
@@ -19,90 +18,40 @@ import (
 	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 )
 
-func Test_newTarget_generic(t *testing.T) {
-	// --- Given ---
-	pkg := &Package{Name: "main"}
-	fn := &doc.Func{
-		Name: "Generic",
-		Decl: &ast.FuncDecl{
-			Name: ast.NewIdent("Generic"),
-			Type: &ast.FuncType{
-				TypeParams: &ast.FieldList{
-					List: []*ast.Field{{
-						Names: []*ast.Ident{ast.NewIdent("T")},
-						Type:  ast.NewIdent("any"),
-					}},
-				},
-			},
-		},
-	}
-
-	// --- When ---
-	have, err := newTarget(pkg, fn)
-
-	// --- Then ---
-	assert.ErrorIs(t, errGeneric, err)
-	assert.Nil(t, have)
-}
-
-func Test_Targets_addFunc_alias(t *testing.T) {
-	// --- Given ---
-	src := "" +
-		"package main\n" +
-		"\n" +
-		"import (\n" +
-		"\t\"context\"\n" +
-		"\n" +
-		"\tr \"github.com/ctx42/ring/pkg/ring\"\n" +
-		")\n" +
-		"\n" +
-		"func Aliased(ctx context.Context, rng *r.Ring) error {\n" +
-		"\treturn nil\n" +
-		"}\n"
-	set := token.NewFileSet()
-	fil := must.Value(goparser.ParseFile(set, "makefile.go", src, 0))
-	docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
-	pkg := &Package{
-		Name:  "main",
-		files: map[string]*ast.File{"makefile.go": fil},
-	}
-	tgs := NewTargets()
-
-	// --- When ---
-	err := tgs.addFunc(pkg, docPkg.Funcs...)
-
-	// --- Then ---
-	assert.NoError(t, err)
-	assert.Equal(t, 0, tgs.Len())
-	assert.Equal(t, []string{"Aliased"}, tgs.skips)
-}
-
-func Test_Targets_reportSkips(t *testing.T) {
-	// --- Given ---
-	tst := ringtest.New(t).WetStderr()
-	rng := tst.Ring()
-
-	tgs := NewTargets()
-	tgs.noteSkip("Aliased")
-
-	// --- When ---
-	tgs.reportSkips(rng)
-
-	// --- Then ---
-	want := "gomake: skipping Aliased: " +
-		"aliased context or ring parameter\n"
-	assert.Equal(t, want, tst.Stderr())
-}
-
-func Test_newTarget_main_package(t *testing.T) {
+func Test_newTarget(t *testing.T) {
 	relPath := "testdata/projects/showcase_targets/project"
 	absPath := modkit.Path(relPath)
 	impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
+	t.Run("error - generic", func(t *testing.T) {
+		// --- Given ---
+		pkg := &Package{Name: "main"}
+		fn := &doc.Func{
+			Name: "Generic",
+			Decl: &ast.FuncDecl{
+				Name: ast.NewIdent("Generic"),
+				Type: &ast.FuncType{
+					TypeParams: &ast.FieldList{
+						List: []*ast.Field{{
+							Names: []*ast.Ident{ast.NewIdent("T")},
+							Type:  ast.NewIdent("any"),
+						}},
+					},
+				},
+			},
+		}
+
+		// --- When ---
+		have, err := newTarget(pkg, fn)
+
+		// --- Then ---
+		assert.ErrorIs(t, errGeneric, err)
+		assert.Nil(t, have)
+	})
+
 	t.Run("basic target", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("Basic"))
@@ -132,8 +81,7 @@ func Test_newTarget_main_package(t *testing.T) {
 
 	t.Run("package imported with namespace", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath, withPkgNS("ns"))
+		tst := NewTestHelper(t, ring.New(), absPath, withPkgNS("ns"))
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("Basic"))
@@ -148,8 +96,7 @@ func Test_newTarget_main_package(t *testing.T) {
 
 	t.Run("kebab case namespace", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 		met, nsp := tst.Method("KebabCase", "HelloWorld")
 
 		// --- When ---
@@ -166,8 +113,7 @@ func Test_newTarget_main_package(t *testing.T) {
 
 	t.Run("error - not exported", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("notExported"))
@@ -177,10 +123,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("error - invalid argument type", func(t *testing.T) {
+	t.Run("error - argument type", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvType"))
@@ -190,10 +135,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid multi context", func(t *testing.T) {
+	t.Run("error - multi context", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtx"))
@@ -203,10 +147,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid multi context with reused arguments", func(t *testing.T) {
+	t.Run("error - multi context with reused arguments", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvMultiCtxReuse"))
@@ -216,10 +159,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid context argument position", func(t *testing.T) {
+	t.Run("error - context argument position", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvCtxPosition"))
@@ -229,10 +171,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid no arguments", func(t *testing.T) {
+	t.Run("error - no arguments", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvNoArgs"))
@@ -242,10 +183,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid no context argument", func(t *testing.T) {
+	t.Run("error - no context argument", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvNoCtx"))
@@ -255,10 +195,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid returning multiple values", func(t *testing.T) {
+	t.Run("error - returning multiple values", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("RetInvMulti"))
@@ -268,10 +207,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid to many arguments", func(t *testing.T) {
+	t.Run("error - too many arguments", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvToMany"))
@@ -281,10 +219,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid to many reused arguments", func(t *testing.T) {
+	t.Run("error - too many reused arguments", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("ArgInvToManyReuse"))
@@ -294,10 +231,9 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("invalid return type", func(t *testing.T) {
+	t.Run("error - return type", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("RetInvType"))
@@ -306,17 +242,14 @@ func Test_newTarget_main_package(t *testing.T) {
 		assert.ErrorIs(t, errInvResult, err)
 		assert.Nil(t, have)
 	})
-}
 
-func Test_newTarget_non_main_package(t *testing.T) {
-	t.Run("target", func(t *testing.T) {
+	t.Run("non-main target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
 		absPath := modkit.Path(relPath)
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("Pkg1"))
@@ -342,14 +275,13 @@ func Test_newTarget_non_main_package(t *testing.T) {
 		assert.Fields(t, 16, have)
 	})
 
-	t.Run("target imported with namespace", func(t *testing.T) {
+	t.Run("non-main target imported with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg1"
 		absPath := modkit.Path(relPath)
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
+		tst := NewTestHelper(t, ring.New(), absPath, withPkgNS("aa"))
 
 		// --- When ---
 		have, err := newTarget(tst.pkg, tst.Func("Pkg1"))
@@ -375,14 +307,13 @@ func Test_newTarget_non_main_package(t *testing.T) {
 		assert.Fields(t, 16, have)
 	})
 
-	t.Run("namespaced target", func(t *testing.T) {
+	t.Run("non-main namespaced target", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
 		absPath := modkit.Path(relPath)
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath)
+		tst := NewTestHelper(t, ring.New(), absPath)
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---
@@ -410,14 +341,13 @@ func Test_newTarget_non_main_package(t *testing.T) {
 		assert.Fields(t, 16, have)
 	})
 
-	t.Run("namespaced target imported with namespace", func(t *testing.T) {
+	t.Run("non-main namespaced target with namespace", func(t *testing.T) {
 		// --- Given ---
 		relPath := "testdata/imports/pkg4"
 		absPath := modkit.Path(relPath)
 		impSpec := gmt.JoinImpSpec(t, gmt.GmModName, relPath)
 
-		rng := ring.New()
-		tst := NewTestHelper(t, rng, absPath, withPkgNS("aa"))
+		tst := NewTestHelper(t, ring.New(), absPath, withPkgNS("aa"))
 		met, nsp := tst.Method("NS", "M0")
 
 		// --- When ---
@@ -444,9 +374,7 @@ func Test_newTarget_non_main_package(t *testing.T) {
 		assert.NotNil(t, have.Run)
 		assert.Fields(t, 16, have)
 	})
-}
 
-func Test_newTarget(t *testing.T) {
 	t.Run("synopsis keeps a repeated name", func(t *testing.T) {
 		// --- Given ---
 		src := "" +
@@ -480,44 +408,44 @@ func Test_newTarget(t *testing.T) {
 		assert.Equal(t, "deploy the app.", have.Doc)
 		assert.Equal(t, "deploy the app", have.Synopsis)
 	})
-}
 
-func Test_newTarget_strips_nolint_from_doc(t *testing.T) {
-	// --- Given ---
-	// A target whose doc carries a spaced "// nolint" line. go/doc keeps such
-	// a line in Func.Doc (only the "//" prefix is stripped), so NewTarget must
-	// remove it from the rendered documentation.
-	src := "" +
-		"package main\n" +
-		"\n" +
-		"import (\n" +
-		"\t\"context\"\n" +
-		"\n" +
-		"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
-		")\n" +
-		"\n" +
-		"// Basic does stuff.\n" +
-		"// nolint:gocyclo\n" +
-		"// More docs.\n" +
-		"func Basic(ctx context.Context, rng *ring.Ring) error {\n" +
-		"\treturn nil\n" +
-		"}\n"
-	set := token.NewFileSet()
-	fil := must.Value(goparser.ParseFile(
-		set, "makefile.go", src, goparser.ParseComments,
-	))
-	docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
-	pkg := &Package{
-		Name:  MainName,
-		files: map[string]*ast.File{"makefile.go": fil},
-	}
+	t.Run("strips nolint from doc", func(t *testing.T) {
+		// --- Given ---
+		// A target whose doc carries a spaced "// nolint" line. go/doc keeps
+		// such a line in Func.Doc (only the "//" prefix is stripped), so
+		// newTarget must remove it from the rendered documentation.
+		src := "" +
+			"package main\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"// Basic does stuff.\n" +
+			"// nolint:gocyclo\n" +
+			"// More docs.\n" +
+			"func Basic(ctx context.Context, rng *ring.Ring) error {\n" +
+			"\treturn nil\n" +
+			"}\n"
+		set := token.NewFileSet()
+		fil := must.Value(goparser.ParseFile(
+			set, "makefile.go", src, goparser.ParseComments,
+		))
+		docPkg := must.Value(doc.NewFromFiles(set, []*ast.File{fil}, "main"))
+		pkg := &Package{
+			Name:  MainName,
+			files: map[string]*ast.File{"makefile.go": fil},
+		}
 
-	// --- When ---
-	have, err := newTarget(pkg, docPkg.Funcs[0])
+		// --- When ---
+		have, err := newTarget(pkg, docPkg.Funcs[0])
 
-	// --- Then ---
-	assert.NoError(t, err)
-	assert.Equal(t, "does stuff. More docs.", have.Doc)
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "does stuff. More docs.", have.Doc)
+	})
 }
 
 func Test_targetName_tabular(t *testing.T) {

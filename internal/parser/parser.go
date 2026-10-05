@@ -73,6 +73,10 @@ var (
 	// ErrAbsPath is returned when package path is not absolute.
 	ErrAbsPath = errors.New("path must be absolute")
 
+	// ErrDupTarget is an error indicating a target (name) is a duplicate
+	// of already existing target.
+	ErrDupTarget = errors.New("duplicated target")
+
 	// ErrNoDefault is returned when the Default variable names no target.
 	ErrNoDefault = errors.New("default target not found")
 
@@ -81,8 +85,15 @@ var (
 	ErrImportTag = errors.New("malformed gomake:import tag")
 )
 
+// MainName represents "main" package name.
+const MainName = "main"
+
+// WithGenReg is a [Generator.Generate] option to generate an "init" function
+// registering the targets.
+func WithGenReg(opts *genOpts) { opts.register = true }
+
 // GenMain represents an entry point for the program called by "go generate".
-// It generates [mkf.MakefileUser] placeholder file. Placeholder file defines
+// It generates the mkf.MakefileUser placeholder file. Placeholder file defines
 // targetsUser function returning empty slice of targets.
 func GenMain(dst string) error {
 	gen := NewGenerator(NewTargets())

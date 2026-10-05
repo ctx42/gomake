@@ -32,13 +32,16 @@ import (
 // and delivered to it through the ring meta store; "--check-config" lists the
 // discovered targets grouped by import path and flags soft structural problems.
 
-// configFileName is the name of gomake's YAML configuration file. Both the
-// user-level and the project-level configurations use this same name.
-const configFileName = "gomake.yaml"
+// Configuration file.
+const (
+	// configFileName is the name of gomake's YAML configuration file. Both the
+	// user-level and the project-level configurations use this same name.
+	configFileName = "gomake.yaml"
 
-// configSchemaVersion is the highest configuration schema version this binary
-// understands.
-const configSchemaVersion = 1
+	// configSchemaVersion is the highest configuration schema version this
+	// binary understands.
+	configSchemaVersion = 1
+)
 
 // Environment keys used to resolve the user-level configuration file location.
 const (
@@ -102,7 +105,7 @@ type fileConfig struct {
 
 // mergedConfig is the effective gomake.yaml settings after merging the
 // user-level and project-level files. Target configuration is not merged; it is
-// resolved per invocation by [resolveDelivered].
+// resolved per invocation by resolveDelivered.
 type mergedConfig struct {
 	// timeout is the effective settings.timeout, or nil when unset.
 	timeout *string
@@ -153,7 +156,7 @@ func loadConfigFile(pth string) (*fileConfig, error) {
 // parseConfigFile decodes the content of a gomake.yaml file. Empty content
 // yields an empty configuration. It rejects unknown keys on the gomake-owned
 // surface, a missing or non-positive version, and a version newer than
-// [configSchemaVersion].
+// configSchemaVersion.
 func parseConfigFile(data []byte) (*fileConfig, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return &fileConfig{}, nil
@@ -239,7 +242,7 @@ func moduleImportPath(dir string) (string, error) {
 // mergeConfigs merges the settings sections of the user-level and
 // project-level configurations. The project-level file wins and the user-level
 // file fills the gaps. Target configuration is not merged; each target's block
-// is resolved per invocation by [resolveDelivered].
+// is resolved per invocation by resolveDelivered.
 func mergeConfigs(user, project *fileConfig) *mergedConfig {
 	return &mergedConfig{
 		timeout: pickSetting(user.timeout(), project.timeout()),
@@ -452,8 +455,8 @@ func (cfg *config) applyFileConfig(env []string) error {
 // used to distinguish child-node keys from settings. It is a no-op when tgt is
 // nil or no configuration file carries a block for it. For an in-process target
 // this is the whole delivery; for a target compiled into a makefile subprocess,
-// [goMake.Execute] ferries the same value across the process boundary via
-// [targetConfigArg].
+// goMake.Execute ferries the same value across the process boundary via
+// targetConfigArg.
 func deliverTargetConfig(
 	rng *ring.Ring,
 	cfg *config,
@@ -541,7 +544,7 @@ func runCheckConfig(
 // discovered target grouped by import path (local targets, whose
 // [mkf.Target.ImpSpec] is empty, resolve their import path from localImp),
 // naming each target by its kebab node path, and reports the soft problems
-// gomake tolerates during a normal run (see [checkConfigProblems]).
+// gomake tolerates during a normal run (see checkConfigProblems).
 func checkConfigReport(
 	tgts []*mkf.Target,
 	localImp string,

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/iotest"
 
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
@@ -148,7 +149,6 @@ func Test_ReadFile(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, "content", have)
-
 	})
 
 	t.Run("link", func(t *testing.T) {
@@ -237,6 +237,40 @@ func Test_ReadChar(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "\x80", have)
 	})
+
+	t.Run("error - truncated rune", func(t *testing.T) {
+		// --- When ---
+		have, err := ReadChar(bytes.NewReader([]byte("\xC3")))
+
+		// --- Then ---
+		assert.ErrorIs(t, io.ErrUnexpectedEOF, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - reader", func(t *testing.T) {
+		// --- When ---
+		have, err := ReadChar(iotest.ErrReader(errTest))
+
+		// --- Then ---
+		assert.ErrorIs(t, errTest, err)
+		assert.ErrorContain(t, "read rune: ", err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - reader inside rune", func(t *testing.T) {
+		// --- Given ---
+		rdr := io.MultiReader(
+			bytes.NewReader([]byte("\xC3")),
+			iotest.ErrReader(errTest),
+		)
+
+		// --- When ---
+		have, err := ReadChar(rdr)
+
+		// --- Then ---
+		assert.ErrorIs(t, errTest, err)
+		assert.Equal(t, "", have)
+	})
 }
 
 func Test_ReadLine(t *testing.T) {
@@ -276,6 +310,22 @@ func Test_ReadLine(t *testing.T) {
 		assert.ErrorIs(t, io.EOF, err)
 		assert.Equal(t, "last", have)
 	})
+
+	t.Run("error - reader", func(t *testing.T) {
+		// --- Given ---
+		rdr := io.MultiReader(
+			bytes.NewReader([]byte(" ab")),
+			iotest.ErrReader(errTest),
+		)
+
+		// --- When ---
+		have, err := ReadLine(rdr)
+
+		// --- Then ---
+		assert.ErrorIs(t, errTest, err)
+		assert.ErrorContain(t, "read line: ", err)
+		assert.Equal(t, "ab", have)
+	})
 }
 
 func Test_ReadLine_tabular(t *testing.T) {
@@ -285,11 +335,11 @@ func Test_ReadLine_tabular(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"1", "abc\n", "abc"},
-		{"2", "abc\n\n", "abc"},
-		{"3", " abc\n\n", "abc"},
-		{"4", "\n abc\n", ""},
-		{"5", "abc\ndef\n", "abc"},
+		{"newline", "abc\n", "abc"},
+		{"trailing blank line", "abc\n\n", "abc"},
+		{"leading space", " abc\n\n", "abc"},
+		{"leading blank line", "\n abc\n", ""},
+		{"first line only", "abc\ndef\n", "abc"},
 	}
 
 	for _, tc := range tt {

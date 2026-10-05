@@ -362,7 +362,7 @@ func Test_moduleImportPath(t *testing.T) {
 		assert.Equal(t, "", have)
 	})
 
-	t.Run("error - unreadable go.mod", func(t *testing.T) {
+	t.Run("error - unreadable go mod", func(t *testing.T) {
 		if os.Geteuid() == 0 {
 			t.Skip("root ignores file permissions")
 		}
@@ -382,7 +382,7 @@ func Test_moduleImportPath(t *testing.T) {
 }
 
 func Test_mergeConfigs(t *testing.T) {
-	t.Run("project settings win, user settings fill gaps", func(t *testing.T) {
+	t.Run("project settings win", func(t *testing.T) {
 		// --- Given ---
 		user := &fileConfig{Settings: &fileSettings{
 			Timeout: new("10s"),
@@ -505,6 +505,27 @@ func Test_settingKeys(t *testing.T) {
 	})
 }
 
+func Test_resolveTargetBlock(t *testing.T) {
+	t.Run("scalar where a descent was expected yields no block",
+		func(t *testing.T) {
+			// --- Given ---
+			root := map[string]any{"go": map[string]any{"lint": "oops"}}
+			known := map[string]bool{
+				"go":              true,
+				"go:lint":         true,
+				"go:lint:install": true,
+			}
+			path := []string{"go", "lint", "install"}
+
+			// --- When ---
+			have, hOk := resolveTargetBlock(root, path, known)
+
+			// --- Then ---
+			assert.False(t, hOk)
+			assert.Nil(t, have)
+		})
+}
+
 func Test_resolveTargetBlock_tabular(t *testing.T) {
 	// Tree mirrors the plan's gomake example: a "go" ns_root carrying a shared
 	// timeout, a "lint" sub-namespace, and a "build" target with its own block.
@@ -568,27 +589,6 @@ func Test_resolveTargetBlock_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have)
 		})
 	}
-}
-
-func Test_resolveTargetBlock(t *testing.T) {
-	t.Run("scalar where a descent was expected yields no block",
-		func(t *testing.T) {
-			// --- Given ---
-			root := map[string]any{"go": map[string]any{"lint": "oops"}}
-			known := map[string]bool{
-				"go":              true,
-				"go:lint":         true,
-				"go:lint:install": true,
-			}
-			path := []string{"go", "lint", "install"}
-
-			// --- When ---
-			have, hOk := resolveTargetBlock(root, path, known)
-
-			// --- Then ---
-			assert.False(t, hOk)
-			assert.Nil(t, have)
-		})
 }
 
 func Test_resolveDelivered(t *testing.T) {
@@ -703,7 +703,11 @@ func Test_fileConfig_timeout(t *testing.T) {
 	})
 
 	t.Run("nil settings", func(t *testing.T) {
-		assert.Nil(t, (&fileConfig{}).timeout())
+		// --- When ---
+		have := (&fileConfig{}).timeout()
+
+		// --- Then ---
+		assert.Nil(t, have)
 	})
 
 	t.Run("value", func(t *testing.T) {
@@ -728,7 +732,11 @@ func Test_fileConfig_tmp(t *testing.T) {
 	})
 
 	t.Run("nil settings", func(t *testing.T) {
-		assert.Nil(t, (&fileConfig{}).tmp())
+		// --- When ---
+		have := (&fileConfig{}).tmp()
+
+		// --- Then ---
+		assert.Nil(t, have)
 	})
 
 	t.Run("value", func(t *testing.T) {

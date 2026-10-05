@@ -9,6 +9,7 @@ import (
 	"go/ast"
 	"go/doc"
 	"go/token"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -18,7 +19,7 @@ import (
 )
 
 // genMakefileUser parses targets in `makefile*.go` files in given directory.
-// Returns source code for [mkf.MakefileUser] file and matching targets
+// Returns source code for the mkf.MakefileUser file and the matching targets
 // collection.
 func genMakefileUser(rng *ring.Ring, dir string) ([]byte, *Targets, error) {
 	// Parse makefile*.go files with user defined targets.
@@ -35,8 +36,9 @@ func genMakefileUser(rng *ring.Ring, dir string) ([]byte, *Targets, error) {
 	return code, pmf.Targets, nil
 }
 
-// GenMakefileUserAndSave based on targets in src directory generates code for
-// [mkf.MakefileUser] in the same directory. Returns user targets.
+// GenMakefileUserAndSave generates the mkf.MakefileUser code for the targets
+// in the src directory and writes it to the file dst. Returns the user
+// targets.
 func GenMakefileUserAndSave(rng *ring.Ring, src, dst string) (*Targets, error) {
 	code, tgs, err := genMakefileUser(rng, src)
 	if err != nil {
@@ -124,8 +126,8 @@ func targetSynopsis(docStr string) string {
 	return strings.TrimRight(p.Synopsis(docStr), ".")
 }
 
-// breadcrumbs returns type's breadcrumb trail or nil. See [isNS] documentation
-// for more info.
+// breadcrumbs returns the type's breadcrumb trail or nil. See the isNS
+// documentation for more info.
 //
 // The namespace path for C:
 //
@@ -133,11 +135,11 @@ func targetSynopsis(docStr string) string {
 //	type B A
 //	type C B
 //
-// is
+// is:
 //
 //	[]string{"__root__", "A", "B", "C"}
 //
-// other examples:
+// Another example:
 //
 //	[]string{"__!!!__", "NS3", "NS4"}
 //
@@ -188,9 +190,9 @@ const (
 // isNS returns breadcrumb trail for the given type or nil if it isn't
 // namespace. When non-nil slice is returned the first element in it may be:
 //
-//   - [rootCrumb]: means the breadcrumb trail is complete (valid namespace).
-//   - [partCrumb]: means the breadcrumb trail describes potential namespace -
-//     which means additional checks are need. It happens for example when
+//   - rootCrumb: means the breadcrumb trail is complete (valid namespace).
+//   - partCrumb: means the breadcrumb trail describes a potential namespace,
+//     which means additional checks are needed. It happens for example when
 //     the base type is in different file or package.
 func isNS(spc *ast.TypeSpec, prev []string) []string {
 	_, ok := spc.Type.(*ast.SelectorExpr)
@@ -263,6 +265,7 @@ func attachDeclDoc(f *ast.File) {
 			if spc.Doc == nil {
 				spc.Doc = gen.Doc
 			}
+
 		case *ast.ImportSpec:
 			if spc.Doc == nil {
 				spc.Doc = gen.Doc
@@ -286,33 +289,16 @@ func commentBodies(grp *ast.CommentGroup) []string {
 	return out
 }
 
-// builtinTypes represents a list of build in types.
-var builtinTypes = map[string]bool{
-	"bool":       true,
-	"string":     true,
-	"int":        true,
-	"int8":       true,
-	"int16":      true,
-	"int32":      true,
-	"int64":      true,
-	"uint":       true,
-	"uint8":      true,
-	"uint16":     true,
-	"uint32":     true,
-	"uint64":     true,
-	"uintptr":    true,
-	"float32":    true,
-	"float64":    true,
-	"complex64":  true,
-	"complex128": true,
-	"byte":       true,
-	"rune":       true,
-}
-
-// isBuiltinType returns true if a type is built-in.
+// isBuiltinType returns true if a type is a predeclared basic type.
 func isBuiltinType(typeName string) bool {
-	_, ok := builtinTypes[typeName]
-	return ok
+	switch typeName {
+	case "bool", "string", "byte", "rune", "uintptr",
+		"int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "complex64", "complex128":
+		return true
+	}
+	return false
 }
 
 // toKebabCase converts a CamelCase name to kebab-case.
@@ -345,7 +331,6 @@ func toKebabCase(camel string) string {
 		}
 
 		switch {
-
 		// Number followed by letter.
 		case pt == NUM && (t == LC || t == UC):
 			b.WriteRune('-')
@@ -383,6 +368,7 @@ func importLocalNames(fil *ast.File) map[string]string {
 			switch imp.Name.Name {
 			case "_", ".":
 				continue
+
 			default:
 				out[imp.Name.Name] = path
 				continue
@@ -617,4 +603,12 @@ func qIdent(expr ast.Expr) string {
 		return "[]" + qIdent(v.Elt)
 	}
 	return ""
+}
+
+// CreateFile writes code to the file at dst.
+func CreateFile(dst string, code []byte) error {
+	if err := os.WriteFile(dst, code, 0600); err != nil {
+		return fmt.Errorf("write %s: %w", dst, err)
+	}
+	return nil
 }

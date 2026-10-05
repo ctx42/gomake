@@ -142,12 +142,12 @@ func listCacheKey(rng *ring.Ring, dir, spec string) (string, bool) {
 	return hex.EncodeToString(h.Sum(nil)), true
 }
 
-// cacheableModule reports whether a module's `go list` result is safe to cache
+// cacheable reports whether a module's `go list` result is safe to cache
 // across invocations. Only version-pinned modules that are not redirected by a
 // replace directive have immutable module-cache content; the main module, local
 // packages, and replaced modules are not content-pinned.
-func cacheableModule(m module) bool {
-	return m.Version != "" && m.Replace == nil
+func (mod module) cacheable() bool {
+	return mod.Version != "" && mod.Replace == nil
 }
 
 // loadListCache returns the cached `go list` output for key and true when a

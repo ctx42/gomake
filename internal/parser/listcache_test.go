@@ -158,13 +158,11 @@ func Test_listCacheKey(t *testing.T) {
 
 	t.Run("unreadable go.mod is not cached", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "go.mod")
 
 		// --- When ---
-		hKey, hOk := listCacheKey(rng, dir, "example.com/x")
+		hKey, hOk := listCacheKey(ring.New(), dir, "example.com/x")
 
 		// --- Then ---
 		assert.False(t, hOk)
@@ -173,14 +171,12 @@ func Test_listCacheKey(t *testing.T) {
 
 	t.Run("unreadable go.sum is not cached", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
 		dir := t.TempDir()
 		oskit.Write(t, "module example.com/m\n", dir, "go.mod")
 		oskit.MkdirAll(t, dir, "go.sum")
 
 		// --- When ---
-		hKey, hOk := listCacheKey(rng, dir, "example.com/x")
+		hKey, hOk := listCacheKey(ring.New(), dir, "example.com/x")
 
 		// --- Then ---
 		assert.False(t, hOk)
@@ -197,7 +193,7 @@ func Test_listCacheKey(t *testing.T) {
 	})
 }
 
-func Test_cacheableModule_tabular(t *testing.T) {
+func Test_module_cacheable_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
 
@@ -216,7 +212,7 @@ func Test_cacheableModule_tabular(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have := cacheableModule(tc.mod)
+			have := tc.mod.cacheable()
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)

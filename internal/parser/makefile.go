@@ -57,6 +57,7 @@ func MakefileFromPackage(rng *ring.Ring, pkg *Package) (*Makefile, error) {
 		// When the import path has no targets, that is not really a problem
 		// since gomake might have been called anywhere with some core target.
 		return pmf, nil
+
 	case err != nil:
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (pmf *Makefile) addTargets() (*doc.Package, error) {
 	return docPkg, nil
 }
 
-// markDefault uses [findDefault] to locate the default target definition and,
+// markDefault uses findDefault to locate the default target definition and,
 // when found, marks the matching target as default. A leading import local
 // name restricts the match to the targets of that import. A declared Default
 // that matches no target is an error.
@@ -132,7 +133,7 @@ func (pmf *Makefile) markDefault(
 			}
 		}
 	}
-	if name := pmf.Targets.MarkDefault(impSpec, defRef); name != "" {
+	if name := pmf.Targets.markDefault(impSpec, defRef); name != "" {
 		pmf.Default = name
 		return nil
 	}

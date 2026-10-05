@@ -79,7 +79,5 @@ func findGomakeRoot() (string, error) {
 		}
 		dir = parent
 	}
-	return "", fmt.Errorf(
-		"could not find gomake module root from %s", start,
-	)
+	return "", fmt.Errorf("could not find gomake module root from %s", start)
 }

@@ -63,7 +63,7 @@ func Test_newGoMake(t *testing.T) {
 		assert.Equal(t, wantNames, have.targets.Names())
 	})
 
-	t.Run("prepare error", func(t *testing.T) {
+	t.Run("error - prepare", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 
@@ -92,7 +92,7 @@ func Test_newGoMake(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("parsing error", func(t *testing.T) {
+	t.Run("error - parsing", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 
@@ -121,7 +121,7 @@ func Test_newGoMake(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("on error defer removes the build directory", func(t *testing.T) {
+	t.Run("error - build directory removed", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 

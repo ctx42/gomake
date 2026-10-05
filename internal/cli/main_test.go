@@ -37,12 +37,10 @@ func mainNoMakefileInWD(t *testing.T) {
 	t.Run("no target name provided", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -111,12 +109,10 @@ func mainNoMakefileInWD(t *testing.T) {
 	t.Run("target name provided", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -140,12 +136,10 @@ func mainNoMakefileInWD(t *testing.T) {
 	t.Run("print version", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -170,12 +164,9 @@ func mainNoMakefileInWD(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -199,12 +190,10 @@ func mainNoMakefileInWD(t *testing.T) {
 	t.Run("not existing built-in target name provided", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -226,12 +215,11 @@ func mainNoMakefileInWD(t *testing.T) {
 	})
 
 	t.Run("custom bin path", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -255,9 +243,9 @@ func mainNoMakefileInWD(t *testing.T) {
 	})
 
 	t.Run("show help", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/no_makefiles/project")
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -286,12 +274,9 @@ func mainMakefileWithNoTargets(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -315,12 +300,9 @@ func mainMakefileWithNoTargets(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -345,12 +327,9 @@ func mainMakefileWithNoTargets(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -375,12 +354,9 @@ func mainMakefileWithNoTargets(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -402,13 +378,12 @@ func mainMakefileWithNoTargets(t *testing.T) {
 	})
 
 	t.Run("custom bin path", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_targets/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -431,10 +406,10 @@ func mainMakefileWithNoTargets(t *testing.T) {
 	})
 
 	t.Run("show help", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/no_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/no_targets/project")
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -463,8 +438,7 @@ func mainMakefileNoDefaultTarget(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -492,8 +466,7 @@ func mainMakefileNoDefaultTarget(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -522,8 +495,7 @@ func mainMakefileNoDefaultTarget(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -549,10 +521,10 @@ func mainMakefileNoDefaultTarget(t *testing.T) {
 	})
 
 	t.Run("custom bin path - call built-n", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t)
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -591,8 +563,7 @@ func mainCases(t *testing.T) {
 	t.Run("unknown target name provided", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -621,8 +592,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -651,8 +621,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -681,8 +650,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -711,8 +679,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -741,8 +708,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -770,8 +736,7 @@ func mainCases(t *testing.T) {
 	t.Run("panicking target", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -800,8 +765,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -830,12 +794,10 @@ func mainCases(t *testing.T) {
 	t.Run("duplicated targets", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/dup_imported/project"
-		absPath := modkit.Path(relPath)
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/dup_imported/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -859,8 +821,7 @@ func mainCases(t *testing.T) {
 	t.Run("target shows its arg help", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -894,8 +855,7 @@ func mainCases(t *testing.T) {
 	t.Run("built-in target shows its help", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -923,10 +883,10 @@ func mainCases(t *testing.T) {
 	})
 
 	t.Run("custom bin path", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t)
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -954,8 +914,7 @@ func mainCases(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_imports/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_imports/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -983,8 +942,7 @@ func mainCases(t *testing.T) {
 	t.Run("list targets", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1013,8 +971,7 @@ func mainCases(t *testing.T) {
 	t.Run("show help", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1045,8 +1002,7 @@ func mainDefaultTargets(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/default_from_ns/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/default_from_ns/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1071,10 +1027,10 @@ func mainDefaultTargets(t *testing.T) {
 	})
 
 	t.Run("custom bin path", func(t *testing.T) {
+		// --- Given ---
 		tst := ringtest.New(t)
 
-		relPath := "testdata/projects/default_from_ns/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/default_from_ns/project")
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
 		prj.MakefilesFrom(absPath)
@@ -1104,8 +1060,7 @@ func mainTargetTimeouts(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1135,8 +1090,7 @@ func mainTargetTimeouts(t *testing.T) {
 			// --- Given ---
 			tst := ringtest.New(t).WetStdout()
 
-			relPath := "testdata/projects/showcase_targets/project"
-			absPath := modkit.Path(relPath)
+			absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 			prj := gmt.NewProject(t)
 			prj.GoModInit()
@@ -1167,8 +1121,7 @@ func mainTargetTimeouts(t *testing.T) {
 			// --- Given ---
 			tst := ringtest.New(t).WetStderr()
 
-			relPath := "testdata/projects/showcase_targets/project"
-			absPath := modkit.Path(relPath)
+			absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 			prj := gmt.NewProject(t)
 			prj.GoModInit()
@@ -1197,12 +1150,11 @@ func mainTargetTimeouts(t *testing.T) {
 }
 
 func mainCompletion(t *testing.T) {
-	t.Run("gomake :<TAB>", func(t *testing.T) {
+	t.Run("complete colon", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1229,12 +1181,11 @@ func mainCompletion(t *testing.T) {
 		assert.Equal(t, ":panic-string :print", tst.Stdout())
 	})
 
-	t.Run("gomake :pa<TAB>", func(t *testing.T) {
+	t.Run("complete colon prefix", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1261,12 +1212,11 @@ func mainCompletion(t *testing.T) {
 		assert.Equal(t, ":panic-string", tst.Stdout())
 	})
 
-	t.Run("gomake :print <TAB>", func(t *testing.T) {
+	t.Run("complete after target", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1296,8 +1246,7 @@ func mainCompletion(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 
-		relPath := "testdata/projects/showcase_targets/project"
-		absPath := modkit.Path(relPath)
+		absPath := modkit.Path("testdata/projects/showcase_targets/project")
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
@@ -1329,12 +1278,9 @@ func mainPreRun(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 
-		relPath := "testdata/projects/pre_run/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/pre_run/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1363,12 +1309,9 @@ func mainPreRun(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
 
-		relPath := "testdata/projects/pre_run/project"
-		absPath := modkit.Path(relPath)
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(absPath)
+		prj.MakefilesFrom(modkit.Path("testdata/projects/pre_run/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1397,11 +1340,10 @@ func mainPreRun(t *testing.T) {
 	t.Run("pre runs fire for built-in target", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1442,15 +1384,13 @@ func mainErrors(t *testing.T) {
 		tst := ringtest.New(t).WetStderr()
 
 		dir := t.TempDir()
-		assert.NoError(t, os.Chmod(dir, 0))
+		must.Nil(os.Chmod(dir, 0))
 		t.Cleanup(func() { _ = os.Chmod(dir, 0755) })
 		tmp := filepath.Join(dir, "sub")
 
-		relPath := "testdata/projects/no_makefiles/project"
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1475,11 +1415,9 @@ func mainErrors(t *testing.T) {
 		oskit.Write(t, "x", parent)
 		tmpPath := filepath.Join(parent, "child", "tmp")
 
-		relPath := "testdata/projects/no_makefiles/project"
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1502,11 +1440,9 @@ func mainErrors(t *testing.T) {
 		tmpFile := filepath.Join(t.TempDir(), "not-a-dir")
 		oskit.Write(t, "x", tmpFile)
 
-		relPath := "testdata/projects/no_makefiles/project"
-
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1523,11 +1459,10 @@ func mainErrors(t *testing.T) {
 	t.Run("tmp path created when missing", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/no_makefiles/project"
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/no_makefiles/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1546,11 +1481,10 @@ func mainErrors(t *testing.T) {
 	t.Run("--help AllTargets error", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/dup_imported/project"
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/dup_imported/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1572,11 +1506,10 @@ func mainErrors(t *testing.T) {
 	t.Run("--list AllTargets error", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStderr()
-		relPath := "testdata/projects/dup_imported/project"
 
 		prj := gmt.NewProject(t)
 		prj.GoModInit()
-		prj.MakefilesFrom(modkit.Path(relPath))
+		prj.MakefilesFrom(modkit.Path("testdata/projects/dup_imported/project"))
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
 		prj.Close()
@@ -1743,10 +1676,6 @@ func BrokenCompile(ctx context.Context, rng *ring.Ring) error {
 	})
 }
 
-// Test_Main_targetConfig verifies that a target's gomake.yaml configuration
-// block is delivered to the running target through the compiled-makefile
-// subprocess bridge.
-
 func Test_Main(t *testing.T) {
 	mainScenarios(t)
 	mainCases(t)
@@ -1766,80 +1695,82 @@ func Test_Main(t *testing.T) {
 		// --- Then ---
 		assert.Equal(t, 0, have)
 	})
-}
 
-func Test_Main_nestedTmp(t *testing.T) {
-	// --- Given ---
-	// Nested --tmp must create missing parents (MkdirAll). --list runs past
-	// tmp setup without requiring a makefile.
-	tst := ringtest.New(t).WetStdout()
-	tmp := filepath.Join(t.TempDir(), "a", "b", "c")
-	src := t.TempDir()
-	rng := tst.Ring("--list", "--tmp", tmp, "--src", src)
+	t.Run("nested tmp", func(t *testing.T) {
+		// --- Given ---
+		// Nested --tmp must create missing parents (MkdirAll). --list runs past
+		// tmp setup without requiring a makefile.
+		tst := ringtest.New(t).WetStdout()
+		tmp := filepath.Join(t.TempDir(), "a", "b", "c")
+		src := t.TempDir()
+		rng := tst.Ring("--list", "--tmp", tmp, "--src", src)
 
-	// --- When ---
-	have := Main(t.Context(), rng, "1.0", builtin.Empty())
+		// --- When ---
+		have := Main(t.Context(), rng, "1.0", builtin.Empty())
 
-	// --- Then ---
-	assert.Equal(t, 0, have)
-	assert.True(t, must.Value(os.Stat(tmp)).IsDir())
-	_ = tst.Stdout() // empty or target list; just drain WetStderr
-}
+		// --- Then ---
+		assert.Equal(t, 0, have)
+		assert.True(t, must.Value(os.Stat(tmp)).IsDir())
+		_ = tst.Stdout() // empty or target list; just drain WetStderr
+	})
 
-func Test_Main_targetConfig(t *testing.T) {
-	// --- Given ---
-	tst := ringtest.New(t).WetStdout()
+	t.Run("target config", func(t *testing.T) {
+		// --- Given ---
+		// A target's gomake.yaml configuration block is delivered to the
+		// running target through the compiled-makefile subprocess bridge.
+		tst := ringtest.New(t).WetStdout()
 
-	absPath := modkit.Path("testdata/projects/config_target/project")
+		absPath := modkit.Path("testdata/projects/config_target/project")
 
-	prj := gmt.NewProject(t)
-	prj.GoModInit()
-	prj.MakefilesFrom(absPath)
-	prj.UseGomakeSrc(modkit.Root())
-	prj.GoModTidy()
-	prj.Close()
+		prj := gmt.NewProject(t)
+		prj.GoModInit()
+		prj.MakefilesFrom(absPath)
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
+		prj.Close()
 
-	yaml := "version: 1\n" +
-		"targets:\n" +
-		"  " + prjkit.GoModName + ":\n" +
-		"    show:\n" +
-		"      message: hello-from-config\n"
-	oskit.Write(t, yaml, prj.Root(), configFileName)
+		yaml := "version: 1\n" +
+			"targets:\n" +
+			"  " + prjkit.GoModName + ":\n" +
+			"    show:\n" +
+			"      message: hello-from-config\n"
+		oskit.Write(t, yaml, prj.Root(), configFileName)
 
-	rng := tst.Ring(
-		"--src", prj.Root(),
-		"--tmp", prj.TempDir(),
-		"show",
-	)
-	bip := builtintest.NewTstProvider()
+		rng := tst.Ring(
+			"--src", prj.Root(),
+			"--tmp", prj.TempDir(),
+			"show",
+		)
+		bip := builtintest.NewTstProvider()
 
-	// --- When ---
-	have := Main(t.Context(), rng, "1.2.3", bip)
+		// --- When ---
+		have := Main(t.Context(), rng, "1.2.3", bip)
 
-	// --- Then ---
-	assert.Equal(t, 0, have)
-	assert.Equal(t, "message=hello-from-config", tst.Stdout())
-}
+		// --- Then ---
+		assert.Equal(t, 0, have)
+		assert.Equal(t, "message=hello-from-config", tst.Stdout())
+	})
 
-func Test_Main_setsContractEnv(t *testing.T) {
-	// --- Given ---
-	// --version returns early after EnvSet of the public contract keys.
-	tst := ringtest.New(t).WetStdout()
-	tmp := t.TempDir()
-	src := t.TempDir()
-	rng := tst.Ring("--version", "--tmp", tmp, "--src", src)
-	ver := "9.9.9-env"
+	t.Run("sets contract env", func(t *testing.T) {
+		// --- Given ---
+		// --version returns early after EnvSet of the public contract keys.
+		tst := ringtest.New(t).WetStdout()
+		tmp := t.TempDir()
+		src := t.TempDir()
+		rng := tst.Ring("--version", "--tmp", tmp, "--src", src)
+		ver := "9.9.9-env"
 
-	// --- When ---
-	have := Main(t.Context(), rng, ver, builtin.Empty())
+		// --- When ---
+		have := Main(t.Context(), rng, ver, builtin.Empty())
 
-	// --- Then ---
-	assert.Equal(t, 0, have)
-	assert.Equal(t, ver+"\n", tst.Stdout())
-	assert.Equal(t, ver, rng.EnvGet(gomake.VersionEnvKey))
-	assert.Equal(t, src, rng.EnvGet(gomake.ProjectDirEnvKey))
-	assert.Equal(t, ver, rng.MetaGet(gomake.VersionEnvKey))
-	assert.Equal(t, src, rng.MetaGet(gomake.ProjectDirEnvKey))
+		// --- Then ---
+		assert.Equal(t, 0, have)
+		assert.Equal(t, ver+"\n", tst.Stdout())
+		assert.Equal(t, ver, rng.EnvGet(gomake.VersionEnvKey))
+		assert.Equal(t, src, rng.EnvGet(gomake.ProjectDirEnvKey))
+		assert.Equal(t, ver, rng.MetaGet(gomake.VersionEnvKey))
+		assert.Equal(t, src, rng.MetaGet(gomake.ProjectDirEnvKey))
+	})
 }
 
 // watchDirEnv names the build directory a Test_watchBuildDir helper process
@@ -1893,8 +1824,6 @@ func Test_watchBuildDir(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
-
-// prePanic is a pre-run hook that panics (exercises main's recover path).
 
 func Test_compileExit_tabular(t *testing.T) {
 	tt := []struct {
@@ -2036,7 +1965,7 @@ func Test_applyExternalTargetMeta(t *testing.T) {
 	})
 }
 
-func Test_RunWithoutCompile(t *testing.T) {
+func Test_runWithoutCompile(t *testing.T) {
 	t.Run("call target with arguments", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
@@ -2132,6 +2061,7 @@ func Test_complete_tabular(t *testing.T) {
 	}
 }
 
+// prePanic is a pre-run hook that panics (exercises main's recover path).
 func prePanic(
 	ctx context.Context,
 	rng *ring.Ring,
@@ -2142,7 +2072,6 @@ func prePanic(
 
 // preAddEnv is pre-run function matching [mkf.PreRunFn] signature which
 // appends to `GM_TEST` environment variable letter `a`.
-
 func preAddEnv(
 	ctx context.Context,
 	rng *ring.Ring,
@@ -2154,7 +2083,6 @@ func preAddEnv(
 
 // preErr is pre-run function matching [mkf.PreRunFn] signature which always
 // returns error.
-
 func preErr(
 	ctx context.Context,
 	rng *ring.Ring,

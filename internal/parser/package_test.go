@@ -56,16 +56,13 @@ func Test_withPkgDir(t *testing.T) {
 func Test_NewPackage(t *testing.T) {
 	t.Run("by path", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
-		relPath := "testdata/imports/pkg2"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg2"))
 		prj.GoModInit()
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(rng, prj.Root())
+		have, err := NewPackage(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -78,16 +75,13 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("with namespace", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
-		relPath := "testdata/imports/pkg2"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg2"))
 		prj.GoModInit()
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(rng, prj.Root(), withPkgNS("ns"))
+		have, err := NewPackage(ring.New(), prj.Root(), withPkgNS("ns"))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -100,9 +94,8 @@ func Test_NewPackage(t *testing.T) {
 		rng.EnvSet("GOOS", "windows")
 		rng.EnvSet("GOARCH", "386")
 
-		relPath := "testdata/projects/arch_os/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/arch_os/project"))
 		prj.GoModInit()
 		prj.Close()
 
@@ -129,9 +122,8 @@ func Test_NewPackage(t *testing.T) {
 		rng.EnvSet("GOARCH", "386")
 		rng = SetBuildTag(rng)
 
-		relPath := "testdata/projects/arch_os/project"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/projects/arch_os/project"))
 		prj.GoModInit()
 		prj.Close()
 
@@ -227,16 +219,13 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("hyphened package name", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
-		relPath := "testdata/imports/xx-pkg"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/xx-pkg"))
 		prj.GoModInit()
 		prj.Close()
 
 		// --- When ---
-		have, err := NewPackage(rng, prj.Root())
+		have, err := NewPackage(ring.New(), prj.Root())
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -251,9 +240,8 @@ func Test_NewPackage(t *testing.T) {
 		// --- Given ---
 		rng := SetBuildTag(ring.New())
 
-		relPath := "testdata/imports/pkg0"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg0"))
 		prj.GoModInit()
 		prj.Close()
 		prj.Chdir()
@@ -270,12 +258,9 @@ func Test_NewPackage(t *testing.T) {
 		assert.Equal(t, []string{"file0.go"}, have.Files)
 	})
 
-	t.Run("import path not absolute error", func(t *testing.T) {
-		// --- Given ---
-		relPath := "../../testdata/imports/pkg2"
-
+	t.Run("error - import path not absolute", func(t *testing.T) {
 		// --- When ---
-		have, err := NewPackage(ring.New(), relPath)
+		have, err := NewPackage(ring.New(), "../../testdata/imports/pkg2")
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrAbsPath, err)
@@ -284,11 +269,8 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
-		relPath := "testdata/imports/pkg2"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg2"))
 		prj.GoModInit()
 		prj.UseGomakeSrc(modkit.Root())
 		prj.GoModTidy()
@@ -296,7 +278,7 @@ func Test_NewPackage(t *testing.T) {
 		prj.Chdir()
 
 		// --- When ---
-		have, err := NewPackage(rng, prj.ImpSpec(), withPkgSpec)
+		have, err := NewPackage(ring.New(), prj.ImpSpec(), withPkgSpec)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -309,18 +291,15 @@ func Test_NewPackage(t *testing.T) {
 
 	t.Run("package by import spec with namespace", func(t *testing.T) {
 		// --- Given ---
-		rng := ring.New()
-
-		relPath := "testdata/imports/pkg2"
 		prj := gmt.NewProject(t)
-		prj.ProjectFrom(modkit.Path(relPath))
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg2"))
 		prj.GoModInit()
 		prj.Close()
 		prj.Chdir()
 
 		// --- When ---
 		have, err := NewPackage(
-			rng,
+			ring.New(),
 			prj.ImpSpec(),
 			withPkgSpec,
 			withPkgNS("ns"),
@@ -335,7 +314,7 @@ func Test_NewPackage(t *testing.T) {
 		assert.Equal(t, []string{"file0.go", "file1.go"}, have.Files)
 	})
 
-	t.Run("not existing import spec", func(t *testing.T) {
+	t.Run("error - missing import spec", func(t *testing.T) {
 		// --- Given ---
 		imp := "example.com/not/existing"
 

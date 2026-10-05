@@ -21,9 +21,9 @@ const targetNameKey = "github.com/ctx42/gomake/pkg/gomake.targetName"
 // to run. The makefile runtime sets it before invoking a target; user targets
 // read it back with [TargetName].
 func WithTargetName(ctx context.Context, name string) context.Context {
-	//nolint:staticcheck // SA1029: a string key is required so the value
-	// matches the one set by the inlined runtime (see targetNameKey).
-	return context.WithValue(ctx, targetNameKey, name)
+	// SA1029: a string key is required so the value matches the one set by
+	// the inlined runtime (see targetNameKey).
+	return context.WithValue(ctx, targetNameKey, name) //nolint:staticcheck
 }
 
 // TargetName returns the name of the target being executed. The makefile

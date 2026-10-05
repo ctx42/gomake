@@ -43,7 +43,11 @@ func Test_ExitCode_tabular(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
-			assert.Equal(t, tc.want, ExitCode(tc.in))
+			// --- When ---
+			have := ExitCode(tc.in)
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
 		})
 	}
 }
@@ -91,26 +95,26 @@ func Test_RecoverError(t *testing.T) {
 		in := errors.New("test error")
 
 		// --- When ---
-		err := RecoverError(in)
+		have := RecoverError(in)
 
 		// --- Then ---
-		assert.Same(t, in, err)
+		assert.Same(t, in, have)
 	})
 
 	t.Run("string", func(t *testing.T) {
 		// --- When ---
-		err := RecoverError("string err")
+		have := RecoverError("string have")
 
 		// --- Then ---
-		assert.ErrorEqual(t, "string err", err)
+		assert.ErrorEqual(t, "string have", have)
 	})
 
 	t.Run("other", func(t *testing.T) {
 		// --- When ---
-		err := RecoverError(123)
+		have := RecoverError(123)
 
 		// --- Then ---
-		assert.ErrorEqual(t, "123", err)
+		assert.ErrorEqual(t, "123", have)
 	})
 }
 
@@ -236,22 +240,21 @@ func Test_runTarget(t *testing.T) {
 		tst := ringtest.New(t)
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
-		wd := must.Value(os.Getwd())
-
 		fn := func(c context.Context, _ *ring.Ring) error {
 			<-c.Done()
 			return c.Err()
 		}
+		wd := must.Value(os.Getwd())
 
 		// --- When ---
-		have := make(chan error, 1)
+		exited := make(chan error, 1)
 		go func() {
-			have <- runTarget(t.Context(), sig, fn, wd, tst.Ring())
+			exited <- runTarget(t.Context(), sig, fn, wd, tst.Ring())
 		}()
 		// Let the target block on ctx.Done, then signal.
 		time.Sleep(20 * time.Millisecond)
 		sig <- syscall.SIGTERM
-		err := <-have
+		err := <-exited
 
 		// --- Then ---
 		var ier interruptedError
@@ -333,7 +336,7 @@ func Test_runTarget(t *testing.T) {
 		assert.Empty(t, tst.Stderr())
 	})
 
-	t.Run("target panicking", func(t *testing.T) {
+	t.Run("error - target panicking", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t)
 		sig := make(chan os.Signal, 1)
@@ -349,7 +352,7 @@ func Test_runTarget(t *testing.T) {
 		assert.Empty(t, tst.Stderr())
 	})
 
-	t.Run("target canceled with signal", func(t *testing.T) {
+	t.Run("error - canceled with signal", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 		sig := make(chan os.Signal, 1)
@@ -360,19 +363,18 @@ func Test_runTarget(t *testing.T) {
 		started := func() bool {
 			return strings.HasPrefix(tst.Stdout(), "started ")
 		}
-		exited := func() bool {
+		printed := func() bool {
 			return strings.HasSuffix(tst.Stdout(), " exited")
 		}
 
 		// --- When ---
-		have := make(chan struct{})
+		exited := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(t.Context(), sig, TgtWaiting().Run, wd, tst.Ring())
-			close(have)
+			close(exited)
 		}()
 
-		// --- Then ---
 		must.Nil(check.Wait(
 			"1s",
 			started,
@@ -383,11 +385,13 @@ func Test_runTarget(t *testing.T) {
 
 		must.Nil(check.Wait(
 			"1s",
-			exited,
+			printed,
 			check.WithWaitThrottle(10*time.Millisecond),
 		))
 
-		<-have // Goroutine exited.
+		<-exited // Goroutine exited.
+
+		// --- Then ---
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
 		assert.Equal(t, syscall.SIGINT, ier.sig)
@@ -395,7 +399,7 @@ func Test_runTarget(t *testing.T) {
 		assert.Equal(t, "", tst.Stderr())
 	})
 
-	t.Run("target canceled with SIGTERM", func(t *testing.T) {
+	t.Run("error - canceled with SIGTERM", func(t *testing.T) {
 		// --- Given ---
 		tst := ringtest.New(t).WetStdout()
 		sig := make(chan os.Signal, 1)
@@ -407,14 +411,13 @@ func Test_runTarget(t *testing.T) {
 		}
 
 		// --- When ---
-		have := make(chan struct{})
+		exited := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(t.Context(), sig, TgtWaiting().Run, wd, tst.Ring())
-			close(have)
+			close(exited)
 		}()
 
-		// --- Then ---
 		must.Nil(check.Wait(
 			"1s",
 			started,
@@ -423,7 +426,9 @@ func Test_runTarget(t *testing.T) {
 
 		sig <- syscall.SIGTERM
 
-		<-have
+		<-exited
+
+		// --- Then ---
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
 		assert.Equal(t, syscall.SIGTERM, ier.sig)
@@ -550,14 +555,13 @@ func Test_runTarget(t *testing.T) {
 		}
 
 		// --- When ---
-		have := make(chan struct{})
+		exited := make(chan struct{})
 		var err error
 		go func() {
 			err = runTarget(t.Context(), sig, TgtWaiting().Run, dir, tst.Ring())
-			close(have)
+			close(exited)
 		}()
 
-		// --- Then ---
 		must.Nil(check.Wait(
 			"1s",
 			started,
@@ -566,7 +570,9 @@ func Test_runTarget(t *testing.T) {
 
 		sig <- syscall.SIGINT
 
-		<-have // RunTarget returned.
+		<-exited // RunTarget returned.
+
+		// --- Then ---
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
 		// The target goroutine outlives RunTarget on the signal path too; its
@@ -648,8 +654,8 @@ func Test_runTarget(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chdir(wd) })
 
 		cwd := t.TempDir()
-		assert.NoError(t, os.Chdir(cwd))
-		assert.NoError(t, os.Remove(cwd))
+		must.Nil(os.Chdir(cwd))
+		must.Nil(os.Remove(cwd))
 
 		// --- When ---
 		err := runTarget(t.Context(), sig, TgtCore().Run, cwd, tst.Ring())
@@ -657,8 +663,8 @@ func Test_runTarget(t *testing.T) {
 		// --- Then ---
 		var e *os.SyscallError
 		assert.ErrorAs(t, &e, err)
-		assert.Equal(t, e.Syscall, "getwd")
-		assert.Equal(t, e.Err, syscall.ENOENT)
+		assert.Equal(t, "getwd", e.Syscall)
+		assert.Equal(t, syscall.ENOENT, e.Err)
 		assert.Empty(t, tst.Stdout())
 		assert.Empty(t, tst.Stderr())
 	})
@@ -671,10 +677,9 @@ func Test_runTarget(t *testing.T) {
 		defer signal.Stop(sig)
 		wd := must.Value(os.Getwd())
 		cwd := pathkit.AbsPath(t, "testdata")
-		args := []string{cwd}
 
 		// --- When ---
-		err := runTarget(ctx, sig, TgtChdir().Run, wd, tst.Ring(args...))
+		err := runTarget(ctx, sig, TgtChdir().Run, wd, tst.Ring(cwd))
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -774,14 +779,11 @@ func Test_awaitDone(t *testing.T) {
 
 func Test_recvDone(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		// --- Given ---
-		done := make(chan error, 1)
-
 		// --- When ---
-		err, have := recvDone(done)
+		hOk, err := recvDone(make(chan error, 1))
 
 		// --- Then ---
-		assert.False(t, have)
+		assert.False(t, hOk)
 		assert.NoError(t, err)
 	})
 
@@ -792,10 +794,10 @@ func Test_recvDone(t *testing.T) {
 		close(done)
 
 		// --- When ---
-		err, have := recvDone(done)
+		hOk, err := recvDone(done)
 
 		// --- Then ---
-		assert.True(t, have)
+		assert.True(t, hOk)
 		assert.NoError(t, err)
 	})
 
@@ -807,16 +809,44 @@ func Test_recvDone(t *testing.T) {
 		close(done)
 
 		// --- When ---
-		have, hOk := recvDone(done)
+		hOk, have := recvDone(done)
 
 		// --- Then ---
 		assert.True(t, hOk)
 		assert.ErrorIs(t, want, have)
 	})
+
+	t.Run("error - closed without result", func(t *testing.T) {
+		// --- Given ---
+		done := make(chan error)
+		close(done)
+
+		// --- When ---
+		hOk, err := recvDone(done)
+
+		// --- Then ---
+		assert.True(t, hOk)
+		assert.ErrorIs(t, errNoResult, err)
+	})
+}
+
+func Test_drainDone(t *testing.T) {
+	// --- Given ---
+	done := make(chan error, 1)
+	done <- errors.New("extra")
+	close(done)
+	want := errors.New("first")
+
+	// --- When ---
+	have := drainDone(done, want)
+
+	// --- Then ---
+	assert.Same(t, want, have)
+	_, open := <-done
+	assert.False(t, open)
 }
 
 func Test_HelpTargets(t *testing.T) {
-
 	t.Run("one target", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtA()}
@@ -906,7 +936,7 @@ func Test_HelpTargets(t *testing.T) {
 		assert.Equal(t, want, have)
 	})
 
-	t.Run("does not reorder the caller's slice", func(t *testing.T) {
+	t.Run("does not reorder input", func(t *testing.T) {
 		// --- Given ---
 		a, b, c := TgtC(), TgtA(), TgtB()
 		tgs := []*Target{a, b, c}
@@ -918,6 +948,17 @@ func Test_HelpTargets(t *testing.T) {
 		assert.Same(t, a, tgs[0])
 		assert.Same(t, b, tgs[1])
 		assert.Same(t, c, tgs[2])
+	})
+
+	t.Run("all hidden", func(t *testing.T) {
+		// --- Given ---
+		tgs := []*Target{{Name: "x", Hidden: true}}
+
+		// --- When ---
+		have := HelpTargets(tgs, 0)
+
+		// --- Then ---
+		assert.Equal(t, "", have)
 	})
 }
 
@@ -965,7 +1006,7 @@ func Test_HelpUsage(t *testing.T) {
 	})
 }
 
-func Test_HelpCommand(t *testing.T) {
+func Test_helpCommand(t *testing.T) {
 	t.Run("usage", func(t *testing.T) {
 		// --- Given ---
 		tgs := []*Target{TgtCore(), TgtA(), TgtB()}
@@ -976,23 +1017,23 @@ func Test_HelpCommand(t *testing.T) {
 		have := helpCommand(MakefileBin, cmf.fs, cmf.targets)
 
 		// --- Then ---
-		want := `makefile [options] [target] [args]
-
-The makefile is a make-like target runner.
-
-options:
-  -h, --help       show this help or target documentation
-      --list       show available targets
-      --timeout    target execution timeout (default: 0)
-      --version    print version
-      --wd         working directory for a target
-
-targets:
-  :tgt-core    syn tgt-core
-
-  tgt-a        syn tgt-a
-  tgt-b*       syn tgt-b
-`
+		want := "" +
+			"makefile [options] [target] [args]\n" +
+			"\n" +
+			"The makefile is a make-like target runner.\n" +
+			"\n" +
+			"options:\n" +
+			"  -h, --help       show this help or target documentation\n" +
+			"      --list       show available targets\n" +
+			"      --timeout    target execution timeout (default: 0)\n" +
+			"      --version    print version\n" +
+			"      --wd         working directory for a target\n" +
+			"\n" +
+			"targets:\n" +
+			"  :tgt-core    syn tgt-core\n" +
+			"\n" +
+			"  tgt-a        syn tgt-a\n" +
+			"  tgt-b*       syn tgt-b\n"
 		assert.Equal(t, want, have)
 	})
 
@@ -1005,31 +1046,31 @@ targets:
 		have := helpCommand(MakefileBin, cmf.fs, cmf.targets)
 
 		// --- Then ---
-		want := `makefile [options] [target] [args]
-
-The makefile is a make-like target runner.
-
-options:
-  -h, --help       show this help or target documentation
-      --list       show available targets
-      --timeout    target execution timeout (default: 0)
-      --version    print version
-      --wd         working directory for a target
-
-targets:
-  no targets
-`
+		want := "" +
+			"makefile [options] [target] [args]\n" +
+			"\n" +
+			"The makefile is a make-like target runner.\n" +
+			"\n" +
+			"options:\n" +
+			"  -h, --help       show this help or target documentation\n" +
+			"      --list       show available targets\n" +
+			"      --timeout    target execution timeout (default: 0)\n" +
+			"      --version    print version\n" +
+			"      --wd         working directory for a target\n" +
+			"\n" +
+			"targets:\n" +
+			"  no targets\n"
 		assert.Equal(t, want, have)
 	})
 }
 
-func Test_helpTarget(t *testing.T) {
+func Test_Target_help(t *testing.T) {
 	t.Run("target with doc string", func(t *testing.T) {
 		// --- Given ---
 		tgt := TgtA()
 
 		// --- When ---
-		have := helpTarget(tgt)
+		have := tgt.help()
 
 		// --- Then ---
 		assert.Equal(t, "tgt-a\tdoc tgt-a\n", have)
@@ -1041,7 +1082,7 @@ func Test_helpTarget(t *testing.T) {
 		tgt.Doc = ""
 
 		// --- When ---
-		have := helpTarget(tgt)
+		have := tgt.help()
 
 		// --- Then ---
 		assert.Equal(t, "tgt-a\t\n", have)

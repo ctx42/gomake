@@ -47,6 +47,9 @@ var (
 	// errTimeout is the cancellation cause of a target run that exceeded the
 	// --timeout deadline.
 	errTimeout = errors.New("target exceeded the timeout")
+
+	// errNoResult reports a target goroutine that ended without a result.
+	errNoResult = errors.New("target finished without a result")
 )
 
 // interruptedError is returned when target execution has been interrupted by
@@ -212,12 +215,7 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 func (cmf *Makefile) Execute(ctx context.Context) error {
 	// Help was requested.
 	if cmf.showHelp {
-		help, err := HelpUsage(
-			MakefileBin,
-			cmf.rng.Args(),
-			cmf.fs,
-			cmf.targets,
-		)
+		help, err := HelpUsage(MakefileBin, cmf.rng.Args(), cmf.fs, cmf.targets)
 		if err != nil {
 			return err
 		}
@@ -238,7 +236,9 @@ func (cmf *Makefile) Execute(ctx context.Context) error {
 	}
 	cmf.rng = cmf.rng.SetArgs(args)
 
+	// Handle interrupt and termination (containers send SIGTERM).
 	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sig)
 
 	var cxl context.CancelFunc

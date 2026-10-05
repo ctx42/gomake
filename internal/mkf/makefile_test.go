@@ -119,7 +119,7 @@ func Test_NewMakefile(t *testing.T) {
 		tst := ringtest.New(t)
 		rngOF := WithMakefileRing(tst.Ring())
 
-		// Option function which designed to extract a slice of arguments
+		// Option function designed to extract a slice of arguments
 		// before it is overwritten by WithMakefileArgs option.
 		var origArgs []string
 		extractArgs := func(cmf *Makefile) { origArgs = cmf.rng.Args() }
@@ -272,7 +272,6 @@ func Test_NewMakefile(t *testing.T) {
 
 	t.Run("version option", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		tgs := make([]*Target, 0)
 		tst := ringtest.New(t).WetStdout()
 		rngOF := WithMakefileRing(tst.Ring("--version"))
@@ -285,13 +284,13 @@ func Test_NewMakefile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, "1.2.3", have.version)
 		assert.Equal(t, []string{}, have.rng.Args())
-		assert.NoError(t, have.Execute(ctx))
+
+		assert.NoError(t, have.Execute(t.Context()))
 		assert.Equal(t, "1.2.3\n", tst.Stdout())
 	})
 
 	t.Run("list option", func(t *testing.T) {
 		// --- Given ---
-		ctx := t.Context()
 		tgs := []*Target{
 			{Name: "first", Synopsis: "doc for first", Default: false},
 			{Name: "second", Synopsis: "doc for second", Default: true},
@@ -305,7 +304,8 @@ func Test_NewMakefile(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, []string{}, have.rng.Args())
-		assert.NoError(t, have.Execute(ctx))
+
+		assert.NoError(t, have.Execute(t.Context()))
 		want := "" +
 			"first      doc for first\n" +
 			"second*    doc for second\n"
@@ -340,8 +340,8 @@ func Test_NewMakefile(t *testing.T) {
 		t.Cleanup(func() { _ = os.Chdir(wd) })
 
 		dir := t.TempDir()
-		assert.NoError(t, os.Chdir(dir))
-		assert.NoError(t, os.Remove(dir))
+		must.Nil(os.Chdir(dir))
+		must.Nil(os.Remove(dir))
 
 		// --- When ---
 		have, err := NewMakefile(tgs, rngOF, argsOF)

@@ -205,6 +205,71 @@ func Test_ImportsConfig_importLines(t *testing.T) {
 	})
 }
 
+func Test_LoadExternalTargets(t *testing.T) {
+	t.Run("fetches valid YAML from HTTP URL", func(t *testing.T) {
+		// --- Given ---
+		ctx := t.Context()
+		body := "imports:\n  - import: a.com/x\n"
+		fn := func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(body))
+		}
+		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
+
+		// --- When ---
+		have, err := LoadExternalTargets(ctx, ring.New(), srv.URL)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
+		assert.Equal(t, []byte(body), have.Raw())
+	})
+
+	t.Run("expands a tilde from the ring", func(t *testing.T) {
+		// --- Given ---
+		home := t.TempDir()
+		body := "imports:\n  - import: a.com/x\n"
+		oskit.Write(t, body, home, "targets.yaml")
+		rng := ring.New()
+		rng.EnvSet("HOME", home)
+		rng.EnvSet("USERPROFILE", home)
+		rng.EnvSet("home", home)
+
+		// --- When ---
+		have, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x"}, have.Paths())
+	})
+
+	t.Run("error - home unset", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet("HOME", "")
+		rng.EnvSet("USERPROFILE", "")
+		rng.EnvSet("home", "")
+
+		// --- When ---
+		_, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
+
+		// --- Then ---
+		assert.ErrorContain(t, "is not defined", err)
+	})
+
+	t.Run("absent file", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		pth := filepath.Join(dir, TargetsFile)
+
+		// --- When ---
+		have, err := LoadExternalTargets(t.Context(), ring.New(), pth)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Nil(t, have.imports)
+	})
+}
+
 func Test_LoadExternalTargets_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
@@ -251,19 +316,6 @@ func Test_LoadExternalTargets_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have.imports)
 		})
 	}
-}
-
-func Test_LoadExternalTargets_absent(t *testing.T) {
-	// --- Given ---
-	dir := t.TempDir()
-	pth := filepath.Join(dir, TargetsFile)
-
-	// --- When ---
-	have, err := LoadExternalTargets(t.Context(), ring.New(), pth)
-
-	// --- Then ---
-	assert.NoError(t, err)
-	assert.Nil(t, have.imports)
 }
 
 func Test_LoadExternalTargets_error_tabular(t *testing.T) {
@@ -325,58 +377,6 @@ func Test_LoadExternalTargets_error_tabular(t *testing.T) {
 			assert.ErrorIs(t, tc.err, err)
 		})
 	}
-}
-
-func Test_LoadExternalTargets(t *testing.T) {
-	t.Run("fetches valid YAML from HTTP URL", func(t *testing.T) {
-		// --- Given ---
-		ctx := t.Context()
-		body := "imports:\n  - import: a.com/x\n"
-		fn := func(w http.ResponseWriter, _ *http.Request) {
-			_, _ = w.Write([]byte(body))
-		}
-		srv := httpkit.HandleFunc(t, "/", fn).Start(ctx)
-
-		// --- When ---
-		have, err := LoadExternalTargets(ctx, ring.New(), srv.URL)
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, have.Paths())
-		assert.Equal(t, []byte(body), have.Raw())
-	})
-
-	t.Run("expands a tilde from the ring", func(t *testing.T) {
-		// --- Given ---
-		home := t.TempDir()
-		body := "imports:\n  - import: a.com/x\n"
-		oskit.Write(t, body, home, "targets.yaml")
-		rng := ring.New()
-		rng.EnvSet("HOME", home)
-		rng.EnvSet("USERPROFILE", home)
-		rng.EnvSet("home", home)
-
-		// --- When ---
-		have, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
-
-		// --- Then ---
-		assert.NoError(t, err)
-		assert.Equal(t, []string{"a.com/x"}, have.Paths())
-	})
-
-	t.Run("error - home unset", func(t *testing.T) {
-		// --- Given ---
-		rng := ring.New()
-		rng.EnvSet("HOME", "")
-		rng.EnvSet("USERPROFILE", "")
-		rng.EnvSet("home", "")
-
-		// --- When ---
-		_, err := LoadExternalTargets(t.Context(), rng, "~/targets.yaml")
-
-		// --- Then ---
-		assert.ErrorContain(t, "is not defined", err)
-	})
 }
 
 func Test_ExpandTargetsPath(t *testing.T) {
@@ -456,7 +456,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		assert.Nil(t, have)
 	})
 
-	t.Run("returns error on non-200 status", func(t *testing.T) {
+	t.Run("error - non-200 status", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
 		fn := func(w http.ResponseWriter, _ *http.Request) {
@@ -471,7 +471,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		assert.ErrorContain(t, "HTTP 404", err)
 	})
 
-	t.Run("returns error on unreachable address", func(t *testing.T) {
+	t.Run("error - unreachable address", func(t *testing.T) {
 		// --- When ---
 		_, err := fetchExternalTargets(t.Context(), "http://localhost:0/x")
 
@@ -479,7 +479,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		assert.ErrorContain(t, "connection refused", err)
 	})
 
-	t.Run("returns error for malformed URL", func(t *testing.T) {
+	t.Run("error - malformed URL", func(t *testing.T) {
 		// --- When ---
 		_, err := fetchExternalTargets(t.Context(), "http://\x00invalid")
 
@@ -487,7 +487,7 @@ func Test_fetchExternalTargets(t *testing.T) {
 		assert.ErrorContain(t, "invalid control character", err)
 	})
 
-	t.Run("returns error for invalid YAML body", func(t *testing.T) {
+	t.Run("error - invalid YAML body", func(t *testing.T) {
 		// --- Given ---
 		ctx := t.Context()
 		fn := func(w http.ResponseWriter, _ *http.Request) {
@@ -535,8 +535,8 @@ func Test_readExternalTargets_tabular(t *testing.T) {
 	}
 }
 
-func Test_readExternalTargets_error(t *testing.T) {
-	t.Run("missing file returns ErrNotExist", func(t *testing.T) {
+func Test_readExternalTargets(t *testing.T) {
+	t.Run("error - missing file", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		pth := filepath.Join(dir, TargetsFile)
@@ -548,7 +548,7 @@ func Test_readExternalTargets_error(t *testing.T) {
 		assert.ErrorIs(t, os.ErrNotExist, err)
 	})
 
-	t.Run("invalid YAML returns errInvConfig", func(t *testing.T) {
+	t.Run("error - invalid YAML", func(t *testing.T) {
 		// --- Given ---
 		dir := t.TempDir()
 		pth := filepath.Join(dir, TargetsFile)
@@ -724,7 +724,7 @@ func Test_decodeTargetsYAML_error_tabular(t *testing.T) {
 	}
 }
 
-func Test_decodeTargetsYAML_config(t *testing.T) {
+func Test_decodeTargetsYAML(t *testing.T) {
 	t.Run("object with config", func(t *testing.T) {
 		// --- Given ---
 		data := `imports:
@@ -781,7 +781,7 @@ func Test_validateNoDupPaths_tabular(t *testing.T) {
 	}
 }
 
-func Test_validateNoDupPaths_duplicate(t *testing.T) {
+func Test_validateNoDupPaths(t *testing.T) {
 	// --- Given ---
 	imports := []ImportEntry{{Path: "a.com/x"}, {Path: "a.com/x"}}
 

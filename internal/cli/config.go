@@ -41,7 +41,7 @@ type config struct {
 
 	// Absolute path to a temporary directory. By default, it is set to the
 	// operating system temporary directory, but its value can be set by the
-	// [EnvKeyTmpDir] environment variable or the "--tmp" option. When both are
+	// envKeyTmpDir environment variable or the "--tmp" option. When both are
 	// provided, the option takes precedence.
 	tmp string
 
@@ -96,15 +96,15 @@ type config struct {
 	target string
 
 	// User-level target configuration tree, keyed by import path. Populated by
-	// [config.applyFileConfig].
+	// config.applyFileConfig.
 	userTargets map[string]any
 
 	// Project-level target configuration tree, keyed by import path. Populated
-	// by [config.applyFileConfig].
+	// by config.applyFileConfig.
 	projectTargets map[string]any
 }
 
-// newConfig returns new instance of [config].
+// newConfig returns a new instance of config.
 func newConfig(ver string, rng *ring.Ring) (*config, error) {
 	env := rng.EnvAll()
 	cfg := &config{
@@ -118,9 +118,9 @@ func newConfig(ver string, rng *ring.Ring) (*config, error) {
 	return cfg, nil
 }
 
-// parse sets [config] fields based on program arguments.
+// parse sets config fields based on program arguments.
 //
-// nolint: gocognit, cyclop
+//nolint:gocognit,cyclop
 func (cfg *config) parse(env, args []string) error {
 	wd, err := os.Getwd()
 	if err != nil {

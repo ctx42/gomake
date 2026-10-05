@@ -16,30 +16,6 @@ import (
 	"github.com/ctx42/ring/pkg/ring"
 )
 
-// ConfigMetaKey is the ring meta-store key under which gomake places the
-// running target's configuration block as a JSON string. Read the block with
-// [TargetConfig] rather than accessing the key directly.
-const ConfigMetaKey = "github.com/ctx42/gomake/pkg/gomake.targetConfig"
-
-// Configuration lookup errors.
-var (
-	// ErrMiss indicates a path that does not resolve to a value: an absent
-	// key or an out-of-range or non-numeric array index.
-	ErrMiss = errors.New("config path not found")
-
-	// ErrType indicates a value that cannot be represented as the requested
-	// type, including descending through a scalar leaf.
-	ErrType = errors.New("config type mismatch")
-
-	// ErrConfig indicates a configuration block that is not a single valid
-	// JSON object.
-	ErrConfig = errors.New("invalid target config")
-
-	// ErrPath indicates a malformed path: an empty path, an unterminated
-	// quote, or a quote not at a segment boundary.
-	ErrPath = errors.New("config path malformed")
-)
-
 // Config is the running target's configuration block, decoded from the JSON
 // gomake stored in the ring meta store under [ConfigMetaKey]. It is an
 // immutable snapshot; read values with [GetCfg] and [Config.Has]. The zero
@@ -103,7 +79,9 @@ func TargetConfig(rng *ring.Ring) (*Config, error) {
 // Path segments are dot-separated and resolved against the current node's
 // type: a map segment is a key, an array segment a zero-based index. A segment
 // wrapped in single quotes is taken literally, so a map key that contains a
-// dot is addressed as 'github.com/acme/app'; see [splitPath] for the grammar.
+// dot is addressed as 'github.com/acme/app'. A quote is significant only as
+// the first character of a segment, and its closing quote must end the
+// segment.
 func (cfg *Config) Has(path string) bool {
 	_, err := cfg.resolve(path)
 	return err == nil
@@ -212,8 +190,9 @@ func splitPath(path string) ([]string, error) {
 // dot-separated; see [Config.Has] for the grammar. The value is converted to
 // T through a JSON round-trip, so T may be any JSON-decodable type: a scalar,
 // a slice, a map, or a struct with json tags. The conversion is strict: a
-// number becomes an integer only when it has no fractional part, and a value
-// of the wrong JSON kind is rejected.
+// number becomes an integer only when written without a fraction or an
+// exponent (so 1e3 is rejected), and a value of the wrong JSON kind is
+// rejected.
 //
 // Two types are special: a [time.Duration] is taken from a JSON number as its
 // nanosecond count, or from a string parsed with [time.ParseDuration]; and T of

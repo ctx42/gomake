@@ -142,12 +142,9 @@ func NewPackage(
 		src := strings.TrimSpace(rng.EnvGet(gomake.ProjectDirEnvKey))
 		if src != "" {
 			pkg.ImpPath = src
-			if !filepath.IsAbs(pkg.ImpPath) {
-				if wd, err := os.Getwd(); err == nil {
-					pkg.ImpPath = filepath.Join(wd, pkg.ImpPath)
-				}
+			if abs, err := filepath.Abs(src); err == nil {
+				pkg.ImpPath = abs
 			}
-			pkg.ImpPath, _ = filepath.Abs(pkg.ImpPath)
 		}
 	}
 
@@ -212,7 +209,7 @@ func NewPackage(
 		}
 	}
 
-	if cacheable && pkg.Error.Err == "" && cacheableModule(pkg.Module) {
+	if cacheable && pkg.Error.Err == "" && pkg.Module.cacheable() {
 		storeListCache(rng, key, sout.Bytes())
 	}
 	return pkg, nil

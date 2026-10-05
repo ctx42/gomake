@@ -81,23 +81,19 @@ func Test_setupBashCompletion(t *testing.T) {
 		have, err := setupBashCompletion(home)
 
 		// --- Then ---
-		assert.NoError(t, err)
-
 		scriptPath := filepath.Join(home, ".bash_completion.d", "gomake")
-		assert.FileExist(t, scriptPath)
+		rcPath := filepath.Join(home, ".bashrc")
+		assert.NoError(t, err)
+		assert.Contain(t, "Gomake bash completion installed.", have)
+		assert.Contain(t, scriptPath, have)
+		assert.Contain(t, "source "+rcPath, have)
 
 		data := oskit.ReadFileStr(t, scriptPath)
 		assert.Equal(t, string(bashCompleteScript), data)
 
-		rcPath := filepath.Join(home, ".bashrc")
-		assert.FileExist(t, rcPath)
-
 		rc := oskit.ReadFileStr(t, rcPath)
 		assert.Contain(t, scriptPath, rc)
 		assert.Contain(t, "# gomake completion", rc)
-		assert.Contain(t, "Gomake bash completion installed.", have)
-		assert.Contain(t, scriptPath, have)
-		assert.Contain(t, "source "+rcPath, have)
 	})
 
 	t.Run("already configured", func(t *testing.T) {

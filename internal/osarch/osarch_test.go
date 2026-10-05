@@ -19,15 +19,21 @@ import (
 // Regenerate with `go generate ./internal/osarch`.
 func Test_IsGOOS(t *testing.T) {
 	// --- Given ---
-	osSet, _ := distList(t)
+	osList, _ := distList(t)
 
-	// --- Then ---
-	for _, v := range osSet {
+	// --- When ---
+	var have []string
+	for _, v := range osList {
 		if !IsGOOS(v) {
-			t.Errorf("GOOS %q reported by the toolchain is missing from "+
-				"versions_gen.go; run: go generate ./internal/osarch", v)
+			have = append(have, v)
 		}
 	}
+
+	// --- Then ---
+	assert.Nil(t, have, ""+
+		"GOOS values reported by the toolchain are missing from "+
+		"versions_gen.go; run: go generate ./internal/osarch",
+	)
 }
 
 func Test_IsGOOS_tabular(t *testing.T) {
@@ -61,15 +67,21 @@ func Test_IsGOOS_tabular(t *testing.T) {
 // Go. Regenerate with `go generate ./internal/osarch`.
 func Test_IsGOARCH(t *testing.T) {
 	// --- Given ---
-	_, archSet := distList(t)
+	_, archList := distList(t)
 
-	// --- Then ---
-	for _, v := range archSet {
+	// --- When ---
+	var have []string
+	for _, v := range archList {
 		if !IsGOARCH(v) {
-			t.Errorf("GOARCH %q reported by the toolchain is missing from "+
-				"versions_gen.go; run: go generate ./internal/osarch", v)
+			have = append(have, v)
 		}
 	}
+
+	// --- Then ---
+	assert.Nil(t, have, ""+
+		"GOARCH values reported by the toolchain are missing from "+
+		"versions_gen.go; run: go generate ./internal/osarch",
+	)
 }
 
 func Test_IsGOARCH_tabular(t *testing.T) {
@@ -98,25 +110,8 @@ func Test_IsGOARCH_tabular(t *testing.T) {
 	}
 }
 
-func Test_generateVersions(t *testing.T) {
-	t.Run("error - invalid GOMAKE_GO_VERSION", func(t *testing.T) {
-		// --- Given ---
-		t.Setenv("GOMAKE_GO_VERSION", "nope")
-
-		cmd := exec.CommandContext(t.Context(), "go", "run",
-			"00_generate_versions.go")
-
-		// --- When ---
-		out, err := cmd.CombinedOutput()
-
-		// --- Then ---
-		assert.Error(t, err)
-		assert.Contain(t, "invalid GOMAKE_GO_VERSION", string(out))
-	})
-}
-
 // distList returns the unique GOOS and GOARCH values from `go tool dist list`.
-func distList(t tester.T) (goos, goarch []string) {
+func distList(t tester.T) (osList, archList []string) {
 	t.Helper()
 	cmd := exec.CommandContext(t.Context(), "go", "tool", "dist", "list")
 	out, err := cmd.Output()
