@@ -97,7 +97,12 @@ gomake --tmp /fast/tmp build
 | `125`   | Target exceeded the `--timeout` deadline                       |
 | `126`   | No target given and no default target is set (`ErrPickTarget`) |
 | `127`   | Unknown target name (`ErrUnkTarget`)                           |
-| `128+n` | Terminated by fatal signal `n`                                 |
+| `128+n` | Interrupted by signal `n` (see below)                          |
+
+On `SIGINT` or `SIGTERM` the target's context is canceled and the target gets
+up to 5 seconds to finish its cleanup; a second signal ends the wait. The
+process then terminates by the same signal rather than calling `exit`, so a
+parent sees a signal death and shells report `128+n` and stop loops on Ctrl-C.
 
 ---
 
@@ -110,9 +115,11 @@ SHA-256 hash of:
 - The module's `go.mod` and `go.sum`
 - The effective `go.work` / `go.work.sum` (parent walk or `GOWORK`)
 - Non-test `.go` files under the module and local `use`/`replace` trees
+- Every file under a directory whose `.go` files use `//go:embed`
 - The gomake version, `GOOS`, and `GOARCH`
 - The Go runtime version and toolchain env (`GOFLAGS`, `CGO_*`,
-  `GOTOOLCHAIN`) when set
+  `GOTOOLCHAIN`, `GOEXPERIMENT`, and architecture levels such as `GOAMD64`
+  or `GOARM`) when set
 
 The cache is invalidated automatically when any input changes. Errors reading
 or writing the cache are silently ignored.

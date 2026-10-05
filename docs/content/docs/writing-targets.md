@@ -13,11 +13,13 @@ func TargetName(ctx context.Context, rng *ring.Ring) error
 ```
 
 GoMake ignores functions that do not match. Invalid signatures are silently
-skipped, not errors. Only the parameter *types* matter — the `ctx` and `rng`
-names are yours to choose. One caveat: the second parameter must refer to the
-`ring` package by its real name, so avoid aliasing the import (`r
-"github.com/ctx42/ring/pkg/ring"`) in a makefile, or the function will not be
-recognised as a target.
+skipped, not errors, and generic functions are never targets. Only the
+parameter *types* matter — the `ctx` and `rng` names are yours to choose. One
+caveat: the parameters must refer to the `context` and `ring` packages by
+their real names, so avoid aliasing the imports (`r
+"github.com/ctx42/ring/pkg/ring"`) in a makefile. Such a function is not
+registered as a target, and gomake prints
+`gomake: skipping <Name>: aliased context or ring parameter` to stderr.
 
 | Parameter | Type              | Purpose                                            |
 |-----------|-------------------|----------------------------------------------------|
