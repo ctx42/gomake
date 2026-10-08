@@ -1,3 +1,6 @@
+## v0.29.0 (Thu, 08 Oct 2026 12:55:22 UTC)
+- build(deps): bump golang.org/x/mod to v0.41.0.
+
 ## v0.28.0 (Mon, 05 Oct 2026 16:58:14 UTC)
 - fix(gomake): harden config, env, file, and reader helpers.
 - fix: wrap errors with %w.
