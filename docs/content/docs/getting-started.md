@@ -40,6 +40,9 @@ Or forward `--targets` through the install script with `sh -s --`:
 curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh -s -- --targets=./targets.yaml
 ```
 
+Repeat `--targets` to combine several files, for example a public and a
+private set of targets.
+
 See [Builtin targets]({{< relref "builtin-targets" >}}) for details.
 
 ### Installing from a local clone

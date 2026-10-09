@@ -62,11 +62,14 @@ fails the load rather than being ignored.
 Passing `--targets` to `go run github.com/ctx42/gomake/cmd/install@latest`
 runs the target-preparation step, which:
 
-1. Reads the supplied `targets.yaml`.
+1. Reads each supplied `targets.yaml` and, when `--targets` is repeated,
+   combines their imports (see [Combining several
+   files](#combining-several-files)).
 2. Runs `go get <import-path>` for each listed package. The exception is a
    local `--targets` file inside a Go module (see [Developing targets
-   locally](#developing-targets-locally)): that module is resolved from disk
-   through a temporary Go workspace, so `go get` is skipped for its packages.
+   locally](#developing-targets-locally)): each such module is resolved from
+   disk through a temporary Go workspace, so `go get` is skipped for its
+   packages.
 3. Calls `builtin.GenMain`, which parses each package for target functions and
    generates `internal/builtin/targets.go`.
 4. Compiles the generated file into the gomake binary.
@@ -111,6 +114,37 @@ go generate ./internal/builtin/
 
 ---
 
+## Combining several files
+
+Repeat `--targets` to compile the imports of several files into one binary —
+for example a public and a private set of targets kept in separate
+repositories. Each value is a local path or a URL, and the forms can be mixed:
+
+```shell
+go run github.com/ctx42/gomake/cmd/install@latest \
+    --targets=../gmtask/targets.yaml \
+    --targets=../gmtool/targets.yaml
+```
+
+The install script forwards repeated flags the same way:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/ctx42/gomake/master/install.sh | sh -s -- --targets=a/targets.yaml --targets=b/targets.yaml
+```
+
+The files are read in the order given and their imports combined:
+
+- An import listed identically in more than one file — same path, version,
+  `namespace`, and `config` — is compiled in once.
+- The same package listed with a different version, `namespace`, or `config`
+  fails the install with a `conflicting import` error naming the package and
+  both files.
+
+Every file must exist; a missing one fails the install. An empty value such
+as `--targets=` is dropped, so it does not disturb the other files.
+
+---
+
 ## Developing targets locally
 
 While developing a target package you can build a gomake binary from its
@@ -138,8 +172,10 @@ The `-buildvcs=true` flag records the checked-out revision in the binary; see
 [Installing from a local clone]({{< relref "getting-started#installing-from-a-local-clone" >}})
 for why `go run` needs it.
 
-Only the module containing the `targets.yaml` is resolved locally; imports from
-any other module still come from the proxy via `go get`.
+With `--targets` repeated, every local file inside a Go module adds its module
+to the same workspace, so unpublished edits in each of them compile in. Only
+the modules containing those `targets.yaml` files are resolved locally;
+imports from any other module still come from the proxy via `go get`.
 
 ---
 
