@@ -1,3 +1,7 @@
+## v0.30.1 (Fri, 09 Oct 2026 18:32:05 UTC)
+- build(deps): bump github.com/ctx42/xdef to v0.9.1.
+- build(deps): bump github.com/ctx42/testkit to v0.16.0.
+
 ## v0.30.0 (Fri, 09 Oct 2026 15:05:17 UTC)
 - feat(install): accept --targets more than once.
 - docs(agents): require docs site updates and protect release files.
