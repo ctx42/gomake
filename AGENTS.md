@@ -216,9 +216,15 @@ in), see `dev/README.md`.
 - **Verification**: After edits, run `go test ./...` (and targeted if faster).
   Consider the check-work skill for self-review of diffs. Prefer `go test
   -run=...` loops during iteration.
-- **Changes**: Use `search_replace` for precise edits. Update CHANGELOG.md
-  (newest entry at top) for user-visible or notable internal changes. Keep
-  prose under ~80 columns where practical (especially in .md files).
+- **Changes**: Use `search_replace` for precise edits. Keep prose under ~80
+  columns where practical (especially in .md files).
+- **CHANGELOG.md and VER**: Never create, edit, or delete them; the
+  maintainer's release tooling owns both.
+- **Docs site**: When a change alters anything the Hugo site describes
+  (behavior, flags, commands, config, built-in targets), update the matching
+  pages in `docs/content/` in the same work, alongside README.md. Keep docs
+  edits separate from code edits so they commit on their own. Never edit
+  generated output (`docs/public/`, `docs/resources/`).
 - **AGENTS.md**: Keep this file up to date when project conventions, risky
   areas, or workflows change. It is read during discovery by quality skills.
 - **Token hygiene**: For reviews or remediation, follow the `/go-review`
