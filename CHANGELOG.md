@@ -1,3 +1,8 @@
+## v0.30.0 (Fri, 09 Oct 2026 15:05:17 UTC)
+- feat(install): accept --targets more than once.
+- docs(agents): require docs site updates and protect release files.
+- docs: describe repeatable --targets.
+
 ## v0.29.0 (Thu, 08 Oct 2026 12:55:22 UTC)
 - build(deps): bump golang.org/x/mod to v0.41.0.
 
