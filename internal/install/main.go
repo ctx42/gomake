@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
+	"slices"
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -30,8 +31,9 @@ var ErrNoBuildInfo = errors.New("gomake: build info unavailable")
 // Main builds and installs the gomake binary into GOBIN, returning a non-nil
 // error if any step fails. The destination is resolved via [cli.GoBinPath]:
 // set GOBIN (or GOPATH) in the environment to control where the binary lands.
-// The tgs argument may be a local path or a URL to a `targets.yaml` file; an
-// empty string uses the source `targets.yaml`. The rng carries the environment
+// Each of tgs is a local path or a URL to a `targets.yaml` file, and their
+// imports are combined (see [cli.MergeImports]); no tgs uses the source
+// `targets.yaml`. The rng carries the environment
 // and standard streams; info is the [debug.BuildInfo] embedded by the
 // toolchain, which supplies both the version to record and the installation
 // mode ("(devel)" for `go run ./cmd/install`, an actual version for
@@ -40,7 +42,7 @@ func Main(
 	ctx context.Context,
 	rng *ring.Ring,
 	info *debug.BuildInfo,
-	tgs string,
+	tgs []string,
 ) error {
 
 	dst, err := cli.GoBinPath(rng)
@@ -62,8 +64,8 @@ func Main(
 // copy for a published build), writes the effective targets.yaml, regenerates
 // the builtins, then compiles.
 //
-// When tgs is a local path inside a Go module, that module is resolved from
-// disk through a temporary Go workspace (see setupWorkspace) rather than
+// When any of tgs is a local path inside a Go module, that module is resolved
+// from disk through a temporary Go workspace (see setupWorkspace) rather than
 // fetched with go get, so an unpublished target module is compiled in and the
 // build tree's go.mod is left untouched.
 //
@@ -73,7 +75,7 @@ func installTo(
 	rng *ring.Ring,
 	info *debug.BuildInfo,
 	dst string,
-	tgs string,
+	tgs []string,
 ) (err error) {
 
 	// Build metadata embedded by the Go toolchain gives the installation
@@ -110,7 +112,7 @@ func installTo(
 		}
 	}
 
-	// Resolve the effective imports: a --targets file (path or URL) overrides
+	// Resolve the effective imports: --targets files (paths or URLs) override
 	// the source targets.yaml.
 	cfg, err := effectiveImports(ctx, rng, src, tgs)
 	if err != nil {
@@ -165,51 +167,56 @@ func installTo(
 		defer func() { err = joinRestore(err, restore) }()
 	}
 
-	// Local --targets in a Go module: resolve that module from disk via a
+	// Local --targets in Go modules: resolve those modules from disk via a
 	// temporary workspace so the build compiles in unpublished edits without
-	// go get, keeping go.mod untouched. skipMod names the module whose imports
-	// the workspace provides; its go get is skipped below.
-	skipMod, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+	// go get, keeping go.mod untouched. skipMods names the modules whose
+	// imports the workspace provides; their go get is skipped below.
+	skipMods, cleanup, err := setupWorkspace(rng, buildDir, tgs)
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
 	defer cleanup()
 
-	if tgs != "" {
+	if len(tgs) > 0 {
 		out := filepath.Join(buildDir, cli.TargetsFile)
 		if err = os.WriteFile(out, cfg.Raw(), 0o600); err != nil {
 			return fmt.Errorf("gomake: write targets: %w", err)
 		}
 	}
-	if err = cli.PrepareTargets(ctx, rng, buildDir, skipMod); err != nil {
+	if err = cli.PrepareTargets(ctx, rng, buildDir, skipMods); err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
 	return build(rng, buildDir, dst, ldflags)
 }
 
 // effectiveImports resolves the imports the build should compile in. When tgs
-// names a --targets file (a local path or an HTTP/HTTPS URL) it is loaded
-// directly; otherwise the source targets.yaml in srcDir is used. A missing
-// source file returns an empty config. A missing --targets file is an error.
+// names --targets files (local paths or HTTP/HTTPS URLs) they are loaded and
+// combined with [cli.MergeImports]; otherwise the source targets.yaml in srcDir
+// is used. A missing source file returns an empty config. A missing --targets
+// file is an error.
 func effectiveImports(
 	ctx context.Context,
 	rng *ring.Ring,
 	srcDir string,
-	tgs string,
+	tgs []string,
 ) (*cli.ImportsConfig, error) {
 
-	pth := filepath.Join(srcDir, cli.TargetsFile)
-	if tgs != "" {
-		pth = tgs
+	if len(tgs) == 0 {
+		pth := filepath.Join(srcDir, cli.TargetsFile)
+		return cli.LoadExternalTargets(ctx, rng, pth)
 	}
-	cfg, err := cli.LoadExternalTargets(ctx, rng, pth)
-	if err != nil {
-		return nil, err
+	cfgs := make([]*cli.ImportsConfig, 0, len(tgs))
+	for _, tg := range tgs {
+		cfg, err := cli.LoadExternalTargets(ctx, rng, tg)
+		if err != nil {
+			return nil, err
+		}
+		if cfg.Raw() == nil {
+			return nil, fmt.Errorf("read targets %q: %w", tg, os.ErrNotExist)
+		}
+		cfgs = append(cfgs, cfg)
 	}
-	if tgs != "" && cfg.Raw() == nil {
-		return nil, fmt.Errorf("read targets %q: %w", tgs, os.ErrNotExist)
-	}
-	return cfg, nil
+	return cli.MergeImports(tgs, cfgs)
 }
 
 // moduleCacheDir runs `go mod download -json <module>` and returns the local
@@ -252,47 +259,37 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	return info.Dir, nil
 }
 
-// setupWorkspace enables disk resolution of a local --targets module. When tgs
-// is a filesystem path whose directory lies inside a Go module, it creates a
-// temporary Go workspace covering both buildDir and that module, points the
-// build subprocess environment at it via GOWORK, and returns the module's
-// import path so the caller can skip `go get` for its packages. Resolving from
-// the workspace instead of the proxy keeps buildDir's go.mod untouched and
-// compiles in unpublished local edits.
+// setupWorkspace enables disk resolution of local --targets modules. For each
+// of tgs that is a filesystem path whose directory lies inside a Go module, it
+// adds that module to a temporary Go workspace covering buildDir too, points
+// the build subprocess environment at it via GOWORK, and returns the modules'
+// import paths so the caller can skip `go get` for their packages. Resolving
+// from the workspace instead of the proxy keeps buildDir's go.mod untouched
+// and compiles in unpublished local edits.
 //
-// It returns an empty module path and a no-op cleanup when tgs is empty, is a
-// URL, or its directory is not inside a module: the caller then falls back to
-// `go get`. While the workspace is active GOFLAGS loses any "-mod=mod", which
-// workspace mode rejects. The returned cleanup removes the workspace file,
-// sets GOWORK back to "off" and restores GOFLAGS; it is always safe to call.
+// It returns no module paths and a no-op cleanup when every one of tgs is a
+// URL or lies outside a module: the caller then falls back to `go get`. While
+// the workspace is active GOFLAGS loses any "-mod=mod", which workspace mode
+// rejects. The returned cleanup removes the workspace file, sets GOWORK back
+// to "off" and restores GOFLAGS; it is always safe to call.
 func setupWorkspace(
 	env ring.Environ,
 	buildDir string,
-	tgs string,
-) (string, func(), error) {
+	tgs []string,
+) ([]string, func(), error) {
 
 	noop := func() {}
-	lower := strings.ToLower(tgs)
-	if tgs == "" ||
-		strings.HasPrefix(lower, "http://") ||
-		strings.HasPrefix(lower, "https://") {
-		return "", noop, nil
-	}
-	tgs, err := cli.ExpandTargetsPath(env, tgs)
+	mods, roots, err := localModules(env, tgs)
 	if err != nil {
-		return "", noop, err
+		return nil, noop, err
 	}
-	mod, root, ok, err := moduleAt(env, filepath.Dir(tgs))
-	if err != nil {
-		return "", noop, err
-	}
-	if !ok {
-		return "", noop, nil
+	if len(mods) == 0 {
+		return nil, noop, nil
 	}
 
 	wsDir, err := os.MkdirTemp(tempRoot(env), "gomake-work-*")
 	if err != nil {
-		return "", noop, fmt.Errorf("workspace temp: %w", err)
+		return nil, noop, fmt.Errorf("workspace temp: %w", err)
 	}
 	restoreFlags := restoreEnv(env, "GOFLAGS")
 	cleanup := func() {
@@ -306,11 +303,37 @@ func setupWorkspace(
 	if flags, ok := env.EnvLookup("GOFLAGS"); ok {
 		env.EnvSet("GOFLAGS", withoutModMod(flags))
 	}
-	if err = goWorkInit(env, wsDir, buildDir, root); err != nil {
+	if err = goWorkInit(env, wsDir, buildDir, roots...); err != nil {
 		cleanup()
-		return "", noop, err
+		return nil, noop, err
 	}
-	return mod, cleanup, nil
+	return mods, cleanup, nil
+}
+
+// localModules returns the import paths and root directories of the Go
+// modules holding the local files among tgs, each module once, in the order
+// first met. URLs and files outside a module are skipped.
+func localModules(env ring.Environ, tgs []string) ([]string, []string, error) {
+	var mods, roots []string
+	for _, tg := range tgs {
+		lower := strings.ToLower(tg)
+		if strings.HasPrefix(lower, "http://") ||
+			strings.HasPrefix(lower, "https://") {
+			continue
+		}
+		tg, err := cli.ExpandTargetsPath(env, tg)
+		if err != nil {
+			return nil, nil, err
+		}
+		mod, root, ok, err := moduleAt(env, filepath.Dir(tg))
+		if err != nil {
+			return nil, nil, err
+		}
+		if ok && !slices.Contains(roots, root) {
+			mods, roots = append(mods, mod), append(roots, root)
+		}
+	}
+	return mods, roots, nil
 }
 
 // withoutModMod returns the GOFLAGS value flags without its "-mod=mod" flags.
@@ -374,10 +397,17 @@ func notModule(err error) bool {
 	return strings.Contains(msg, "cannot find main module")
 }
 
-// goWorkInit runs `go work init buildDir modRoot` in wsDir, writing the
-// workspace file that lists both modules.
-func goWorkInit(env ring.Environ, wsDir, buildDir, modRoot string) error {
-	cmd := exec.Command("go", "work", "init", buildDir, modRoot)
+// goWorkInit runs `go work init buildDir modRoots...` in wsDir, writing the
+// workspace file that lists all the modules.
+func goWorkInit(
+	env ring.Environ,
+	wsDir string,
+	buildDir string,
+	modRoots ...string,
+) error {
+
+	args := append([]string{"work", "init", buildDir}, modRoots...)
+	cmd := exec.Command("go", args...)
 	cmd.Env = env.EnvAll()
 	cmd.Dir = wsDir
 	out, err := cmd.CombinedOutput()

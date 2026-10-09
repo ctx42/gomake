@@ -31,7 +31,7 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := PrepareTargets(t.Context(), tst.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), tst.Ring(), dir, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -46,7 +46,7 @@ func Test_PrepareTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := PrepareTargets(t.Context(), tst.Ring(), dir, "")
+		err := PrepareTargets(t.Context(), tst.Ring(), dir, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -58,7 +58,7 @@ func Test_PrepareTargets(t *testing.T) {
 		cxl()
 
 		// --- When ---
-		err := PrepareTargets(ctx, ringtest.New(t).Ring(), t.TempDir(), "")
+		err := PrepareTargets(ctx, ringtest.New(t).Ring(), t.TempDir(), nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -74,7 +74,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -91,7 +91,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Write(t, `{bad json}`, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, errInvConfig, err)
@@ -108,12 +108,37 @@ func Test_prepareExternalTargets(t *testing.T) {
 		oskit.Write(t, content, dir, TargetsFile)
 
 		// --- When ---
-		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, "")
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, nil)
 
 		// --- Then ---
 		assert.ErrorRegexp(t,
 			"(?s)go get example.com/pkg@v1.0.0.*go mod tidy", err,
 		)
+	})
+}
+
+func Test_prepareExternalTargets_skipMods(t *testing.T) {
+	t.Run("skips go get for workspace modules", func(t *testing.T) {
+		// --- Given ---
+		// No go.mod in dir, so a go get would fail before code generation.
+		tst := ringtest.New(t)
+
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
+		content := "" +
+			"imports:\n" +
+			"  - import: example.com/a/pkg\n" +
+			"  - import: example.com/b\n"
+		oskit.Write(t, content, dir, TargetsFile)
+		skip := []string{"example.com/a", "example.com/b"}
+
+		// --- When ---
+		err := prepareExternalTargets(t.Context(), tst.Ring(), dir, skip)
+
+		// --- Then ---
+		// Code generation runs only after every go get, so failing there
+		// shows both imports skipped go get.
+		assert.ErrorContain(t, "codegen builtins", err)
 	})
 }
 

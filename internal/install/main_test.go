@@ -18,6 +18,7 @@ import (
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/oskit"
+	"github.com/ctx42/testkit/pkg/pathkit"
 )
 
 func Test_Main(t *testing.T) {
@@ -41,7 +42,7 @@ func Test_Main(t *testing.T) {
 		info, _ := debug.ReadBuildInfo()
 
 		// --- When ---
-		err := Main(t.Context(), rng, info, "")
+		err := Main(t.Context(), rng, info, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -62,7 +63,7 @@ func Test_Main(t *testing.T) {
 		tst := ringtest.New(t)
 
 		// --- When ---
-		err := Main(t.Context(), tst.Ring(), nil, "")
+		err := Main(t.Context(), tst.Ring(), nil, nil)
 
 		// --- Then ---
 		assert.ErrorContain(t, "cannot determine GOBIN/GOPATH", err)
@@ -86,7 +87,7 @@ func Test_installTo(t *testing.T) {
 		rng.EnvSet("GOWORK", "keep")
 
 		// --- When ---
-		err := installTo(t.Context(), rng, nil, t.TempDir(), "")
+		err := installTo(t.Context(), rng, nil, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, ErrNoBuildInfo, err)
@@ -102,7 +103,7 @@ func Test_installTo(t *testing.T) {
 		rng.EnvSet("GOWORK", "keep")
 
 		// --- When ---
-		err := installTo(t.Context(), rng, develInfo, t.TempDir(), "")
+		err := installTo(t.Context(), rng, develInfo, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -118,7 +119,7 @@ func Test_installTo(t *testing.T) {
 		rng.EnvUnset("GOWORK")
 
 		// --- When ---
-		err := installTo(t.Context(), rng, develInfo, t.TempDir(), "")
+		err := installTo(t.Context(), rng, develInfo, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.Error(t, err)
@@ -135,7 +136,7 @@ func Test_installTo(t *testing.T) {
 		t.Chdir(src)
 
 		tst := ringtest.New(t)
-		pth := filepath.Join(t.TempDir(), "missing.yaml")
+		pth := []string{filepath.Join(t.TempDir(), "missing.yaml")}
 		info, _ := debug.ReadBuildInfo()
 
 		// --- When ---
@@ -158,8 +159,8 @@ func Test_installTo(t *testing.T) {
 
 		tst := ringtest.New(t)
 
-		tgs := filepath.Join(t.TempDir(), "targets.yaml")
-		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
+		content := "imports:\n  - import: example.com/pkg@v1.0.0\n"
+		tgs := []string{oskit.Write(t, content, t.TempDir(), "targets.yaml")}
 
 		info, _ := debug.ReadBuildInfo()
 
@@ -187,8 +188,8 @@ func Test_installTo(t *testing.T) {
 
 		tst := ringtest.New(t)
 
-		tgs := filepath.Join(t.TempDir(), "targets.yaml")
-		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
+		content := "imports:\n  - import: example.com/pkg@v1.0.0\n"
+		tgs := []string{oskit.Write(t, content, t.TempDir(), "targets.yaml")}
 
 		info, _ := debug.ReadBuildInfo()
 
@@ -210,7 +211,7 @@ func Test_installTo(t *testing.T) {
 		}
 
 		// --- When ---
-		err := installTo(t.Context(), tst.Ring(), info, t.TempDir(), "")
+		err := installTo(t.Context(), tst.Ring(), info, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.ErrorContain(t, "module download example.invalid/mod", err)
@@ -230,7 +231,7 @@ func Test_installTo(t *testing.T) {
 		oskit.Write(t, "imports:\n  - import: example.com/pkg@v1.0.0\n", tgs)
 
 		// --- When ---
-		err := installTo(t.Context(), rng, publishedInfo, dst, tgs)
+		err := installTo(t.Context(), rng, publishedInfo, dst, []string{tgs})
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrNotExist, err)
@@ -254,7 +255,7 @@ func Test_installTo(t *testing.T) {
 			tst.Ring(),
 			publishedInfo,
 			t.TempDir(),
-			tgs,
+			[]string{tgs},
 		)
 
 		// --- Then ---
@@ -300,7 +301,7 @@ func Test_installTo(t *testing.T) {
 		info, _ := debug.ReadBuildInfo()
 
 		// --- When ---
-		err := installTo(t.Context(), rng, info, dst, tgs)
+		err := installTo(t.Context(), rng, info, dst, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -341,7 +342,7 @@ func Test_installTo(t *testing.T) {
 		rng.EnvSet("GOFLAGS", "-mod=mod")
 
 		// --- When ---
-		err := installTo(t.Context(), rng, info, t.TempDir(), "")
+		err := installTo(t.Context(), rng, info, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -368,7 +369,7 @@ func Test_installTo(t *testing.T) {
 		rng := ringtest.New(t).Ring()
 
 		// --- When ---
-		err := installTo(t.Context(), rng, info, t.TempDir(), "")
+		err := installTo(t.Context(), rng, info, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.ErrorRegexp(t, "(?s)cmd/gomake.*go.mod: permission denied", err)
@@ -423,7 +424,7 @@ func Test_installTo(t *testing.T) {
 		}}
 
 		// --- When ---
-		err := installTo(t.Context(), tst.Ring(), info, dst, tgs)
+		err := installTo(t.Context(), tst.Ring(), info, dst, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -492,7 +493,7 @@ func Test_installTo(t *testing.T) {
 		}}
 
 		// --- When ---
-		err := installTo(t.Context(), tst.Ring(), info, dst, tgs)
+		err := installTo(t.Context(), tst.Ring(), info, dst, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -526,7 +527,7 @@ func Test_effectiveImports(t *testing.T) {
 		oskit.Write(t, content, srcDir, "targets.yaml")
 
 		// --- When ---
-		have, err := effectiveImports(t.Context(), ring.New(), srcDir, "")
+		have, err := effectiveImports(t.Context(), ring.New(), srcDir, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -535,7 +536,7 @@ func Test_effectiveImports(t *testing.T) {
 
 	t.Run("no flag and absent source", func(t *testing.T) {
 		// --- When ---
-		have, err := effectiveImports(t.Context(), ring.New(), t.TempDir(), "")
+		have, err := effectiveImports(t.Context(), ring.New(), t.TempDir(), nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -550,9 +551,10 @@ func Test_effectiveImports(t *testing.T) {
 
 		flagFile := filepath.Join(t.TempDir(), "flag.yaml")
 		oskit.Write(t, "imports:\n  - import: flag.com/y\n", flagFile)
+		tgs := []string{flagFile}
 
 		// --- When ---
-		have, err := effectiveImports(t.Context(), ring.New(), srcDir, flagFile)
+		have, err := effectiveImports(t.Context(), ring.New(), srcDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -564,6 +566,54 @@ func Test_effectiveImports(t *testing.T) {
 		assert.Equal(t, []string{"flag.com/y"}, have.Paths())
 	})
 
+	t.Run("flag files are merged", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		f0 := oskit.Write(t, "imports:\n  - import: a.com/x\n", dir, "f0.yaml")
+		content := "imports:\n  - import: a.com/x\n  - import: b.com/y\n"
+		f1 := oskit.Write(t, content, dir, "f1.yaml")
+		tgs := []string{f0, f1}
+
+		// --- When ---
+		have, err := effectiveImports(t.Context(), ring.New(), dir, tgs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x", "b.com/y"}, have.Paths())
+	})
+
+	t.Run("error - conflicting flag files", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		content := "imports:\n  - import: a.com/x@v1.0.0\n"
+		f0 := oskit.Write(t, content, dir, "f0.yaml")
+		content = "imports:\n  - import: a.com/x@v2.0.0\n"
+		f1 := oskit.Write(t, content, dir, "f1.yaml")
+		tgs := []string{f0, f1}
+
+		// --- When ---
+		have, err := effectiveImports(t.Context(), ring.New(), dir, tgs)
+
+		// --- Then ---
+		want := "conflicting import: a.com/x in " + f0 + " and " + f1
+		assert.ErrorContain(t, want, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - one of flag files missing", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		f0 := oskit.Write(t, "imports:\n  - import: a.com/x\n", dir, "f0.yaml")
+		tgs := []string{f0, filepath.Join(dir, "missing.yaml")}
+
+		// --- When ---
+		have, err := effectiveImports(t.Context(), ring.New(), dir, tgs)
+
+		// --- Then ---
+		assert.ErrorContain(t, "missing.yaml", err)
+		assert.Nil(t, have)
+	})
+
 	t.Run("error - missing flag file", func(t *testing.T) {
 		// --- Given ---
 		flagFile := filepath.Join(t.TempDir(), "missing.yaml")
@@ -573,7 +623,7 @@ func Test_effectiveImports(t *testing.T) {
 			t.Context(),
 			ring.New(),
 			t.TempDir(),
-			flagFile,
+			[]string{flagFile},
 		)
 
 		// --- Then ---
@@ -590,7 +640,7 @@ func Test_effectiveImports(t *testing.T) {
 			t.Context(),
 			ring.New(),
 			t.TempDir(),
-			flagFile,
+			[]string{flagFile},
 		)
 
 		// --- Then ---
@@ -607,7 +657,7 @@ func Test_effectiveImports(t *testing.T) {
 			ctx,
 			ring.New(),
 			t.TempDir(),
-			"https://example.com/targets.yaml",
+			[]string{"https://example.com/targets.yaml"},
 		)
 
 		// --- Then ---
@@ -693,11 +743,11 @@ func Test_setupWorkspace(t *testing.T) {
 		buildDir := t.TempDir()
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, "")
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", hMod)
+		assert.Nil(t, hMod)
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
 
@@ -711,11 +761,11 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := "https://example.com/targets.yaml"
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", hMod)
+		assert.Nil(t, hMod)
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
 
@@ -731,11 +781,11 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "", hMod)
+		assert.Nil(t, hMod)
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
 
@@ -758,11 +808,11 @@ func Test_setupWorkspace(t *testing.T) {
 		oskit.Write(t, "imports:\n", tgs)
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "example.com/tgt", hMod)
+		assert.Equal(t, []string{"example.com/tgt"}, hMod)
 		work, set := rng.EnvLookup("GOWORK")
 		assert.True(t, set)
 		assert.True(t, oskit.PathExists(t, work))
@@ -774,6 +824,36 @@ func Test_setupWorkspace(t *testing.T) {
 		assert.True(t, set)
 		assert.Equal(t, "off", workVal)
 		assert.False(t, oskit.PathExists(t, work))
+	})
+
+	t.Run("two local modules", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+
+		buildDir := t.TempDir()
+		bmod := "module example.com/build\n\ngo 1.24\n"
+		oskit.Write(t, bmod, buildDir, "go.mod")
+
+		mod0 := t.TempDir()
+		oskit.Write(t, "module example.com/a\n\ngo 1.24\n", mod0, "go.mod")
+		mod1 := t.TempDir()
+		oskit.Write(t, "module example.com/b\n\ngo 1.24\n", mod1, "go.mod")
+		tgs := []string{
+			oskit.Write(t, "imports:\n", mod0, "targets.yaml"),
+			oskit.Write(t, "imports:\n", mod1, "targets.yaml"),
+		}
+
+		// --- When ---
+		have, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"example.com/a", "example.com/b"}, have)
+		work := rng.EnvGet("GOWORK")
+		assert.FileContain(t, filepath.Base(mod0), work)
+		assert.FileContain(t, filepath.Base(mod1), work)
+
+		hCleanup()
 	})
 
 	t.Run("GOFLAGS -mod=mod", func(t *testing.T) {
@@ -790,11 +870,11 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := oskit.Write(t, "imports:\n", modDir, "targets.yaml")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		have, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "example.com/tgt", have)
+		assert.Equal(t, []string{"example.com/tgt"}, have)
 		cmd := exec.CommandContext(t.Context(), "go", "list", "-m")
 		cmd.Env = rng.EnvAll()
 		cmd.Dir = buildDir
@@ -817,13 +897,14 @@ func Test_setupWorkspace(t *testing.T) {
 		buildDir := t.TempDir()
 		bmod := "module example.com/build\n\ngo 1.24\n"
 		oskit.Write(t, bmod, buildDir, "go.mod")
+		tgs := []string{"~/targets.yaml"}
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, buildDir, "~/targets.yaml")
+		have, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, "example.com/tgt", have)
+		assert.Equal(t, []string{"example.com/tgt"}, have)
 
 		hCleanup()
 	})
@@ -838,11 +919,11 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := oskit.Write(t, "imports:\n", modDir, "targets.yaml")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, t.TempDir(), tgs)
+		have, hCleanup, err := setupWorkspace(rng, t.TempDir(), []string{tgs})
 
 		// --- Then ---
 		assert.ErrorContain(t, "workspace temp", err)
-		assert.Equal(t, "", have)
+		assert.Nil(t, have)
 		_, set := rng.EnvLookup("GOWORK")
 		assert.False(t, set)
 
@@ -860,14 +941,65 @@ func Test_setupWorkspace(t *testing.T) {
 		missing := filepath.Join(t.TempDir(), "missing")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, missing, tgs)
+		have, hCleanup, err := setupWorkspace(rng, missing, []string{tgs})
 
 		// --- Then ---
 		assert.ErrorContain(t, "go work init", err)
-		assert.Equal(t, "", have)
+		assert.Nil(t, have)
 		assert.Equal(t, "off", rng.EnvGet("GOWORK"))
 
 		hCleanup()
+	})
+}
+
+func Test_localModules(t *testing.T) {
+	t.Run("skips URLs and files outside a module", func(t *testing.T) {
+		// --- Given ---
+		tgs := []string{
+			"https://example.com/targets.yaml",
+			filepath.Join(t.TempDir(), "targets.yaml"),
+		}
+
+		// --- When ---
+		hMods, hRoots, err := localModules(ring.New(), tgs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Nil(t, hMods)
+		assert.Nil(t, hRoots)
+	})
+
+	t.Run("one module listed once", func(t *testing.T) {
+		// --- Given ---
+		modDir := t.TempDir()
+		oskit.Write(t, "module example.com/a\n\ngo 1.24\n", modDir, "go.mod")
+		oskit.MkdirAll(t, modDir, "sub")
+		tgs := []string{
+			oskit.Write(t, "imports:\n", modDir, "f0.yaml"),
+			oskit.Write(t, "imports:\n", modDir, "sub", "f1.yaml"),
+		}
+
+		// --- When ---
+		hMods, hRoots, err := localModules(ring.New(), tgs)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"example.com/a"}, hMods)
+		wRoots := []string{pathkit.EvalSymlinks(t, modDir)}
+		assert.Equal(t, wRoots, hRoots)
+	})
+
+	t.Run("error - home not set", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New(ring.WithEnv([]string{}))
+
+		// --- When ---
+		hMods, hRoots, err := localModules(rng, []string{"~/targets.yaml"})
+
+		// --- Then ---
+		assert.Error(t, err)
+		assert.Nil(t, hMods)
+		assert.Nil(t, hRoots)
 	})
 }
 

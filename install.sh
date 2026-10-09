@@ -7,6 +7,7 @@
 # With a custom targets.yaml (local path or HTTPS URL):
 #   curl -fsSL ... | sh -s -- --targets=path/to/targets.yaml
 #   curl -fsSL ... | sh -s -- --targets=http://example.com/targets.yaml
+#   curl -fsSL ... | sh -s -- --targets=a/targets.yaml --targets=b/targets.yaml
 #
 set -eu
 

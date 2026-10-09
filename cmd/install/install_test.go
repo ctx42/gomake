@@ -67,19 +67,74 @@ func Test_emptyTargetsNote_tabular(t *testing.T) {
 			"no external targets provided",
 		},
 		{"flag with path", []string{"--targets=./targets.yaml"}, ""},
+		{
+			"empty and path",
+			[]string{"--targets=", "--targets=./targets.yaml"},
+			"",
+		},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- Given ---
 			fs := xflag.NewFlagSet("install", flag.ContinueOnError)
-			tgs := fs.String("targets", "", "")
+			var tgs targetsFlag
+			fs.Var(&tgs, "targets", "")
 			must.Nil(fs.Parse(tc.args))
 
 			// --- When ---
-			have := emptyTargetsNote(fs, *tgs)
+			have := emptyTargetsNote(fs, tgs)
 
 			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_targetsFlag_String(t *testing.T) {
+	// --- Given ---
+	tgs := targetsFlag{"a.yaml", "b.yaml"}
+
+	// --- When ---
+	have := tgs.String()
+
+	// --- Then ---
+	assert.Equal(t, "a.yaml,b.yaml", have)
+}
+
+func Test_targetsFlag_Set_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		args []string
+		want targetsFlag
+	}{
+		{"absent", []string{}, nil},
+		{"one", []string{"--targets=a.yaml"}, targetsFlag{"a.yaml"}},
+		{
+			"repeated",
+			[]string{"--targets=a.yaml", "--targets", "b.yaml"},
+			targetsFlag{"a.yaml", "b.yaml"},
+		},
+		{
+			"trims and drops empty",
+			[]string{"--targets= a.yaml ", "--targets=", "--targets=  "},
+			targetsFlag{"a.yaml"},
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- Given ---
+			fs := xflag.NewFlagSet("install", flag.ContinueOnError)
+			var have targetsFlag
+			fs.Var(&have, "targets", "")
+
+			// --- When ---
+			err := fs.Parse(tc.args)
+
+			// --- Then ---
+			assert.NoError(t, err)
 			assert.Equal(t, tc.want, have)
 		})
 	}

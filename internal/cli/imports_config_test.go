@@ -13,6 +13,7 @@ import (
 
 	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/testing/pkg/assert"
+	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testkit/pkg/httpkit"
 	"github.com/ctx42/testkit/pkg/oskit"
 )
@@ -55,6 +56,51 @@ func Test_ImportEntry_MetaKey_tabular(t *testing.T) {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
 			have := tc.entry.MetaKey()
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
+func Test_ImportEntry_equal_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		ent   ImportEntry
+		other ImportEntry
+		want  bool
+	}{
+		{
+			"identical",
+			ImportEntry{Path: "a.com/x", Namespace: "n", Config: []byte(`{}`)},
+			ImportEntry{Path: "a.com/x", Namespace: "n", Config: []byte(`{}`)},
+			true,
+		},
+		{
+			"different version",
+			ImportEntry{Path: "a.com/x@v1.0.0"},
+			ImportEntry{Path: "a.com/x@v1.1.0"},
+			false,
+		},
+		{
+			"different namespace",
+			ImportEntry{Path: "a.com/x", Namespace: "n"},
+			ImportEntry{Path: "a.com/x", Namespace: "m"},
+			false,
+		},
+		{
+			"different config",
+			ImportEntry{Path: "a.com/x", Config: []byte(`{"a":1}`)},
+			ImportEntry{Path: "a.com/x", Config: []byte(`{"a":2}`)},
+			false,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := tc.ent.equal(tc.other)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
@@ -172,6 +218,52 @@ func Test_ImportsConfig_Paths_tabular(t *testing.T) {
 			assert.Equal(t, tc.want, have)
 		})
 	}
+}
+
+func Test_ImportsConfig_encode(t *testing.T) {
+	t.Run("round trips", func(t *testing.T) {
+		// --- Given ---
+		cfg := &ImportsConfig{imports: []ImportEntry{
+			{Path: "a.com/x@v1.0.0"},
+			{Path: "b.com/y", Namespace: "y", Config: []byte(`{"k":"v"}`)},
+		}}
+
+		// --- When ---
+		have, err := cfg.encode()
+
+		// --- Then ---
+		assert.NoError(t, err)
+
+		back, err := parseExternalTargets(have)
+		assert.NoError(t, err)
+		assert.Equal(t, cfg.imports, back.imports)
+	})
+
+	t.Run("no imports", func(t *testing.T) {
+		// --- Given ---
+		cfg := &ImportsConfig{}
+
+		// --- When ---
+		have, err := cfg.encode()
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "imports: []\n", string(have))
+	})
+
+	t.Run("error - invalid config JSON", func(t *testing.T) {
+		// --- Given ---
+		cfg := &ImportsConfig{imports: []ImportEntry{
+			{Path: "a.com/x", Config: []byte(`{`)},
+		}}
+
+		// --- When ---
+		have, err := cfg.encode()
+
+		// --- Then ---
+		assert.ErrorContain(t, "encode a.com/x config", err)
+		assert.Nil(t, have)
+	})
 }
 
 func Test_ImportsConfig_importLines(t *testing.T) {
@@ -377,6 +469,107 @@ func Test_LoadExternalTargets_error_tabular(t *testing.T) {
 			assert.ErrorIs(t, tc.err, err)
 		})
 	}
+}
+
+func Test_MergeImports(t *testing.T) {
+	t.Run("single config is returned as is", func(t *testing.T) {
+		// --- Given ---
+		cfg := must.Value(parseExternalTargets([]byte(
+			"imports:\n  - import: a.com/x\n",
+		)))
+		cfg.raw = []byte("raw")
+
+		// --- When ---
+		have, err := MergeImports([]string{"f0"}, []*ImportsConfig{cfg})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Same(t, cfg, have)
+	})
+
+	t.Run("merges and keeps order", func(t *testing.T) {
+		// --- Given ---
+		cfg0 := &ImportsConfig{imports: []ImportEntry{{Path: "a.com/x"}}}
+		cfg1 := &ImportsConfig{imports: []ImportEntry{
+			{Path: "b.com/y", Namespace: "y", Config: []byte(`{"k":1}`)},
+		}}
+		srcs := []string{"f0", "f1"}
+
+		// --- When ---
+		have, err := MergeImports(srcs, []*ImportsConfig{cfg0, cfg1})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x", "b.com/y"}, have.Paths())
+
+		back, err := parseExternalTargets(have.Raw())
+		assert.NoError(t, err)
+		assert.Equal(t, have.imports, back.imports)
+	})
+
+	t.Run("identical imports are deduplicated", func(t *testing.T) {
+		// --- Given ---
+		ent := ImportEntry{Path: "a.com/x", Config: []byte(`{"k":1}`)}
+		cfg0 := &ImportsConfig{imports: []ImportEntry{ent}}
+		cfg1 := &ImportsConfig{imports: []ImportEntry{ent, {Path: "b.com/y"}}}
+		srcs := []string{"f0", "f1"}
+
+		// --- When ---
+		have, err := MergeImports(srcs, []*ImportsConfig{cfg0, cfg1})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"a.com/x", "b.com/y"}, have.Paths())
+	})
+
+	t.Run("error - conflicting version", func(t *testing.T) {
+		// --- Given ---
+		cfg0 := &ImportsConfig{imports: []ImportEntry{{Path: "a.com/x@v1"}}}
+		cfg1 := &ImportsConfig{imports: []ImportEntry{{Path: "a.com/x@v2"}}}
+		srcs := []string{"f0.yaml", "f1.yaml"}
+
+		// --- When ---
+		have, err := MergeImports(srcs, []*ImportsConfig{cfg0, cfg1})
+
+		// --- Then ---
+		assert.ErrorIs(t, errConflictImport, err)
+		assert.ErrorContain(t, "a.com/x in f0.yaml and f1.yaml", err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - conflicting namespace", func(t *testing.T) {
+		// --- Given ---
+		cfg0 := &ImportsConfig{imports: []ImportEntry{{Path: "a.com/x"}}}
+		cfg1 := &ImportsConfig{imports: []ImportEntry{
+			{Path: "a.com/x", Namespace: "n"},
+		}}
+		srcs := []string{"f0.yaml", "f1.yaml"}
+
+		// --- When ---
+		have, err := MergeImports(srcs, []*ImportsConfig{cfg0, cfg1})
+
+		// --- Then ---
+		assert.ErrorIs(t, errConflictImport, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - conflicting config", func(t *testing.T) {
+		// --- Given ---
+		cfg0 := &ImportsConfig{imports: []ImportEntry{
+			{Path: "a.com/x", Config: []byte(`{"k":1}`)},
+		}}
+		cfg1 := &ImportsConfig{imports: []ImportEntry{
+			{Path: "a.com/x", Config: []byte(`{"k":2}`)},
+		}}
+		srcs := []string{"f0.yaml", "f1.yaml"}
+
+		// --- When ---
+		have, err := MergeImports(srcs, []*ImportsConfig{cfg0, cfg1})
+
+		// --- Then ---
+		assert.ErrorIs(t, errConflictImport, err)
+		assert.Nil(t, have)
+	})
 }
 
 func Test_ExpandTargetsPath(t *testing.T) {

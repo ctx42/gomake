@@ -138,6 +138,20 @@ go run github.com/ctx42/gomake/cmd/install@latest --targets=./targets.yaml
 go run github.com/ctx42/gomake/cmd/install@latest --targets=https://example.com/targets.yaml
 ```
 
+Repeat `--targets` to combine several files, for example a public and a
+private set of targets. An import listed identically in more than one file is
+compiled in once; the same package with a different version, namespace, or
+config fails the install, naming both files:
+
+```shell
+go run github.com/ctx42/gomake/cmd/install@latest \
+    --targets=../gmtask/targets.yaml \
+    --targets=../gmtool/targets.yaml
+```
+
+Each local file inside a Go module is resolved from disk through a temporary
+Go workspace, so unpublished edits in any of those modules compile in.
+
 Or forward `--targets` through the install script with `sh -s --`:
 
 ```shell

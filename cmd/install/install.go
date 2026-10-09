@@ -14,6 +14,12 @@
 //	go run ./cmd/install
 //	go run ./cmd/install --targets=path/to/targets.yaml
 //	go run ./cmd/install --targets=http://example.com/targets.yaml
+//	go run ./cmd/install --targets=a/targets.yaml --targets=b/targets.yaml
+//
+// The --targets flag may be repeated: the imports of all the files are
+// combined, an import listed identically in several files is kept once, and
+// the same package imported with a different version, namespace, or config
+// fails the install.
 package main
 
 import (
@@ -34,7 +40,9 @@ func main() {
 	rng := ring.New()
 	fs := xflag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	fs.SetOutput(rng.Stderr())
-	targets := fs.String("targets", "", "path or URL to a targets.yaml file")
+	var tgs targetsFlag
+	usage := "path or URL to a targets.yaml file; may be repeated"
+	fs.Var(&tgs, "targets", usage)
 	_ = fs.Parse(os.Args[1:])
 
 	if err := rejectArgs(fs); err != nil {
@@ -42,10 +50,6 @@ func main() {
 		fs.Usage()
 		os.Exit(2)
 	}
-
-	// Trim so whitespace-only --targets= is treated as empty, matching the
-	// note and the value passed to install.Main.
-	tgs := strings.TrimSpace(*targets)
 
 	// An explicitly empty --targets= is not an error: report that no external
 	// targets were provided and continue installing.
@@ -70,16 +74,31 @@ func rejectArgs(fs *xflag.FlagSet) error {
 	return fmt.Errorf("gomake: unexpected argument: %q", args[0])
 }
 
-// emptyTargetsNote returns the note to print when --targets was set on fs with
-// an empty value tgs. Whitespace-only values count as empty. It returns "" when
-// the flag was absent or non-empty, so that an explicit --targets= is reported
-// rather than treated as an error.
-func emptyTargetsNote(fs *xflag.FlagSet, tgs string) string {
-	if strings.TrimSpace(tgs) != "" {
+// emptyTargetsNote returns the note to print when --targets was set on fs but
+// collected no file into tgs. It returns "" when the flag was absent or named
+// a file, so that an explicit --targets= is reported rather than treated as an
+// error.
+func emptyTargetsNote(fs *xflag.FlagSet, tgs targetsFlag) string {
+	if len(tgs) > 0 {
 		return ""
 	}
 	if !fs.WasSet("targets") {
 		return ""
 	}
 	return "no external targets provided"
+}
+
+// targetsFlag collects the values of the repeatable --targets flag. Values
+// are trimmed, and whitespace-only ones are dropped.
+type targetsFlag []string
+
+var _ flag.Value = (*targetsFlag)(nil)
+
+func (tf *targetsFlag) String() string { return strings.Join(*tf, ",") }
+
+func (tf *targetsFlag) Set(val string) error {
+	if val = strings.TrimSpace(val); val != "" {
+		*tf = append(*tf, val)
+	}
+	return nil
 }

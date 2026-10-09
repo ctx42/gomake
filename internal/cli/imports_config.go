@@ -40,6 +40,10 @@ var (
 
 	// errInvConfig indicates invalid YAML or schema in the config file.
 	errInvConfig = errors.New("invalid external targets config")
+
+	// errConflictImport indicates two targets files import the same package
+	// with a different version, namespace, or config.
+	errConflictImport = errors.New("conflicting import")
 )
 
 // ImportEntry is one import from [TargetsFile].
@@ -72,6 +76,14 @@ func (ent ImportEntry) MetaKey() string {
 		base = path.Base(path.Dir(p))
 	}
 	return base
+}
+
+// equal reports whether ent and other import the same path, under the same
+// namespace, with the same config.
+func (ent ImportEntry) equal(other ImportEntry) bool {
+	return ent.Path == other.Path &&
+		ent.Namespace == other.Namespace &&
+		bytes.Equal(ent.Config, other.Config)
 }
 
 // isMajorVersion reports whether seg is a module major-version path segment
@@ -117,6 +129,28 @@ func (cfg *ImportsConfig) Paths() []string {
 	return specs
 }
 
+// encode returns the imports in cfg encoded as a targets.yaml document.
+func (cfg *ImportsConfig) encode() ([]byte, error) {
+	type item struct {
+		Path      string `yaml:"import"`
+		Namespace string `yaml:"namespace,omitempty"`
+		Config    any    `yaml:"config,omitempty"`
+	}
+	doc := struct {
+		Imports []item `yaml:"imports"`
+	}{}
+	for _, ent := range cfg.imports {
+		itm := item{Path: ent.Path, Namespace: ent.Namespace}
+		if len(ent.Config) > 0 {
+			if err := json.Unmarshal(ent.Config, &itm.Config); err != nil {
+				return nil, fmt.Errorf("encode %s config: %w", ent.Path, err)
+			}
+		}
+		doc.Imports = append(doc.Imports, itm)
+	}
+	return yaml.Marshal(doc)
+}
+
 // importLines returns one announcement line per import in the config, each of
 // the form "adding external target <path>". The result is empty when the
 // config has no imports.
@@ -158,6 +192,51 @@ func LoadExternalTargets(
 		return &ImportsConfig{}, nil
 	}
 	return cfg, err
+}
+
+// MergeImports combines the configs loaded from the targets files named by
+// srcs, in order; srcs[i] names the file cfgs[i] came from. An import repeated
+// with the same version, namespace, and config is kept once. The same package
+// imported with any of those different returns errConflictImport naming both
+// files. A single config is returned as it is, raw bytes included; a merged
+// one gets raw bytes encoding its imports as targets.yaml.
+func MergeImports(
+	srcs []string,
+	cfgs []*ImportsConfig,
+) (*ImportsConfig, error) {
+
+	if len(cfgs) == 1 {
+		return cfgs[0], nil
+	}
+	type origin struct {
+		ent ImportEntry
+		src string
+	}
+	seen := make(map[string]origin)
+	merged := &ImportsConfig{}
+	for i, cfg := range cfgs {
+		for _, ent := range cfg.imports {
+			pkg, _, _ := strings.Cut(ent.Path, "@")
+			prev, ok := seen[pkg]
+			if !ok {
+				seen[pkg] = origin{ent: ent, src: srcs[i]}
+				merged.imports = append(merged.imports, ent)
+				continue
+			}
+			if !prev.ent.equal(ent) {
+				format := "%w: %s in %s and %s"
+				return nil, fmt.Errorf(
+					format, errConflictImport, pkg, prev.src, srcs[i],
+				)
+			}
+		}
+	}
+	raw, err := merged.encode()
+	if err != nil {
+		return nil, err
+	}
+	merged.raw = raw
+	return merged, nil
 }
 
 // ExpandTargetsPath expands a leading "~" in a local targets path to the

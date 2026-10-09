@@ -248,9 +248,12 @@ in), see `dev/README.md`.
   `tmp/.golangci.yml` (may be stale vs. golangci-lint v2).
 - No replace directives in go.mod (good). Testdata contains example go.mod_
   / go.work_ demonstrating workspace + replace support.
-- `cmd/install` resolves a local `--targets` module (a `targets.yaml` inside a
-  Go module) from disk via a temporary `GOWORK` workspace instead of `go get`,
-  so unpublished target edits compile in without touching `go.mod`. The devel
+- `cmd/install` takes `--targets` repeatedly; `cli.MergeImports` combines the
+  files (identical imports kept once, a differing version/namespace/config is
+  an error naming both files). Every local `--targets` module (a
+  `targets.yaml` inside a Go module) is resolved from disk via one temporary
+  `GOWORK` workspace instead of `go get`, so unpublished target edits compile
+  in without touching `go.mod`. The devel
   in-source build snapshots and restores the regenerated `targets.go` /
   `targets.yaml`, so the tree stays clean and the install is re-runnable.
   Snapshot restore runs on clean return (success or error) via `defer` only —

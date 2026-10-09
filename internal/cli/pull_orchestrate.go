@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -19,17 +20,16 @@ import (
 // PrepareTargets runs PrepareExternalTargets, then loads the resulting config
 // and announces each external target import to rng.Stderr(). It is the single
 // call used by install and build scripts to prepare and announce external
-// target imports. Imports under skipMod (an empty string disables this) are a
-// module a Go workspace already provides from disk, so their `go get` is
-// skipped.
+// target imports. Imports under any of skipMods are in modules a Go workspace
+// already provides from disk, so their `go get` is skipped.
 func PrepareTargets(
 	ctx context.Context,
 	rng *ring.Ring,
 	wd string,
-	skipMod string,
+	skipMods []string,
 ) error {
 
-	if err := prepareExternalTargets(ctx, rng, wd, skipMod); err != nil {
+	if err := prepareExternalTargets(ctx, rng, wd, skipMods); err != nil {
 		return err
 	}
 	cfg, err := LoadExternalTargets(ctx, rng, filepath.Join(wd, TargetsFile))
@@ -44,13 +44,13 @@ func PrepareTargets(
 
 // prepareExternalTargets reads `wd/targets.yaml`, runs go get for each
 // listed import, and regenerates `internal/builtin/targets.go`. It's called by
-// install and build scripts before compiling the binary. Imports under skipMod
-// are provided by a Go workspace and their `go get` is skipped.
+// install and build scripts before compiling the binary. Imports under any of
+// skipMods are provided by a Go workspace and their `go get` is skipped.
 func prepareExternalTargets(
 	ctx context.Context,
 	rng *ring.Ring,
 	wd string,
-	skipMod string,
+	skipMods []string,
 ) error {
 
 	cfg, err := LoadExternalTargets(ctx, rng, filepath.Join(wd, TargetsFile))
@@ -58,7 +58,10 @@ func prepareExternalTargets(
 		return err
 	}
 	for _, ent := range cfg.imports {
-		if underModule(ent.Path, skipMod) {
+		inWorkspace := func(mod string) bool {
+			return underModule(ent.Path, mod)
+		}
+		if slices.ContainsFunc(skipMods, inWorkspace) {
 			continue
 		}
 		if err = runGoInDir(ctx, rng, wd, "get", ent.Path); err != nil {
