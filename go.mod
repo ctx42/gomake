@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/ctx42/ring v0.8.0
 	github.com/ctx42/testing v0.56.0
-	github.com/ctx42/testkit v0.15.0
+	github.com/ctx42/testkit v0.16.0
 	github.com/ctx42/xdef v0.9.1
 	github.com/ctx42/xflag v0.11.0
 	github.com/goccy/go-yaml v1.19.2
