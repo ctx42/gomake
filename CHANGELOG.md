@@ -1,3 +1,6 @@
+## v0.30.2 (Sat, 10 Oct 2026 19:26:29 UTC)
+- build(deps): update 4 ctx42 dependencies.
+
 ## v0.30.1 (Fri, 09 Oct 2026 18:32:05 UTC)
 - build(deps): bump github.com/ctx42/xdef to v0.9.1.
 - build(deps): bump github.com/ctx42/testkit to v0.16.0.
