@@ -1,3 +1,7 @@
+## v0.30.3 (Sat, 10 Oct 2026 19:45:23 UTC)
+- refactor(cli): drop hardcoded xflag fallback version.
+- fix(parser): read project dir from ring metadata.
+
 ## v0.30.2 (Sat, 10 Oct 2026 19:26:29 UTC)
 - build(deps): update 4 ctx42 dependencies.
 
