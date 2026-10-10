@@ -729,7 +729,7 @@ const (
 	// xflagFallbackVer pins the xflag version used when build information
 	// does not record the module. Test binaries omit dependency versions,
 	// so this must match the xflag require in the module's go.mod.
-	xflagFallbackVer = "v0.11.0"
+	xflagFallbackVer = "v0.11.1"
 )
 
 // xflagVersion returns the xflag module version gomake was built with, so the
