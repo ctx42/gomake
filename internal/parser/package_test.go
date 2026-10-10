@@ -314,6 +314,26 @@ func Test_NewPackage(t *testing.T) {
 		assert.Equal(t, []string{"file0.go", "file1.go"}, have.Files)
 	})
 
+	t.Run("project dir in env ignored", func(t *testing.T) {
+		// --- Given ---
+		rng := ring.New()
+		rng.EnvSet(gomake.ProjectDirEnvKey, t.TempDir())
+
+		prj := gmt.NewProject(t)
+		prj.ProjectFrom(modkit.Path("testdata/imports/pkg2"))
+		prj.GoModInit()
+		prj.Close()
+		prj.Chdir()
+
+		// --- When ---
+		have, err := NewPackage(rng, prj.ImpSpec(), withPkgSpec)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, prj.Root(), have.ImpPath)
+		assert.Equal(t, "example.com/comp/pkg2", have.ImpSpec)
+	})
+
 	t.Run("error - missing import spec", func(t *testing.T) {
 		// --- Given ---
 		imp := "example.com/not/existing"
@@ -332,7 +352,7 @@ func Test_NewPackage(t *testing.T) {
 
 		rng := ring.New()
 		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
-		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
+		rng.MetaSet(gomake.ProjectDirEnvKey, proj)
 
 		spec := "example.com/cached/pkg"
 
@@ -353,7 +373,7 @@ func Test_NewPackage(t *testing.T) {
 		proj := modkit.Root()
 		rng := ring.New()
 		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
-		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
+		rng.MetaSet(gomake.ProjectDirEnvKey, proj)
 
 		spec := "github.com/ctx42/ring/pkg/ring"
 		key, _ := listCacheKey(rng, proj, spec)
@@ -373,7 +393,7 @@ func Test_NewPackage(t *testing.T) {
 		proj := modkit.Root()
 		rng := ring.New()
 		rng.EnvSet("XDG_CACHE_HOME", t.TempDir())
-		rng.EnvSet(gomake.ProjectDirEnvKey, proj)
+		rng.MetaSet(gomake.ProjectDirEnvKey, proj)
 
 		spec := "github.com/ctx42/ring/pkg/ring"
 		key, _ := listCacheKey(rng, proj, spec)

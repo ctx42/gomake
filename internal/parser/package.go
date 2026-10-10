@@ -138,9 +138,11 @@ func NewPackage(
 		args = append(args, pkg.ImpSpec)
 	}
 
+	// Read the project directory from metadata, not the environment, which
+	// processes started below a gomake run inherit (e.g. "go test").
 	if pkg.ImpPath == "" && pkg.ImpSpec != "" && !filepath.IsAbs(pkg.ImpSpec) {
-		src := strings.TrimSpace(rng.EnvGet(gomake.ProjectDirEnvKey))
-		if src != "" {
+		src, _ := rng.MetaGet(gomake.ProjectDirEnvKey).(string)
+		if src = strings.TrimSpace(src); src != "" {
 			pkg.ImpPath = src
 			if abs, err := filepath.Abs(src); err == nil {
 				pkg.ImpPath = abs
