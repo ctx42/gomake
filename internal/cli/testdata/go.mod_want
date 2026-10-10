@@ -6,7 +6,7 @@ require (
 	example.com/user/repo v0.0.0
 	github.com/ctx42/dotenv v0.2.0
 	github.com/ctx42/testing v0.49.0
-	github.com/ctx42/xflag v0.11.1
+	github.com/ctx42/xflag XFLAG_VER
 )
 
 replace example.com/user/repo v0.0.0 => /module/path

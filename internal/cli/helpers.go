@@ -619,8 +619,12 @@ func editGoMod(
 	pth, pkgImpSpec, pkgPath, srcModDir string,
 ) error {
 
+	if xflagVer == "" {
+		format := "%w at %s: unknown %s version in build information"
+		return fmt.Errorf(format, errGoModEdit, pth, xflagModPath)
+	}
 	dir := filepath.Dir(pth)
-	xflagReq := xflagModPath + "@" + xflagVersion()
+	xflagReq := xflagModPath + "@" + xflagVer
 	// Pin GOWORK like compile so ambient workspace does not affect go mod.
 	modEnv := pinBuildGOWORK(env.EnvAll(), dir)
 
@@ -719,26 +723,22 @@ func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 	return nil
 }
 
-// xflag pins are the module path and the fallback version inlined into
-// generated makefiles.
-const (
-	// xflagModPath is the module path of the xflag package inlined into
-	// generated makefiles.
-	xflagModPath = "github.com/ctx42/xflag"
+// xflagModPath is the module path of the xflag package inlined into generated
+// makefiles.
+const xflagModPath = "github.com/ctx42/xflag"
 
-	// xflagFallbackVer pins the xflag version used when build information
-	// does not record the module. Test binaries omit dependency versions,
-	// so this must match the xflag require in the module's go.mod.
-	xflagFallbackVer = "v0.11.1"
-)
+// xflagVer is the xflag module version required by generated makefiles. It is
+// a var, not a const, so tests can set it from go.mod: test binaries do not
+// record dependency versions in their build information.
+var xflagVer = xflagVersion()
 
 // xflagVersion returns the xflag module version gomake was built with, so the
-// generated makefile pins the same version. It falls back to xflagFallbackVer
-// when build information does not record the dependency.
+// generated makefile pins the same version. It returns an empty string when
+// build information does not record the dependency.
 func xflagVersion() string {
 	bi, ok := debug.ReadBuildInfo()
 	if !ok {
-		return xflagFallbackVer
+		return ""
 	}
 	for _, dep := range bi.Deps {
 		if dep.Path != xflagModPath {
@@ -747,11 +747,9 @@ func xflagVersion() string {
 		if dep.Replace != nil {
 			dep = dep.Replace
 		}
-		if dep.Version != "" {
-			return dep.Version
-		}
+		return dep.Version
 	}
-	return xflagFallbackVer
+	return ""
 }
 
 // goEditErr wraps a failed "go mod/work edit" with sentinel and the location,

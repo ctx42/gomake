@@ -999,6 +999,7 @@ func Test_editGoMod(t *testing.T) {
 		inData := oskit.ReadFile(t, "testdata/go.mod_in")
 		pth := oskit.Write(t, inData, t.TempDir(), "go.mod")
 		wantData := oskit.ReadFileStr(t, "testdata/go.mod_want")
+		wantData = strings.ReplaceAll(wantData, "XFLAG_VER", xflagVer)
 
 		// --- When ---
 		err := editGoMod(
@@ -1032,30 +1033,37 @@ func Test_editGoMod(t *testing.T) {
 		// The path, then the underlying toolchain diagnostic.
 		assert.ErrorRegexp(t, regexp.QuoteMeta(pth)+".*go:", err)
 	})
-}
 
-func Test_xflagFallbackVer(t *testing.T) {
-	// --- Given ---
-	modPth := filepath.Join(modkit.Root(), "go.mod")
-	want := must.Value(modkit.ModVer(modPth, xflagModPath))
+	t.Run("error - unknown xflag version", func(t *testing.T) {
+		// --- Given ---
+		ver := xflagVer
+		xflagVer = ""
+		t.Cleanup(func() { xflagVer = ver })
 
-	// --- When ---
-	have := xflagFallbackVer
+		pth := oskit.Write(t, "", t.TempDir(), "go.mod")
 
-	// --- Then ---
-	assert.Equal(t, want, have)
+		// --- When ---
+		err := editGoMod(
+			ring.New(),
+			pth,
+			"example.com/user/repo",
+			"/module/path",
+			filepath.Dir(pth),
+		)
+
+		// --- Then ---
+		assert.ErrorIs(t, errGoModEdit, err)
+		assert.ErrorRegexp(t, "unknown .*/xflag version", err)
+	})
 }
 
 func Test_xflagVersion(t *testing.T) {
-	// --- Given ---
-	modPth := filepath.Join(modkit.Root(), "go.mod")
-	want := must.Value(modkit.ModVer(modPth, xflagModPath))
-
 	// --- When ---
 	have := xflagVersion()
 
 	// --- Then ---
-	assert.Equal(t, want, have)
+	// Test binaries do not record dependency versions.
+	assert.Equal(t, "", have)
 }
 
 func Test_findGoWorkValue(t *testing.T) {
