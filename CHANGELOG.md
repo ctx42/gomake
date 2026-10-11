@@ -1,3 +1,5 @@
+## v0.31.0 (Sun, 11 Oct 2026 12:49:47 UTC)
+
 ## v0.30.3 (Sat, 10 Oct 2026 19:45:23 UTC)
 - refactor(cli): drop hardcoded xflag fallback version.
 - fix(parser): read project dir from ring metadata.
