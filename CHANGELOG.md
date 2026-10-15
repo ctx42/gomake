@@ -1,3 +1,6 @@
+## v0.31.1 (Thu, 15 Oct 2026 14:58:29 UTC)
+- build(deps): bump golang.org/x/mod to v0.42.0.
+
 ## v0.31.0 (Sun, 11 Oct 2026 12:49:47 UTC)
 
 ## v0.30.3 (Sat, 10 Oct 2026 19:45:23 UTC)
