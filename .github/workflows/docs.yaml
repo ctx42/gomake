@@ -14,6 +14,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  C42_CC_RUN_ID: github-${{ github.repository }}-${{ github.run_id }}-${{ github.run_attempt }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
