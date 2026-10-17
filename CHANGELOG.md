@@ -1,3 +1,6 @@
+## v0.31.4 (Sat, 17 Oct 2026 18:57:41 UTC)
+- test(mkf): wait for abandoned target to restore the cwd.
+
 ## v0.31.3 (Sat, 17 Oct 2026 16:18:23 UTC)
 - refactor(cli): add ImportEntry.PkgPath.
 - fix(cli): drop import version suffix before generating targets.
