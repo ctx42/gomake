@@ -65,10 +65,7 @@ func (ent ImportEntry) MetaKey() string {
 	if ent.Namespace != "" {
 		return ent.Namespace
 	}
-	p := ent.Path
-	if i := strings.Index(p, "@"); i >= 0 {
-		p = p[:i]
-	}
+	p := ent.PkgPath()
 	base := path.Base(p)
 	// A major-version path suffix ("/v2", "/v3", ...) is not the package name;
 	// it lives in the preceding segment.
@@ -76,6 +73,13 @@ func (ent ImportEntry) MetaKey() string {
 		base = path.Base(path.Dir(p))
 	}
 	return base
+}
+
+// PkgPath returns the import path without its "@version" suffix: the path Go
+// source imports the package by.
+func (ent ImportEntry) PkgPath() string {
+	pkg, _, _ := strings.Cut(ent.Path, "@")
+	return pkg
 }
 
 // equal reports whether ent and other import the same path, under the same
@@ -216,7 +220,7 @@ func MergeImports(
 	merged := &ImportsConfig{}
 	for i, cfg := range cfgs {
 		for _, ent := range cfg.imports {
-			pkg, _, _ := strings.Cut(ent.Path, "@")
+			pkg := ent.PkgPath()
 			prev, ok := seen[pkg]
 			if !ok {
 				seen[pkg] = origin{ent: ent, src: srcs[i]}

@@ -63,6 +63,41 @@ func Test_ImportEntry_MetaKey_tabular(t *testing.T) {
 	}
 }
 
+func Test_ImportEntry_PkgPath_tabular(t *testing.T) {
+	tt := []struct {
+		testN string
+
+		entry ImportEntry
+		want  string
+	}{
+		{
+			"no version",
+			ImportEntry{Path: "a.com/pkg/gmbump"},
+			"a.com/pkg/gmbump",
+		},
+		{
+			"version stripped",
+			ImportEntry{Path: "a.com/pkg/gmbump@v1.2.3"},
+			"a.com/pkg/gmbump",
+		},
+		{
+			"major version path kept",
+			ImportEntry{Path: "a.com/pkg/gmbump/v2@v2.1.0"},
+			"a.com/pkg/gmbump/v2",
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.testN, func(t *testing.T) {
+			// --- When ---
+			have := tc.entry.PkgPath()
+
+			// --- Then ---
+			assert.Equal(t, tc.want, have)
+		})
+	}
+}
+
 func Test_ImportEntry_equal_tabular(t *testing.T) {
 	tt := []struct {
 		testN string
