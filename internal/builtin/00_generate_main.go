@@ -42,7 +42,7 @@ func main() {
 	imports := make([]parser.Import, 0, len(entries))
 	for _, ent := range entries {
 		imports = append(imports, parser.Import{
-			Path:      ent.Path,
+			Path:      ent.PkgPath(),
 			Namespace: ent.Namespace,
 		})
 	}

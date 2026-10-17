@@ -278,6 +278,64 @@ func Test_regenBuiltins(t *testing.T) {
 
 		oskit.Stat(t, wd, "internal", "builtin", "targets.go")
 	})
+
+	t.Run("versioned import", func(t *testing.T) {
+		// An import pinned with "@version" names the package by its path
+		// alone; with the version left on, code generation found no package
+		// and silently generated no targets.
+
+		// --- Given ---
+		tst := ringtest.New(t)
+		rng := tst.Ring()
+		rng.EnvSet("GOFLAGS", "-mod=mod")
+
+		wd := t.TempDir()
+		oskit.MkdirAll(t, wd, "fakepkg")
+		mod := "" +
+			"module example.com/fakepkg\n" +
+			"\n" +
+			"go 1.24\n" +
+			"\n" +
+			"require github.com/ctx42/ring v0.8.1\n"
+		oskit.Write(t, mod, wd, "fakepkg", "go.mod")
+		src := "" +
+			"package fakepkg\n" +
+			"\n" +
+			"import (\n" +
+			"\t\"context\"\n" +
+			"\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n" +
+			"\n" +
+			"// Ping pings.\n" +
+			"func Ping(_ context.Context, _ *ring.Ring) error { return nil }\n"
+		oskit.Write(t, src, wd, "fakepkg", "fakepkg.go")
+		gomod := "" +
+			"module test.example.com\n" +
+			"\n" +
+			"go 1.24\n" +
+			"\n" +
+			"require (\n" +
+			"\texample.com/fakepkg v0.0.0\n" +
+			"\tgithub.com/ctx42/ring v0.8.1\n" +
+			")\n" +
+			"\n" +
+			"replace example.com/fakepkg => ./fakepkg\n"
+		oskit.Write(t, gomod, wd, "go.mod")
+		oskit.MkdirAll(t, wd, "internal", "builtin", "data")
+
+		cfg := &ImportsConfig{
+			imports: []ImportEntry{{Path: "example.com/fakepkg@v0.0.0"}},
+		}
+
+		// --- When ---
+		err := regenBuiltins(rng, wd, cfg)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		gen := filepath.Join(wd, "internal", "builtin", "targets.go")
+		assert.FileContain(t, "return fakepkg.Ping(ctx, rng)", gen)
+	})
 }
 
 func Test_runGoInDir(t *testing.T) {

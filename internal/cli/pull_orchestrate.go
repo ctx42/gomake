@@ -89,12 +89,14 @@ func underModule(importPath, mod string) bool {
 }
 
 // regenBuiltins runs builtin.GenImports to regenerate
-// internal/builtin/targets.go, carrying each import's namespace.
+// internal/builtin/targets.go, carrying each import's namespace. An import's
+// version suffix is dropped: go get has already fetched that version, and Go
+// source imports the package by its path alone.
 func regenBuiltins(rng *ring.Ring, wd string, cfg *ImportsConfig) error {
 	imports := make([]parser.Import, 0, len(cfg.imports))
 	for _, ent := range cfg.imports {
 		imports = append(imports, parser.Import{
-			Path:      ent.Path,
+			Path:      ent.PkgPath(),
 			Namespace: ent.Namespace,
 		})
 	}
