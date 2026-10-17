@@ -1,3 +1,7 @@
+## v0.31.2 (Sat, 17 Oct 2026 10:19:49 UTC)
+- refactor(cli): export AbsolutizeGoModReplaces.
+- fix(install): keep the clone version for installs with targets.
+
 ## v0.31.1 (Thu, 15 Oct 2026 14:58:29 UTC)
 - build(deps): bump golang.org/x/mod to v0.42.0.
 
