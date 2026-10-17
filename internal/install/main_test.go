@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime/debug"
+	"syscall"
 	"testing"
 
 	"github.com/ctx42/ring/pkg/ring"
@@ -517,6 +518,64 @@ func Test_installTo(t *testing.T) {
 		assert.True(t, oskit.PathExists(t, bin))
 		assert.Contain(t, "wsxyzzy", runBin(t, bin, "--list"))
 	})
+
+	t.Run("repository build keeps the tree and its version", func(t *testing.T) {
+		// A devel install from a repository builds from a copy of the files
+		// the build reads, so the working tree is never modified and the
+		// binary reports the version the toolchain gives the untouched tree
+		// instead of a "+dirty" one.
+		if testing.Short() {
+			t.Skip("slow: copies the module and runs go build")
+		}
+
+		// --- Given ---
+		root := goListDir(t, "-m", "-f", "{{.Dir}}", "github.com/ctx42/gomake")
+		build := t.TempDir()
+		copyTree(t, root, build)
+		gitCommit(t, build, "v0.99.0")
+
+		// A separate local module exposing one gomake target, wired through
+		// the workspace.
+		ext := t.TempDir()
+		extMod := "module example.com/rptgt\n\ngo 1.26\n\n" +
+			"require github.com/ctx42/ring v0.7.0\n"
+		oskit.Write(t, extMod, ext, "go.mod")
+		target := "" +
+			"package rptgt\n\n" +
+			"import (\n" +
+			"\t\"context\"\n\n" +
+			"\t\"github.com/ctx42/ring/pkg/ring\"\n" +
+			")\n\n" +
+			"// Rpxyzzy prints a sentinel.\n" +
+			"func Rpxyzzy(_ context.Context, rng *ring.Ring) error {\n" +
+			"\t_, _ = rng.Stdout().Write([]byte(\"pong\"))\n" +
+			"\treturn nil\n" +
+			"}\n"
+		oskit.Write(t, target, ext, "target.go")
+		tgs := filepath.Join(ext, "targets.yaml")
+		oskit.Write(t, "imports:\n  - import: example.com/rptgt\n", tgs)
+
+		t.Chdir(build)
+		dst := t.TempDir()
+		tst := ringtest.New(t).WetStderr()
+		info := &debug.BuildInfo{Main: debug.Module{
+			Path:    "github.com/ctx42/gomake",
+			Version: "(devel)",
+		}}
+
+		// --- When ---
+		err := installTo(t.Context(), tst.Ring(), info, dst, []string{tgs})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		want := "adding external target example.com/rptgt"
+		assert.Contain(t, want, tst.Stderr())
+		assert.Equal(t, "", gitRun(t, build, "status", "--porcelain"))
+
+		bin := filepath.Join(dst, "gomake")
+		assert.Equal(t, "gomake v0.99.0\n", runBin(t, bin, "--version"))
+		assert.Contain(t, "rpxyzzy", runBin(t, bin, "--list"))
+	})
 }
 
 func Test_effectiveImports(t *testing.T) {
@@ -736,6 +795,208 @@ func Test_moduleCacheDir(t *testing.T) {
 	})
 }
 
+func Test_repoVersion(t *testing.T) {
+	// probeModule writes a module with the installer package repoVersion
+	// builds and returns its root.
+	probeModule := func(t *testing.T) string {
+		t.Helper()
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+		oskit.MkdirAll(t, src, "cmd", "install")
+		main := "package main\n\nfunc main() {}\n"
+		oskit.Write(t, main, src, "cmd", "install", "main.go")
+		return src
+	}
+
+	t.Run("tag at the commit", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+		src := probeModule(t)
+		gitCommit(t, src, "v1.2.3")
+
+		// --- When ---
+		have, err := repoVersion(rng, src)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "v1.2.3", have)
+	})
+
+	t.Run("uncommitted change", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+		src := probeModule(t)
+		gitCommit(t, src, "v1.2.3")
+		oskit.Write(t, "package main\n", src, "cmd", "install", "extra.go")
+
+		// --- When ---
+		have, err := repoVersion(rng, src)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "v1.2.3+dirty", have)
+	})
+
+	t.Run("not in a repository", func(t *testing.T) {
+		// --- Given ---
+		// No installer package either: nothing is built outside a repository.
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+
+		// --- When ---
+		have, err := repoVersion(ringtest.New(t).Ring(), src)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("version control stamping disabled", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+		rng.EnvSet("GOFLAGS", "-buildvcs=false")
+
+		src := probeModule(t)
+		gitCommit(t, src, "v1.2.3")
+
+		// --- When ---
+		have, err := repoVersion(rng, src)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - probe temp dir", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+		rng.EnvSet("TMPDIR", filepath.Join(t.TempDir(), "nonexistent"))
+
+		src := probeModule(t)
+		gitCommit(t, src, "")
+
+		// --- When ---
+		have, err := repoVersion(rng, src)
+
+		// --- Then ---
+		assert.ErrorContain(t, "version probe temp", err)
+		assert.Equal(t, "", have)
+	})
+
+	t.Run("error - no installer package", func(t *testing.T) {
+		// --- Given ---
+		rng := ringtest.New(t).Ring()
+
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+		gitCommit(t, src, "")
+
+		// --- When ---
+		have, err := repoVersion(rng, src)
+
+		// --- Then ---
+		assert.ErrorRegexp(t, "version probe: go build.*cmd/install", err)
+		assert.Equal(t, "", have)
+	})
+}
+
+func Test_inRepo(t *testing.T) {
+	t.Run("marker in the directory", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.MkdirAll(t, dir, ".git")
+
+		// --- When ---
+		have := inRepo(dir)
+
+		// --- Then ---
+		assert.True(t, have)
+	})
+
+	t.Run("marker file in a parent", func(t *testing.T) {
+		// --- Given ---
+		// A worktree or submodule holds .git as a file.
+		root := t.TempDir()
+		oskit.Write(t, "gitdir: /elsewhere\n", root, ".git")
+		dir := oskit.MkdirAll(t, root, "a", "b")
+
+		// --- When ---
+		have := inRepo(dir)
+
+		// --- Then ---
+		assert.True(t, have)
+	})
+
+	t.Run("no marker", func(t *testing.T) {
+		// --- When ---
+		have := inRepo(t.TempDir())
+
+		// --- Then ---
+		assert.False(t, have)
+	})
+}
+
+func Test_buildFiles(t *testing.T) {
+	t.Run("module files the binary builds from", func(t *testing.T) {
+		// --- Given ---
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+		oskit.Write(t, "", src, "go.sum")
+		oskit.Write(t, "imports:\n", src, "targets.yaml")
+
+		lib := "" +
+			"package lib\n" +
+			"\n" +
+			"import _ \"embed\"\n" +
+			"\n" +
+			"//go:embed data/tpl.txt\n" +
+			"var Tpl string\n"
+		oskit.MkdirAll(t, src, "lib", "data")
+		oskit.Write(t, lib, src, "lib", "lib.go")
+		oskit.Write(t, "tpl", src, "lib", "data", "tpl.txt")
+		oskit.Write(t, "package lib\n", src, "lib", "lib_test.go")
+		oskit.MkdirAll(t, src, "other")
+		oskit.Write(t, "package other\n", src, "other", "other.go")
+
+		main := "" +
+			"package main\n" +
+			"\n" +
+			"import _ \"example.test/lib\"\n" +
+			"\n" +
+			"func main() {}\n"
+		oskit.MkdirAll(t, src, "cmd", "gomake")
+		oskit.Write(t, main, src, "cmd", "gomake", "main.go")
+
+		// --- When ---
+		have, err := buildFiles(ringtest.New(t).Ring(), src)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		want := []string{
+			filepath.Join("lib", "lib.go"),
+			filepath.Join("lib", "data", "tpl.txt"),
+			filepath.Join("cmd", "gomake", "main.go"),
+			"go.mod",
+			"go.sum",
+			"targets.yaml",
+		}
+		assert.Equal(t, want, have)
+	})
+
+	t.Run("error - no gomake package", func(t *testing.T) {
+		// --- Given ---
+		src := t.TempDir()
+		oskit.Write(t, "module example.test\n\ngo 1.24\n", src, "go.mod")
+
+		// --- When ---
+		have, err := buildFiles(ringtest.New(t).Ring(), src)
+
+		// --- Then ---
+		assert.ErrorRegexp(t, "go list ./cmd/gomake: exit status 1: .+", err)
+		assert.Nil(t, have)
+	})
+}
+
 func Test_setupWorkspace(t *testing.T) {
 	t.Run("empty targets is a no-op", func(t *testing.T) {
 		// --- Given ---
@@ -743,7 +1004,7 @@ func Test_setupWorkspace(t *testing.T) {
 		buildDir := t.TempDir()
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, nil)
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, buildDir, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -761,7 +1022,12 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := "https://example.com/targets.yaml"
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
+		hMod, hCleanup, err := setupWorkspace(
+			rng,
+			buildDir,
+			buildDir,
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -781,7 +1047,12 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := filepath.Join(t.TempDir(), "targets.yaml")
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
+		hMod, hCleanup, err := setupWorkspace(
+			rng,
+			buildDir,
+			buildDir,
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -808,7 +1079,12 @@ func Test_setupWorkspace(t *testing.T) {
 		oskit.Write(t, "imports:\n", tgs)
 
 		// --- When ---
-		hMod, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
+		hMod, hCleanup, err := setupWorkspace(
+			rng,
+			buildDir,
+			buildDir,
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -844,7 +1120,7 @@ func Test_setupWorkspace(t *testing.T) {
 		}
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		have, hCleanup, err := setupWorkspace(rng, buildDir, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -870,7 +1146,12 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := oskit.Write(t, "imports:\n", modDir, "targets.yaml")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, buildDir, []string{tgs})
+		have, hCleanup, err := setupWorkspace(
+			rng,
+			buildDir,
+			buildDir,
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -900,7 +1181,7 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := []string{"~/targets.yaml"}
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, buildDir, tgs)
+		have, hCleanup, err := setupWorkspace(rng, buildDir, buildDir, tgs)
 
 		// --- Then ---
 		assert.NoError(t, err)
@@ -919,7 +1200,12 @@ func Test_setupWorkspace(t *testing.T) {
 		tgs := oskit.Write(t, "imports:\n", modDir, "targets.yaml")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, t.TempDir(), []string{tgs})
+		have, hCleanup, err := setupWorkspace(
+			rng,
+			t.TempDir(),
+			t.TempDir(),
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.ErrorContain(t, "workspace temp", err)
@@ -941,12 +1227,45 @@ func Test_setupWorkspace(t *testing.T) {
 		missing := filepath.Join(t.TempDir(), "missing")
 
 		// --- When ---
-		have, hCleanup, err := setupWorkspace(rng, missing, []string{tgs})
+		have, hCleanup, err := setupWorkspace(
+			rng,
+			missing,
+			missing,
+			[]string{tgs},
+		)
 
 		// --- Then ---
 		assert.ErrorContain(t, "go work init", err)
 		assert.Nil(t, have)
 		assert.Equal(t, "off", rng.EnvGet("GOWORK"))
+
+		hCleanup()
+	})
+
+	t.Run("local module at the source uses the build dir", func(t *testing.T) {
+		// --- Given ---
+		// The targets file lives in the module being built, which buildDir
+		// is a copy of: the workspace must list the copy only.
+		rng := ringtest.New(t).Ring()
+
+		buildDir := t.TempDir()
+		mod := "module example.com/self\n\ngo 1.24\n"
+		oskit.Write(t, mod, buildDir, "go.mod")
+
+		src := t.TempDir()
+		oskit.Write(t, mod, src, "go.mod")
+		tgs := oskit.Write(t, "imports:\n", src, "targets.yaml")
+
+		// --- When ---
+		hMod, hCleanup, err := setupWorkspace(rng, buildDir, src, []string{tgs})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, []string{"example.com/self"}, hMod)
+		work, _ := rng.EnvLookup("GOWORK")
+		content := oskit.ReadFileStr(t, work)
+		assert.Contain(t, buildDir, content)
+		assert.NotContain(t, src, content)
 
 		hCleanup()
 	})
@@ -1325,11 +1644,30 @@ func Test_copyToTemp(t *testing.T) {
 		oskit.Write(t, "hello", src, "a.txt")
 
 		// --- When ---
-		hDst, hCleanup, err := copyToTemp(ring.New(), src)
+		hDst, hCleanup, err := copyToTemp(ring.New(), src, nil)
 
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.FileContain(t, "hello", filepath.Join(hDst, "a.txt"))
+
+		hCleanup()
+
+		assert.False(t, oskit.PathExists(t, hDst))
+	})
+
+	t.Run("copies only the listed files", func(t *testing.T) {
+		// --- Given ---
+		src := t.TempDir()
+		oskit.Write(t, "hello", src, "a.txt")
+		oskit.Write(t, "skip", src, "b.txt")
+
+		// --- When ---
+		hDst, hCleanup, err := copyToTemp(ring.New(), src, []string{"a.txt"})
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.FileContain(t, "hello", filepath.Join(hDst, "a.txt"))
+		assert.NoFileExist(t, filepath.Join(hDst, "b.txt"))
 
 		hCleanup()
 
@@ -1341,7 +1679,7 @@ func Test_copyToTemp(t *testing.T) {
 		src := filepath.Join(t.TempDir(), "missing")
 
 		// --- When ---
-		_, _, err := copyToTemp(ring.New(), src)
+		_, _, err := copyToTemp(ring.New(), src, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, fs.ErrNotExist, err)
@@ -1354,7 +1692,7 @@ func Test_copyToTemp(t *testing.T) {
 		rng.EnvSet("TMPDIR", filepath.Join(t.TempDir(), "nonexistent"))
 
 		// --- When ---
-		_, _, err := copyToTemp(rng, src)
+		_, _, err := copyToTemp(rng, src, nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrNotExist, err)
@@ -1441,5 +1779,54 @@ func Test_copyDir(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, os.ErrPermission, err)
+	})
+}
+
+func Test_copyFiles(t *testing.T) {
+	t.Run("copies the listed files into their directories", func(t *testing.T) {
+		// --- Given ---
+		src := t.TempDir()
+		oskit.Write(t, "hello", src, "a.txt")
+		oskit.MkdirAll(t, src, "sub")
+		oskit.Write(t, "world", src, "sub", "b.txt")
+		oskit.Write(t, "skip", src, "c.txt")
+
+		dst := t.TempDir()
+		files := []string{"a.txt", filepath.Join("sub", "b.txt")}
+
+		// --- When ---
+		err := copyFiles(src, dst, files)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.FileContain(t, "hello", filepath.Join(dst, "a.txt"))
+		assert.FileContain(t, "world", filepath.Join(dst, "sub", "b.txt"))
+		assert.NoFileExist(t, filepath.Join(dst, "c.txt"))
+		assert.Equal(t, os.FileMode(0o600), oskit.Stat(t, dst, "a.txt").Mode())
+	})
+
+	t.Run("error - missing file", func(t *testing.T) {
+		// --- When ---
+		err := copyFiles(t.TempDir(), t.TempDir(), []string{"missing.txt"})
+
+		// --- Then ---
+		assert.ErrorIs(t, fs.ErrNotExist, err)
+	})
+
+	t.Run("error - directory cannot be created", func(t *testing.T) {
+		// --- Given ---
+		// A file where the destination directory belongs blocks MkdirAll.
+		src := t.TempDir()
+		oskit.MkdirAll(t, src, "sub")
+		oskit.Write(t, "world", src, "sub", "b.txt")
+
+		dst := t.TempDir()
+		oskit.Write(t, "", dst, "sub")
+
+		// --- When ---
+		err := copyFiles(src, dst, []string{filepath.Join("sub", "b.txt")})
+
+		// --- Then ---
+		assert.ErrorIs(t, syscall.ENOTDIR, err)
 	})
 }

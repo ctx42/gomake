@@ -4,7 +4,9 @@
 package install
 
 import (
+	"bytes"
 	"context"
+	"debug/buildinfo"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,8 +63,9 @@ func Main(
 // the shipped builtins already match an empty config, and `go build` only
 // reads the source tree, so the temp copy, go get, and builtin regeneration
 // are all skipped. With imports present it builds from a writable tree (a temp
-// copy for a published build), writes the effective targets.yaml, regenerates
-// the builtins, then compiles.
+// copy for a published build, and for a devel build in a repository, which
+// keeps the working tree unmodified so the toolchain's version for it holds),
+// writes the effective targets.yaml, regenerates the builtins, then compiles.
 //
 // When any of tgs is a local path inside a Go module, that module is resolved
 // from disk through a temporary Go workspace (see setupWorkspace) rather than
@@ -141,37 +144,61 @@ func installTo(
 		return build(rng, src, dst, ldflags)
 	}
 
-	// Full path: external targets present. Build from a writable tree, write
-	// the effective targets.yaml into it, then go get + regenerate builtins.
-	buildDir := src
-	if !devel {
-		tmp, cleanup, cerr := copyToTemp(rng, src)
-		if cerr != nil {
-			return fmt.Errorf("gomake: copy source: %w", cerr)
-		}
-		defer cleanup()
-		buildDir = tmp
-	}
-
-	// A devel build compiles in place. Regenerating the builtins would leave
-	// the working tree with a targets.go importing external modules that only
-	// resolve inside the temporary workspace, breaking the next `go build` or
-	// `go run`. Snapshot those artifacts and restore them after the build; the
-	// binary already carries the compiled-in targets.
+	// A devel build reads the working tree, and building in place rewrites
+	// it: a targets.go importing external modules that only resolve inside
+	// the temporary workspace would break the next `go build` or `go run`.
+	// Snapshot those artifacts and restore them after the build; the binary
+	// already carries the compiled-in targets.
 	if devel {
 		var restore func() error
-		restore, err = snapshotGenerated(buildDir)
+		restore, err = snapshotGenerated(src)
 		if err != nil {
 			return fmt.Errorf("gomake: %w", err)
 		}
 		defer func() { err = joinRestore(err, restore) }()
 	}
 
+	// Full path: external targets present. Build from a writable tree, write
+	// the effective targets.yaml into it, then go get + regenerate builtins.
+	// A published build copies the module cache. A devel build in a
+	// repository copies the files the build reads and stamps the version the
+	// toolchain gives the untouched tree, since regenerating the builtins in
+	// place would make the toolchain report the tree as modified. Any other
+	// devel build compiles in place.
+	buildDir := src
+	var files []string
+	if devel {
+		var ver string
+		if ver, err = repoVersion(rng, src); err != nil {
+			return fmt.Errorf("gomake: %w", err)
+		}
+		if ver != "" {
+			if files, err = buildFiles(rng, src); err != nil {
+				return fmt.Errorf("gomake: %w", err)
+			}
+			ldflags = version.LDFlags(ver)
+		}
+	}
+	if !devel || files != nil {
+		tmp, cleanup, cerr := copyToTemp(rng, src, files)
+		if cerr != nil {
+			return fmt.Errorf("gomake: copy source: %w", cerr)
+		}
+		defer cleanup()
+		buildDir = tmp
+	}
+	if files != nil {
+		envs := rng.EnvAll()
+		if err = cli.AbsolutizeGoModReplaces(envs, buildDir, src); err != nil {
+			return fmt.Errorf("gomake: %w", err)
+		}
+	}
+
 	// Local --targets in Go modules: resolve those modules from disk via a
 	// temporary workspace so the build compiles in unpublished edits without
 	// go get, keeping go.mod untouched. skipMods names the modules whose
 	// imports the workspace provides; their go get is skipped below.
-	skipMods, cleanup, err := setupWorkspace(rng, buildDir, tgs)
+	skipMods, cleanup, err := setupWorkspace(rng, buildDir, src, tgs)
 	if err != nil {
 		return fmt.Errorf("gomake: %w", err)
 	}
@@ -259,6 +286,131 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 	return info.Dir, nil
 }
 
+// repoVersion returns the version the Go toolchain gives a binary built from
+// the module source at src as the tree stands now: the tag at the checked-out
+// commit or a pseudo-version, with "+dirty" for uncommitted changes. It builds
+// the installer package into a temp directory and reads the version from the
+// result. It returns "" without building when src is in no repository, and
+// when the toolchain records no version control information, as with
+// "-buildvcs=false" in GOFLAGS.
+func repoVersion(env ring.Environ, src string) (string, error) {
+	if !inRepo(src) {
+		return "", nil
+	}
+	dir, err := os.MkdirTemp(tempRoot(env), "gomake-probe-*")
+	if err != nil {
+		return "", fmt.Errorf("version probe temp: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+
+	out := filepath.Join(dir, "probe")
+	if err = buildMain(env, src, out, "./cmd/install", ""); err != nil {
+		return "", fmt.Errorf("version probe: %w", err)
+	}
+	info, err := buildinfo.ReadFile(out)
+	if err != nil {
+		return "", fmt.Errorf("version probe: %w", err)
+	}
+	for _, set := range info.Settings {
+		if set.Key == "vcs" {
+			return info.Main.Version, nil
+		}
+	}
+	return "", nil
+}
+
+// inRepo reports whether dir or one of its parents holds the metadata of a
+// version control system the Go toolchain stamps into binaries.
+func inRepo(dir string) bool {
+	markers := []string{".git", ".hg", ".svn", ".bzr", ".fslckout", "_FOSSIL_"}
+	for {
+		for _, marker := range markers {
+			if _, err := os.Stat(filepath.Join(dir, marker)); err == nil {
+				return true
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
+}
+
+// listedPkg holds the fields of a `go list -json` package naming the files a
+// build of it reads.
+type listedPkg struct {
+	Dir    string
+	Module *struct{ Main bool }
+
+	GoFiles      []string
+	CgoFiles     []string
+	CFiles       []string
+	CXXFiles     []string
+	MFiles       []string
+	HFiles       []string
+	FFiles       []string
+	SFiles       []string
+	SwigFiles    []string
+	SwigCXXFiles []string
+	SysoFiles    []string
+	EmbedFiles   []string
+}
+
+// buildFiles returns the files, relative to the module source at src, that
+// building cmd/gomake with external targets reads from it: the files of every
+// package of the module the binary links, as `go list -deps` reports them,
+// plus go.mod, go.sum and targets.yaml when present.
+func buildFiles(env ring.Environ, src string) ([]string, error) {
+	pkg := "./cmd/" + gomakeBinName
+	cmd := exec.Command("go", "list", "-deps", "-json", pkg)
+	cmd.Env = env.EnvAll()
+	cmd.Dir = src
+	out, err := cmd.Output()
+	if err != nil {
+		if e, ok := errors.AsType[*exec.ExitError](err); ok {
+			detail := strings.TrimSpace(string(e.Stderr))
+			return nil, fmt.Errorf("go list %s: %w: %s", pkg, err, detail)
+		}
+		return nil, fmt.Errorf("go list %s: %w", pkg, err)
+	}
+
+	var files []string
+	dec := json.NewDecoder(bytes.NewReader(out))
+	for dec.More() {
+		var lp listedPkg
+		if err = dec.Decode(&lp); err != nil {
+			return nil, fmt.Errorf("go list parse: %w", err)
+		}
+		if lp.Module == nil || !lp.Module.Main {
+			continue
+		}
+		var rel string
+		if rel, err = filepath.Rel(src, lp.Dir); err != nil {
+			return nil, fmt.Errorf("go list: %w", err)
+		}
+		lists := [][]string{
+			lp.GoFiles, lp.CgoFiles, lp.CFiles, lp.CXXFiles, lp.MFiles,
+			lp.HFiles, lp.FFiles, lp.SFiles, lp.SwigFiles, lp.SwigCXXFiles,
+			lp.SysoFiles, lp.EmbedFiles,
+		}
+		for _, name := range slices.Concat(lists...) {
+			files = append(files, filepath.Join(rel, name))
+		}
+	}
+	for _, name := range []string{"go.mod", "go.sum", cli.TargetsFile} {
+		_, err = os.Stat(filepath.Join(src, name))
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, name)
+	}
+	return files, nil
+}
+
 // setupWorkspace enables disk resolution of local --targets modules. For each
 // of tgs that is a filesystem path whose directory lies inside a Go module, it
 // adds that module to a temporary Go workspace covering buildDir too, points
@@ -272,9 +424,14 @@ func moduleCacheDir(env ring.Environ, module string) (string, error) {
 // the workspace is active GOFLAGS loses any "-mod=mod", which workspace mode
 // rejects. The returned cleanup removes the workspace file, sets GOWORK back
 // to "off" and restores GOFLAGS; it is always safe to call.
+//
+// The src is the module source buildDir was copied from, or buildDir itself.
+// A local module rooted at src is the module being built, so the workspace
+// uses buildDir in its place: the same module in two directories fails.
 func setupWorkspace(
 	env ring.Environ,
 	buildDir string,
+	src string,
 	tgs []string,
 ) ([]string, func(), error) {
 
@@ -285,6 +442,11 @@ func setupWorkspace(
 	}
 	if len(mods) == 0 {
 		return nil, noop, nil
+	}
+	for i, root := range roots {
+		if filepath.Clean(root) == filepath.Clean(src) {
+			roots[i] = buildDir
+		}
 	}
 
 	wsDir, err := os.MkdirTemp(tempRoot(env), "gomake-work-*")
@@ -510,17 +672,28 @@ func snapshotGenerated(buildDir string) (func() error, error) {
 
 // copyToTemp copies the read-only module source at src into a fresh temp
 // directory under tempRoot(env) the caller owns, so go get and codegen can
-// write into it. It returns the temp path and a cleanup the caller must defer.
-// On error it removes any temp directory it created and returns a no-op
-// cleanup.
-func copyToTemp(env ring.Environ, src string) (string, func(), error) {
+// write into it. Nil files copies the whole tree; otherwise only files, paths
+// relative to src. It returns the temp path and a cleanup the caller must
+// defer. On error it removes any temp directory it created and returns a
+// no-op cleanup.
+func copyToTemp(
+	env ring.Environ,
+	src string,
+	files []string,
+) (string, func(), error) {
+
 	noop := func() {}
 	tempDir, err := os.MkdirTemp(tempRoot(env), "gomake-install-*")
 	if err != nil {
 		return "", noop, fmt.Errorf("install temp: %w", err)
 	}
 	cleanup := func() { _ = os.RemoveAll(tempDir) }
-	if err = copyDir(src, tempDir); err != nil {
+	if files == nil {
+		err = copyDir(src, tempDir)
+	} else {
+		err = copyFiles(src, tempDir, files)
+	}
+	if err != nil {
 		cleanup()
 		return "", noop, err
 	}
@@ -565,4 +738,24 @@ func copyDir(src, dst string) error {
 		return os.WriteFile(target, data, 0o600)
 	}
 	return filepath.WalkDir(src, fn)
+}
+
+// copyFiles copies files, paths relative to src, into the same paths under
+// dst, creating the directories they need. Files are written with mode 0o600,
+// as copyDir does.
+func copyFiles(src, dst string, files []string) error {
+	for _, file := range files {
+		data, err := os.ReadFile(filepath.Join(src, file))
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, file)
+		if err = os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			return err
+		}
+		if err = os.WriteFile(target, data, 0o600); err != nil {
+			return err
+		}
+	}
+	return nil
 }

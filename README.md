@@ -224,6 +224,12 @@ it compiles from the module cache, which carries no repository to read. The
 installer stamps the version there with `-ldflags -X`, and a stamp always
 wins over the toolchain's own value.
 
+An install from a clone with `--targets` is stamped too. Compiling external
+targets in regenerates files in the source tree, which would mark every such
+build `+dirty`, so the installer builds from a temporary copy of the files
+the build reads and stamps the version the toolchain gives the untouched
+clone.
+
 ---
 
 ## Quick start

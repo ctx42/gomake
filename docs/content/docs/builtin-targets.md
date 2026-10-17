@@ -152,7 +152,7 @@ unpublished source, without pushing to a module proxy. Point `--targets` at a
 local `targets.yaml` that lives inside the target's Go module:
 
 ```shell
-GOBIN=$PWD/dist go run -buildvcs=true ./cmd/install --targets=/path/to/module/targets.yaml
+GOBIN=$PWD/dist go run ./cmd/install --targets=/path/to/module/targets.yaml
 ```
 
 When the `--targets` file sits inside a Go module, `cmd/install` resolves that
@@ -161,16 +161,14 @@ module from disk through a temporary Go workspace instead of fetching it with
 and `go.mod` is left untouched — no `replace` or `require` is added. Re-run the
 command after each edit to rebuild.
 
-A devel in-source install regenerates `targets.yaml` / `internal/builtin`
-glue for the build, then restores the prior contents on a normal exit
-(success or error). A hard interrupt (for example `SIGINT` / `SIGKILL`) can
-skip that restore and leave those files dirty — recover with
-`git checkout -- targets.yaml internal/builtin/targets.go
-internal/builtin/data/targets_main.go_`.
-
-The `-buildvcs=true` flag records the checked-out revision in the binary; see
-[Installing from a local clone]({{< relref "getting-started#installing-from-a-local-clone" >}})
-for why `go run` needs it.
+An install from a clone builds from a temporary copy of the files the build
+reads, so the `targets.yaml` and `internal/builtin` glue it regenerates never
+touches your working tree, and the binary reports the clone's version without
+`+dirty`. Outside a repository the installer regenerates that glue in place
+and restores the prior contents on a normal exit (success or error). A hard
+interrupt (for example `SIGINT` / `SIGKILL`) can skip that restore and leave
+`targets.yaml`, `internal/builtin/targets.go`, and
+`internal/builtin/data/targets_main.go_` modified.
 
 With `--targets` repeated, every local file inside a Go module adds its module
 to the same workspace, so unpublished edits in each of them compile in. Only

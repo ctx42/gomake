@@ -115,9 +115,13 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
 - **Versioning**: the Go toolchain's, not gomake's. `internal/version` reads
   `debug.ReadBuildInfo()` at run time — a module version for a published
   install, a pseudo-version with commit and `+dirty` for a build made in the
-  repository. The installer stamps `xdef.VarScmRev` with `-ldflags -X` only
-  for a published install, which compiles from the module cache and so has no
-  repository for the toolchain to read.
+  repository. The installer stamps `xdef.VarScmRev` with `-ldflags -X` for a
+  published install, which compiles from the module cache and so has no
+  repository for the toolchain to read, and for a devel install with external
+  targets in a repository, which builds from a temp copy of the files
+  `go list -deps` names so the regenerated builtins never dirty the tree; the
+  stamp is the version a probe build of `./cmd/install` from the untouched
+  tree reports.
 
 ## Common Gotchas
 

@@ -90,6 +90,12 @@ A published install is the one build the toolchain cannot version by itself:
 it compiles from the module cache, which carries no repository to read. The
 installer stamps the version there with `-ldflags -X`.
 
+An install from a clone with `--targets` is stamped too. Compiling external
+targets in regenerates files in the source tree, which would mark every such
+build `+dirty`, so the installer builds from a temporary copy of the files
+the build reads and stamps the version the toolchain gives the untouched
+clone.
+
 ---
 
 ## Your first makefile

@@ -75,3 +75,44 @@ func runBin(t tester.T, bin string, args ...string) string {
 	}
 	return string(out)
 }
+
+// gitCommit makes dir a git repository holding all its files in one commit,
+// tagged with tag unless it is empty. It skips the test when git is not in
+// PATH. The user and system git configuration are ignored, so hooks or
+// signing settings cannot interfere.
+func gitCommit(t tester.T, dir, tag string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not in PATH")
+	}
+	cmds := [][]string{
+		{"init", "-q"},
+		{"add", "-A"},
+		{"commit", "-q", "-m", "test"},
+	}
+	if tag != "" {
+		cmds = append(cmds, []string{"tag", tag})
+	}
+	for _, args := range cmds {
+		gitRun(t, dir, args...)
+	}
+}
+
+// gitRun runs git with args in dir, ignoring the user and system git
+// configuration, and returns its output, failing the test on error.
+func gitRun(t tester.T, dir string, args ...string) string {
+	t.Helper()
+	cfg := []string{"-c", "user.name=test", "-c", "user.email=test@test"}
+	cmd := exec.Command("git", append(cfg, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(
+		os.Environ(),
+		"GIT_CONFIG_GLOBAL="+os.DevNull,
+		"GIT_CONFIG_NOSYSTEM=1",
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v: %v: %s", args, err, out)
+	}
+	return string(out)
+}
