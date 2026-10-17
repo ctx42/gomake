@@ -644,7 +644,7 @@ func editGoMod(
 		return goEditErr(errGoModEdit, pth, out.String(), err)
 	}
 
-	if err := absolutizeGoModReplaces(modEnv, dir, srcModDir); err != nil {
+	if err := AbsolutizeGoModReplaces(modEnv, dir, srcModDir); err != nil {
 		return err
 	}
 
@@ -662,9 +662,9 @@ func editGoMod(
 	return nil
 }
 
-// absolutizeGoModReplaces rewrites relative local replace targets in the
+// AbsolutizeGoModReplaces rewrites relative local replace targets in the
 // build-dir go.mod so they resolve against the original source module root.
-func absolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
+func AbsolutizeGoModReplaces(env []string, buildDir, srcModDir string) error {
 	out := &bytes.Buffer{}
 	cmd := exec.Command("go", "mod", "edit", "-json")
 	cmd.Env = env

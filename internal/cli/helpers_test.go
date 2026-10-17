@@ -1115,7 +1115,7 @@ func Test_findGoWorkValue(t *testing.T) {
 	})
 }
 
-func Test_absolutizeGoModReplaces(t *testing.T) {
+func Test_AbsolutizeGoModReplaces(t *testing.T) {
 	// --- Given ---
 	src := t.TempDir()
 	build := t.TempDir()
@@ -1123,7 +1123,7 @@ func Test_absolutizeGoModReplaces(t *testing.T) {
 	pth := oskit.Write(t, mod, build, "go.mod")
 
 	// --- When ---
-	err := absolutizeGoModReplaces(os.Environ(), build, src)
+	err := AbsolutizeGoModReplaces(os.Environ(), build, src)
 
 	// --- Then ---
 	assert.NoError(t, err)
