@@ -1,3 +1,7 @@
+## v0.31.3 (Sat, 17 Oct 2026 16:18:23 UTC)
+- refactor(cli): add ImportEntry.PkgPath.
+- fix(cli): drop import version suffix before generating targets.
+
 ## v0.31.2 (Sat, 17 Oct 2026 10:19:49 UTC)
 - refactor(cli): export AbsolutizeGoModReplaces.
 - fix(install): keep the clone version for installs with targets.
