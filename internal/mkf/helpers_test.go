@@ -484,9 +484,10 @@ func Test_runTarget(t *testing.T) {
 		sig := make(chan os.Signal, 1)
 		defer signal.Stop(sig)
 		wd := must.Value(os.Getwd())
+		t.Cleanup(func() { _ = os.Chdir(wd) })
+		dir := pathkit.AbsPath(t, "testdata/dir")
 
 		release := make(chan struct{})
-		defer close(release)
 		started := make(chan struct{})
 		fn := func(_ context.Context, _ *ring.Ring) error {
 			close(started)
@@ -500,11 +501,22 @@ func Test_runTarget(t *testing.T) {
 		}()
 
 		// --- When ---
-		err := runTarget(t.Context(), sig, fn, wd, tst.Ring())
+		err := runTarget(t.Context(), sig, fn, dir, tst.Ring())
 
 		// --- Then ---
 		var ier interruptedError
 		assert.ErrorAs(t, &ier, err)
+
+		// The target goroutine outlives runTarget and restores the working
+		// directory once released. Wait for the restore, so it cannot land
+		// in a later test after that test's target changed the directory.
+		close(release)
+		restored := func() bool { return must.Value(os.Getwd()) == wd }
+		must.Nil(check.Wait(
+			"1s",
+			restored,
+			check.WithWaitThrottle(10*time.Millisecond),
+		))
 	})
 
 	t.Run("cwd restored after timeout", func(t *testing.T) {
