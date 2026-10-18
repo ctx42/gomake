@@ -1,3 +1,7 @@
+## v0.31.5 (Sun, 18 Oct 2026 08:24:21 UTC)
+- ci: set C42_CC_RUN_ID in the workflow environment.
+- chore(deps): update dependencies.
+
 ## v0.31.4 (Sat, 17 Oct 2026 18:57:41 UTC)
 - test(mkf): wait for abandoned target to restore the cwd.
 
