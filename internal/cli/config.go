@@ -130,12 +130,14 @@ func (cfg *config) parse(env, args []string) error {
 	cfg.fs = xflag.NewFlagSet("gomake", flag.ContinueOnError)
 	cfg.fs.SetOutput(io.Discard)
 
-	// Option flags that are superset of the makefile flags.
-	cfg.fs.StringVar(&cfg.src, "src", wd, "path where to look for targets")
+	// Option flags that are superset of the makefile flags. The source and
+	// working directories default to empty, resolved to the current directory
+	// after parsing, so the help does not show a machine-specific path.
+	cfg.fs.StringVar(&cfg.src, "src", "", "path where to look for targets")
 	cfg.fs.StringVar(
 		&cfg.wd,
 		"wd",
-		wd,
+		"",
 		"working directory for compiled makefile",
 	)
 	cfg.fs.StringVar(

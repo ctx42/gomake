@@ -156,8 +156,10 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 	cmf.fs = xflag.NewFlagSet("makefile", flag.ContinueOnError)
 	cmf.fs.SetOutput(io.Discard)
 
-	// Option flags.
-	cmf.fs.StringVar(&cmf.wd, "wd", wd, "working directory for a target")
+	// Option flags. The working directory defaults to empty, resolved to the
+	// current directory after parsing, so the help does not show a
+	// machine-specific path.
+	cmf.fs.StringVar(&cmf.wd, "wd", "", "working directory for a target")
 	cmf.fs.DurationVar(
 		&cmf.timeout,
 		"timeout",
@@ -186,6 +188,9 @@ func NewMakefile(tgs []*Target, opts ...func(*Makefile)) (*Makefile, error) {
 	}
 	if cmf.timeout < 0 {
 		return nil, ErrInvTimeout
+	}
+	if cmf.wd == "" {
+		cmf.wd = wd
 	}
 	cmf.rng = cmf.rng.SetArgs(cmf.fs.Args())
 
