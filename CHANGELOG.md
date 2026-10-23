@@ -1,3 +1,6 @@
+## v0.31.6 (Fri, 23 Oct 2026 20:08:23 UTC)
+- fix(cli): keep machine paths out of the --src and --wd help.
+
 ## v0.31.5 (Sun, 18 Oct 2026 08:24:21 UTC)
 - ci: set C42_CC_RUN_ID in the workflow environment.
 - chore(deps): update dependencies.
