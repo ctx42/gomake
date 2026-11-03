@@ -106,9 +106,14 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
   child's environment; the `go` binary itself is still resolved on the process
   PATH.
 - **Generation & Embeds**: Parser and builtin packages embed templates and
-  generate code (see //go:generate and //go:embed). Changes to core templates
-  (makefile.go, target.go, helpers.go in pkg/gomake) or generator logic usually
-  require regenerating testdata golden files.
+  generate code (see //go:generate and //go:embed). Changes to the inlined
+  runtime (makefile.go, target.go, helpers.go in internal/mkf) or generator
+  logic usually require regenerating testdata golden files.
+- **Inlined runtime**: code after the CODE MARK in those three files may use
+  only symbols from the same three files and the imports in `mainTpl`
+  (internal/cli/gen_main.go). Add a new import to `mainTpl` too; inline a
+  helper rather than call `pkg/gomake` or another `internal/mkf` file. A
+  break shows only in the `internal/cli` tests that compile a makefile.
 - **Build isolation**: gomake uses out-of-source builds under a temp dir
   (GOMAKE_TMP_DIR or system tmp + random subdir). The dir is cleaned on
   success or error paths in most cases.
@@ -146,6 +151,16 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
 - The generated makefile main links none of gomake's packages (its sources are
   inlined after the CODE MARK), so a `-ldflags -X` naming one would go
   nowhere. The makefile learns the gomake version from the generated source.
+- `internal/parser` speed is bound by the `go list` subprocess, about 150
+  times the cost of the AST parse (`internal/parser/bench_test.go`). Local
+  directories resolve in-process (`newLocalPackage`); external `go list`
+  results are cached on disk only when `module.cacheable` holds (version set,
+  no replace), because a replaced module's directory can change. After
+  changing either path, run `go test ./... -race` twice: staleness across runs
+  shows only once the cache is warm.
+- `ringtest.Tester.Ring()` builds a new ring on every call, so an `EnvSet` on
+  one result is lost on the next and an env-driven branch silently goes
+  untested. Bind `rng := tst.Ring()` once and pass `rng` everywhere.
 - Exported `Target` zero value has `Run: nil` (will panic if called). Use
   `NewTarget()` or the parser.
 - No `Example*` functions yet; README and godoc examples are limited.
