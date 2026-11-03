@@ -41,8 +41,8 @@ go vet ./...
 # compilation and execution of generated makefiles)
 go test ./...
 
-# Lint (requires golangci-lint in PATH)
-golangci-lint run ./...
+# Lint (requires golangci-lint in PATH; config is local, see Other Notes)
+golangci-lint run -c tmp/.golangci.yml ./...
 
 # Regenerate built-in target glue (parser + builtin packages use go:generate)
 go generate ./internal/parser
@@ -201,7 +201,9 @@ When testing assertion helpers themselves, use `tester.Spy` instead of raw
 - **pkg/gomake**: The module's only public package — env/path helpers
   (`GetGOOS`, `LookupEnv`, `Root`, ...), process helpers (`ExitStatus`,
   `HasRun`), the target-name context key reused by downstream targets, and
-  target configuration (`TargetConfig`, `ConfigMetaKey`).
+  target configuration (`TargetConfig`, `ConfigMetaKey`). Keep it to the
+  target-author toolkit: never re-export runtime or generator types there;
+  put new machinery under `internal/`.
 - **internal/builtin**: Built-in target provider (`Generated`/`Empty`,
   `Provider`) for targets compiled into the binary from `targets.yaml`, plus
   their code generation (`GenMain`) and embedded templates. The generated
@@ -269,8 +271,13 @@ in), see `dev/README.md`.
 - The module path is still github.com/ctx42/gomake (historical). README
   install instructions use `go run .../cmd/install@latest`.
 - CI is Jenkins-based (see Jenkinsfile) and uses a custom library + docker
-  images with caches. Local `golangci-lint` config for reference lives in
-  `tmp/.golangci.yml` (may be stale vs. golangci-lint v2).
+  images with caches.
+- The golangci-lint config stays local in the git-ignored `tmp/.golangci.yml`
+  on purpose: lint with `golangci-lint run -c tmp/.golangci.yml ./...` and
+  never propose committing or moving it.
+- Backward compatibility is not required before v1.0.0: change or break the
+  `pkg/gomake` API freely. Downstream target modules use it, so name each
+  break in your report, but do not treat it as a blocker.
 - No replace directives in go.mod (good). Testdata contains example go.mod_
   / go.work_ demonstrating workspace + replace support.
 - `cmd/install` takes `--targets` repeatedly; `cli.MergeImports` combines the
