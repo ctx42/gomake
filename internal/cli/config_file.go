@@ -105,6 +105,10 @@ type fileConfig struct {
 	// Targets maps an import path to a nested tree of namespace and target
 	// nodes; each node's non-child keys are that node's opaque setting block.
 	Targets map[string]any `yaml:"targets"`
+
+	// pth is the path of the file the configuration was read from. It is
+	// empty when no file was read.
+	pth string
 }
 
 // mergedConfig is the effective gomake.yaml settings after merging the
@@ -114,8 +118,14 @@ type mergedConfig struct {
 	// timeout is the effective settings.timeout, or nil when unset.
 	timeout *string
 
+	// timeoutPth is the path of the file timeout comes from.
+	timeoutPth string
+
 	// tmp is the effective settings.tmp, or nil when unset.
 	tmp *string
+
+	// tmpPth is the path of the file tmp comes from.
+	tmpPth string
 }
 
 // userConfigPath returns the path to the user-level gomake.yaml. It honors
@@ -154,6 +164,7 @@ func loadConfigFile(pth string) (*fileConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", pth, err)
 	}
+	cfg.pth = pth
 	return cfg, nil
 }
 
@@ -248,10 +259,14 @@ func moduleImportPath(dir string) (string, error) {
 // file fills the gaps. Target configuration is not merged; each target's block
 // is resolved per invocation by resolveDelivered.
 func mergeConfigs(user, project *fileConfig) *mergedConfig {
-	return &mergedConfig{
-		timeout: pickSetting(user.timeout(), project.timeout()),
-		tmp:     pickSetting(user.tmp(), project.tmp()),
-	}
+	mrg := &mergedConfig{}
+	mrg.timeout, mrg.timeoutPth = pickSetting(
+		user,
+		project,
+		(*fileConfig).timeout,
+	)
+	mrg.tmp, mrg.tmpPth = pickSetting(user, project, (*fileConfig).tmp)
+	return mrg
 }
 
 // impInModule reports whether the import path imp is the module modPath or a
@@ -377,12 +392,21 @@ func resolveDelivered(
 	return nil, false
 }
 
-// pickSetting returns project when it is non-nil, otherwise user.
-func pickSetting(user, project *string) *string {
-	if project != nil {
-		return project
+// pickSetting returns the setting get reads from project, or from user when
+// project does not set it, together with the path of the file it came from.
+// The path is empty when neither sets it.
+func pickSetting(
+	user, project *fileConfig,
+	get func(*fileConfig) *string,
+) (*string, string) {
+
+	if val := get(project); val != nil {
+		return val, project.pth
 	}
-	return user
+	if val := get(user); val != nil {
+		return val, user.pth
+	}
+	return nil, ""
 }
 
 // timeout returns the settings.timeout value, or nil when it is unset.
@@ -456,10 +480,12 @@ func (cfg *config) applyFileConfig(env []string) error {
 	if !set["timeout"] && merged.timeout != nil {
 		dur, err := time.ParseDuration(*merged.timeout)
 		if err != nil {
-			return fmt.Errorf("%w: settings.timeout: %w", errCfgParse, err)
+			format := "%s: %w: settings.timeout: %w"
+			return fmt.Errorf(format, merged.timeoutPth, errCfgParse, err)
 		}
 		if dur < 0 {
-			return mkf.ErrInvTimeout
+			format := "%s: settings.timeout: %w"
+			return fmt.Errorf(format, merged.timeoutPth, mkf.ErrInvTimeout)
 		}
 		cfg.timeout = dur
 	}
@@ -470,6 +496,11 @@ func (cfg *config) applyFileConfig(env []string) error {
 		case envMap[envKeyTmpDir] != "":
 			cfg.tmp = envMap[envKeyTmpDir]
 		case merged.tmp != nil && *merged.tmp != "":
+			if !filepath.IsAbs(*merged.tmp) {
+				format := "%s: settings.tmp %w: %s"
+				pth := merged.tmpPth
+				return fmt.Errorf(format, pth, parser.ErrAbsPath, *merged.tmp)
+			}
 			cfg.tmp = *merged.tmp
 		default:
 			cfg.tmp = filepath.Join(os.TempDir(), binName)

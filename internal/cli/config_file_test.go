@@ -96,6 +96,7 @@ func Test_loadConfigFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, have)
 		assert.Nil(t, have.Version)
+		assert.Empty(t, have.pth)
 	})
 
 	t.Run("reads and parses present file", func(t *testing.T) {
@@ -114,6 +115,7 @@ func Test_loadConfigFile(t *testing.T) {
 		assert.Equal(t, 1, *have.Version)
 		assert.NotNil(t, have.Settings)
 		assert.Equal(t, "30s", *have.Settings.Timeout)
+		assert.Equal(t, pth, have.pth)
 	})
 
 	t.Run("error - invalid content propagates", func(t *testing.T) {
@@ -384,18 +386,26 @@ func Test_moduleImportPath(t *testing.T) {
 func Test_mergeConfigs(t *testing.T) {
 	t.Run("project settings win", func(t *testing.T) {
 		// --- Given ---
-		user := &fileConfig{Settings: &fileSettings{
-			Timeout: new("10s"),
-			Tmp:     new("/u/tmp"),
-		}}
-		project := &fileConfig{Settings: &fileSettings{Timeout: new("30s")}}
+		user := &fileConfig{
+			Settings: &fileSettings{
+				Timeout: new("10s"),
+				Tmp:     new("/u/tmp"),
+			},
+			pth: "/u/gomake.yaml",
+		}
+		project := &fileConfig{
+			Settings: &fileSettings{Timeout: new("30s")},
+			pth:      "/p/gomake.yaml",
+		}
 
 		// --- When ---
 		have := mergeConfigs(user, project)
 
 		// --- Then ---
 		assert.Equal(t, "30s", *have.timeout)
+		assert.Equal(t, "/p/gomake.yaml", have.timeoutPth)
 		assert.Equal(t, "/u/tmp", *have.tmp)
+		assert.Equal(t, "/u/gomake.yaml", have.tmpPth)
 	})
 
 	t.Run("target trees are not merged into settings", func(t *testing.T) {
@@ -408,7 +418,9 @@ func Test_mergeConfigs(t *testing.T) {
 
 		// --- Then ---
 		assert.Nil(t, have.timeout)
+		assert.Empty(t, have.timeoutPth)
 		assert.Nil(t, have.tmp)
+		assert.Empty(t, have.tmpPth)
 	})
 }
 
@@ -670,25 +682,42 @@ func Test_resolveDelivered(t *testing.T) {
 }
 
 func Test_pickSetting_tabular(t *testing.T) {
+	usr := &fileConfig{
+		Settings: &fileSettings{Timeout: new("u")},
+		pth:      "/u/gomake.yaml",
+	}
+	prj := &fileConfig{
+		Settings: &fileSettings{Timeout: new("p")},
+		pth:      "/p/gomake.yaml",
+	}
+	none := &fileConfig{pth: "/n/gomake.yaml"}
+
 	tt := []struct {
 		testN string
 
-		user    *string
-		project *string
-		want    *string
+		user     *fileConfig
+		project  *fileConfig
+		want     *string
+		wantPath string
 	}{
-		{"project wins", new("u"), new("p"), new("p")},
-		{"user fills gap", new("u"), nil, new("u")},
-		{"both nil", nil, nil, nil},
+		{"project wins", usr, prj, new("p"), "/p/gomake.yaml"},
+		{"user fills gap", usr, none, new("u"), "/u/gomake.yaml"},
+		{"both unset", none, none, nil, ""},
+		{"nil files", nil, nil, nil, ""},
 	}
 
 	for _, tc := range tt {
 		t.Run(tc.testN, func(t *testing.T) {
 			// --- When ---
-			have := pickSetting(tc.user, tc.project)
+			have, hPth := pickSetting(
+				tc.user,
+				tc.project,
+				(*fileConfig).timeout,
+			)
 
 			// --- Then ---
 			assert.Equal(t, tc.want, have)
+			assert.Equal(t, tc.wantPath, hPth)
 		})
 	}
 }
@@ -840,7 +869,7 @@ func Test_config_loadUserConfig(t *testing.T) {
 
 		// --- Then ---
 		assert.NoError(t, err)
-		assert.Equal(t, &fileConfig{}, have)
+		assert.Equal(t, &fileConfig{pth: pth}, have)
 	})
 
 	t.Run("no file at default path", func(t *testing.T) {
@@ -1058,6 +1087,71 @@ func Test_config_applyFileConfig(t *testing.T) {
 
 		// --- Then ---
 		assert.ErrorIs(t, errCfgParse, err)
+		want := filepath.Join(dir, configFileName) + ": " +
+			"invalid gomake.yaml: settings.timeout: " +
+			"time: invalid duration \"nope\""
+		assert.ErrorEqual(t, want, err)
+	})
+
+	t.Run("error - invalid user settings timeout", func(t *testing.T) {
+		// --- Given ---
+		usr := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: nope\n",
+			usr, "user.yaml")
+		pth := filepath.Join(usr, "user.yaml")
+
+		cfg := &config{
+			src: t.TempDir(),
+			fs:  xflag.NewFlagSet("t", flag.ContinueOnError),
+		}
+		env := []string{envKeyUserConfig + "=" + pth}
+
+		// --- When ---
+		err := cfg.applyFileConfig(env)
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgParse, err)
+		assert.ErrorContain(t, pth+": ", err)
+	})
+
+	t.Run("error - negative settings timeout", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: -5s\n",
+			dir, configFileName)
+		cfg := &config{
+			src: dir,
+			fs:  xflag.NewFlagSet("t", flag.ContinueOnError),
+		}
+
+		// --- When ---
+		err := cfg.applyFileConfig(nil)
+
+		// --- Then ---
+		assert.ErrorIs(t, mkf.ErrInvTimeout, err)
+		want := filepath.Join(dir, configFileName) + ": " +
+			"settings.timeout: invalid timeout"
+		assert.ErrorEqual(t, want, err)
+	})
+
+	t.Run("error - relative settings tmp", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  tmp: rel/tmp\n",
+			dir, configFileName)
+		cfg := &config{
+			src: dir,
+			fs:  xflag.NewFlagSet("t", flag.ContinueOnError),
+		}
+
+		// --- When ---
+		err := cfg.applyFileConfig(nil)
+
+		// --- Then ---
+		assert.ErrorIs(t, parser.ErrAbsPath, err)
+		want := filepath.Join(dir, configFileName) + ": " +
+			"settings.tmp path must be absolute: rel/tmp"
+		assert.ErrorEqual(t, want, err)
 	})
 }
 
