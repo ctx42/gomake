@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ctx42/ring/pkg/ring"
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
@@ -23,7 +24,7 @@ import (
 func Test_newGoMake(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		relPth := "testdata/projects/showcase_imports/project"
 		absPth := modkit.Path(relPth)
@@ -65,7 +66,7 @@ func Test_newGoMake(t *testing.T) {
 
 	t.Run("error - prepare", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		relPth := "testdata/projects/no_makefile/project"
 		absPth := modkit.Path(relPth)
@@ -94,7 +95,7 @@ func Test_newGoMake(t *testing.T) {
 
 	t.Run("error - parsing", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		relPth := "testdata/projects/dup_imported/project"
 		absPth := modkit.Path(relPth)
@@ -123,7 +124,7 @@ func Test_newGoMake(t *testing.T) {
 
 	t.Run("error - build directory removed", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		relPth := "testdata/projects/dup_imported/project"
 		absPth := modkit.Path(relPth)
@@ -153,7 +154,7 @@ func Test_newGoMake(t *testing.T) {
 
 	t.Run("GOOS GOARCH", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		relPth := "testdata/projects/arch_os_build_tag/project"
 		absPth := modkit.Path(relPth)
@@ -192,7 +193,7 @@ func Test_newGoMake(t *testing.T) {
 	t.Run("--bin does not change the compilation unit MainBin path",
 		func(t *testing.T) {
 			// --- Given ---
-			tst := ringtest.New(t)
+			tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 			relPth := "testdata/projects/showcase_targets/project"
 			absPth := modkit.Path(relPth)
@@ -225,7 +226,7 @@ func Test_newGoMake(t *testing.T) {
 
 func Test_goMake_Compile(t *testing.T) {
 	// --- Given ---
-	tst := ringtest.New(t)
+	tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 	absPth := modkit.Path("testdata/projects/showcase_targets/project")
 
@@ -254,7 +255,7 @@ func Test_goMake_Compile(t *testing.T) {
 func Test_goMake_Execute(t *testing.T) {
 	t.Run("show version", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStdout()
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t))).WetStdout()
 
 		relPth := "testdata/projects/showcase_imports/project"
 		absPth := modkit.Path(relPth)
@@ -285,7 +286,7 @@ func Test_goMake_Execute(t *testing.T) {
 
 	t.Run("show env", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStdout()
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t))).WetStdout()
 
 		relPth := "testdata/projects/showcase_targets/project"
 		absPth := modkit.Path(relPth)
@@ -318,7 +319,7 @@ func Test_goMake_Execute(t *testing.T) {
 
 	t.Run("run error", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t).WetStderr()
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t))).WetStderr()
 
 		relPth := "testdata/projects/no_targets/project"
 		absPth := modkit.Path(relPth)

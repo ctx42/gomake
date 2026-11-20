@@ -20,12 +20,14 @@ import (
 	"github.com/ctx42/testing/pkg/must"
 	"github.com/ctx42/testing/pkg/tester"
 	"github.com/ctx42/testkit/pkg/oskit"
+
+	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 )
 
 func Test_PrepareTargets(t *testing.T) {
 	t.Run("the absent file succeeds and prints nothing", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -39,7 +41,7 @@ func Test_PrepareTargets(t *testing.T) {
 
 	t.Run("error - invalid config", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -56,9 +58,10 @@ func Test_PrepareTargets(t *testing.T) {
 		// --- Given ---
 		ctx, cxl := context.WithCancel(t.Context())
 		cxl()
+		rng := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t))).Ring()
 
 		// --- When ---
-		err := PrepareTargets(ctx, ringtest.New(t).Ring(), t.TempDir(), nil)
+		err := PrepareTargets(ctx, rng, t.TempDir(), nil)
 
 		// --- Then ---
 		assert.ErrorIs(t, context.Canceled, err)
@@ -68,7 +71,7 @@ func Test_PrepareTargets(t *testing.T) {
 func Test_prepareExternalTargets(t *testing.T) {
 	t.Run("an absent file generates empty targets", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -84,7 +87,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 
 	t.Run("error - invalid config", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -100,7 +103,7 @@ func Test_prepareExternalTargets(t *testing.T) {
 	t.Run("error - go get fails", func(t *testing.T) {
 		// --- Given ---
 		// No go.mod in dir so go get fails before touching the network.
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -121,7 +124,7 @@ func Test_prepareExternalTargets_skipMods(t *testing.T) {
 	t.Run("skips go get for workspace modules", func(t *testing.T) {
 		// --- Given ---
 		// No go.mod in dir, so a go get would fail before code generation.
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -175,7 +178,7 @@ func Test_underModule_tabular(t *testing.T) {
 func Test_regenBuiltins(t *testing.T) {
 	t.Run("empty specs", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -193,7 +196,7 @@ func Test_regenBuiltins(t *testing.T) {
 
 	t.Run("error - invalid import spec", func(t *testing.T) {
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		dir := t.TempDir()
 		oskit.MkdirAll(t, dir, "internal", "builtin", "data")
@@ -228,7 +231,7 @@ func Test_regenBuiltins(t *testing.T) {
 
 		// A fresh, empty build tree; regenBuiltins creates the destination dir.
 		wd := t.TempDir()
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		cfg := &ImportsConfig{}
 
@@ -249,7 +252,7 @@ func Test_regenBuiltins(t *testing.T) {
 		// package".
 
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 
 		wd := t.TempDir()
 		oskit.MkdirAll(t, wd, "fakepkg")
@@ -285,7 +288,7 @@ func Test_regenBuiltins(t *testing.T) {
 		// and silently generated no targets.
 
 		// --- Given ---
-		tst := ringtest.New(t)
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
 		rng := tst.Ring()
 		rng.EnvSet("GOFLAGS", "-mod=mod")
 

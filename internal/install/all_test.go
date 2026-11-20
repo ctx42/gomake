@@ -11,6 +11,8 @@ import (
 	"strings"
 
 	"github.com/ctx42/testing/pkg/tester"
+
+	gmt "github.com/ctx42/gomake/internal/cli/clitest"
 )
 
 // goListDir returns the single trimmed line printed by `go list` with args,
@@ -64,11 +66,13 @@ func goModEdit(t tester.T, dir string, args ...string) {
 }
 
 // runBin runs bin with args in a fresh empty directory and returns its combined
-// output, failing the test on a non-zero exit.
+// output, failing the test on a non-zero exit. The binary gets the fixed test
+// environment, so the developer's gomake settings cannot change its output.
 func runBin(t tester.T, bin string, args ...string) string {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = t.TempDir()
+	cmd.Env = gmt.TestEnv(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("run %s %v: %v: %s", bin, args, err, out)
