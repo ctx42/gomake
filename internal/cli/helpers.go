@@ -276,7 +276,6 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 	buildDirCreated = true
 
 	// Copy all makefiles to destination and remove the gomake build tag.
-	copied := make([]string, 0, len(mkfFiles))
 	for _, srcPth := range mkfFiles {
 		var filData []byte
 		srcPth = filepath.Join(src, srcPth)
@@ -288,7 +287,6 @@ func prepare(rng *ring.Ring, tmp, src string) (cu *compUnit, err error) {
 		if err = os.WriteFile(dstPth, filData, 0600); err != nil {
 			return nil, err
 		}
-		copied = append(copied, dstPth)
 	}
 
 	// Add empty user targets, later we can override it once we have them.
