@@ -14,6 +14,7 @@ import (
 	"github.com/ctx42/ring/pkg/ring/ringtest"
 	"github.com/ctx42/testing/pkg/assert"
 	"github.com/ctx42/testing/pkg/must"
+	"github.com/ctx42/testkit/pkg/oskit"
 	"github.com/ctx42/testkit/pkg/pathkit"
 	"github.com/ctx42/testkit/pkg/subkit"
 
@@ -25,7 +26,7 @@ import (
 func Test_newConfig(t *testing.T) {
 	// Tripwire: a new config field must gain an assertion below, not just a
 	// bumped count.
-	assert.Fields(t, 18, config{})
+	assert.Fields(t, 19, config{})
 
 	t.Run("no args", func(t *testing.T) {
 		// --- Given ---
@@ -56,6 +57,7 @@ func Test_newConfig(t *testing.T) {
 		assert.Empty(t, have.target)
 		assert.Equal(t, 0, len(have.userTargets))
 		assert.Equal(t, 0, len(have.projectTargets))
+		assert.Empty(t, have.userCfg)
 	})
 
 	t.Run("option work dir absolute", func(t *testing.T) {
@@ -221,6 +223,113 @@ func Test_newConfig(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, "/dir-arg", have.tmp)
+	})
+
+	t.Run("option user config", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 11s\n", dir, "a.yaml")
+		pth := filepath.Join(dir, "a.yaml")
+
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
+		args := []string{"--user-config", pth}
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring(args...))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, pth, have.userCfg)
+		assert.Equal(t, 11*time.Second, have.timeout)
+	})
+
+	t.Run("user config from environment", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 13s\n", dir, "b.yaml")
+
+		env := append(
+			gmt.TestEnv(t),
+			envKeyUserConfig+"="+filepath.Join(dir, "b.yaml"),
+		)
+		tst := ringtest.New(t, ring.WithEnv(env))
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring())
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Empty(t, have.userCfg)
+		assert.Equal(t, 13*time.Second, have.timeout)
+	})
+
+	t.Run("option user config beats environment", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 11s\n", dir, "a.yaml")
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 13s\n", dir, "b.yaml")
+
+		env := append(
+			gmt.TestEnv(t),
+			envKeyUserConfig+"="+filepath.Join(dir, "b.yaml"),
+		)
+		tst := ringtest.New(t, ring.WithEnv(env))
+		args := []string{"--user-config", filepath.Join(dir, "a.yaml")}
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring(args...))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 11*time.Second, have.timeout)
+	})
+
+	t.Run("empty option user config uses environment", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 13s\n", dir, "b.yaml")
+
+		env := append(
+			gmt.TestEnv(t),
+			envKeyUserConfig+"="+filepath.Join(dir, "b.yaml"),
+		)
+		tst := ringtest.New(t, ring.WithEnv(env))
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring("--user-config="))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 13*time.Second, have.timeout)
+	})
+
+	t.Run("error - relative option user config", func(t *testing.T) {
+		// --- Given ---
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
+		args := []string{"--user-config", "rel.yaml"}
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring(args...))
+
+		// --- Then ---
+		assert.ErrorIs(t, parser.ErrAbsPath, err)
+		assert.ErrorContain(t, "rel.yaml", err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - missing option user config", func(t *testing.T) {
+		// --- Given ---
+		pth := filepath.Join(t.TempDir(), "nope.yaml")
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
+		args := []string{"--user-config", pth}
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring(args...))
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgUserMissing, err)
+		assert.ErrorContain(t, pth, err)
+		assert.Nil(t, have)
 	})
 
 	t.Run("option src absolute", func(t *testing.T) {
@@ -435,6 +544,19 @@ func Test_newConfig(t *testing.T) {
 
 		// --- When ---
 		have, err := newConfig("1.2.3", tst.Ring(args...))
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.True(t, have.showVersion)
+	})
+
+	t.Run("option version ignores user config", func(t *testing.T) {
+		// --- Given ---
+		env := append(gmt.TestEnv(t), envKeyUserConfig+"=rel.yaml")
+		tst := ringtest.New(t, ring.WithEnv(env))
+
+		// --- When ---
+		have, err := newConfig("1.2.3", tst.Ring("--version"))
 
 		// --- Then ---
 		assert.NoError(t, err)

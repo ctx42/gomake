@@ -23,6 +23,7 @@ gomake [flags] [target] [target-arguments...]
 | `--wd <dir>`           | `$PWD`         | Working directory for the compiled makefile binary                          |
 | `--bin <path>`         | —              | Compile the makefile and write the binary to `<path>` instead of running it |
 | `--tmp <dir>`          | See below      | Override the temporary build directory                                      |
+| `--user-config <path>` | See below      | Absolute path to the user-level `gomake.yaml`                               |
 | `--timeout <duration>` | `0` (no limit) | Target execution timeout (e.g. `30s`, `5m`)                                 |
 | `--complete`           | —              | Install bash shell completion                                               |
 | `--check-config`       | —              | Validate `gomake.yaml` and list the config key of every target, then exit   |
@@ -31,9 +32,16 @@ gomake [flags] [target] [target-arguments...]
 
 ## Environment variables
 
-| Variable         | Description                                                                             |
-|------------------|-----------------------------------------------------------------------------------------|
-| `GOMAKE_TMP_DIR` | Overrides the default temporary directory. `--tmp` takes precedence over this variable. |
+| Variable             | Description                                                                                         |
+|----------------------|-----------------------------------------------------------------------------------------------------|
+| `GOMAKE_TMP_DIR`     | Overrides the default temporary directory. `--tmp` takes precedence over this variable.             |
+| `GOMAKE_USER_CONFIG` | Absolute path to the user-level `gomake.yaml`. `--user-config` takes precedence over this variable. |
+
+GoMake picks the user-level `gomake.yaml` from `--user-config`, then
+`GOMAKE_USER_CONFIG`, then `$XDG_CONFIG_HOME/gomake/gomake.yaml`, then
+`$HOME/.config/gomake/gomake.yaml`. To run without a user-level file, use
+`GOMAKE_USER_CONFIG=/dev/null`. See
+[Configuration]({{< relref "configuration#user-level-file" >}}) for details.
 
 The default temporary directory is `<os-temp>/gomake/` (e.g.
 `/tmp/gomake/` on Linux, `%TEMP%\gomake\` on Windows).
@@ -72,6 +80,12 @@ gomake --wd /var/deploy deploy
 
 # Use a custom temp directory
 gomake --tmp /fast/tmp build
+
+# Use a different user-level config file
+gomake --user-config /etc/ci/gomake.yaml build
+
+# Run without a user-level config file
+GOMAKE_USER_CONFIG=/dev/null gomake build
 ```
 
 ---
@@ -82,6 +96,8 @@ gomake --tmp /fast/tmp build
   and specifying a target name.
 - `--complete` must be the only flag — no other flags or targets are allowed.
 - `--tmp` must be an absolute path.
+- `--user-config` and `GOMAKE_USER_CONFIG` must be absolute paths to existing
+  files. An empty value counts as not set.
 - `--src` is made absolute relative to the current working directory when a
   relative path is given.
 

@@ -25,6 +25,11 @@ const (
 	// envKeyTmpDir represents environment variable setting absolute path to
 	// the temporary directory used by gomake.
 	envKeyTmpDir = "GOMAKE_TMP_DIR"
+
+	// envKeyUserConfig represents environment variable setting absolute path
+	// to the user-level gomake.yaml file. It replaces the default user-level
+	// path; the "--user-config" option takes precedence over it.
+	envKeyUserConfig = "GOMAKE_USER_CONFIG"
 )
 
 // config represents gomake run configuration.
@@ -44,6 +49,12 @@ type config struct {
 	// envKeyTmpDir environment variable or the "--tmp" option. When both are
 	// provided, the option takes precedence.
 	tmp string
+
+	// Absolute path to the user-level gomake.yaml file set by the
+	// "--user-config" option. Empty when the option is not given or empty,
+	// in which case the envKeyUserConfig environment variable and then the
+	// default user-level path apply.
+	userCfg string
 
 	// Absolute path to the compiled makefile.
 	bin string
@@ -147,6 +158,12 @@ func (cfg *config) parse(env, args []string) error {
 		"path to put the compiled makefile in",
 	)
 	cfg.fs.StringVar(&cfg.tmp, "tmp", "", "absolute path temporary directory")
+	cfg.fs.StringVar(
+		&cfg.userCfg,
+		"user-config",
+		"",
+		"absolute path to user gomake.yaml (env GOMAKE_USER_CONFIG)",
+	)
 	cfg.fs.DurationVar(
 		&cfg.timeout,
 		"timeout",

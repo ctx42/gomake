@@ -751,6 +751,194 @@ func Test_fileConfig_tmp(t *testing.T) {
 	})
 }
 
+func Test_config_loadUserConfig(t *testing.T) {
+	t.Run("option file", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 11s\n", dir, "a.yaml")
+		cfg := &config{userCfg: filepath.Join(dir, "a.yaml")}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(nil)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "11s", *have.timeout())
+	})
+
+	t.Run("option beats environment", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 11s\n", dir, "a.yaml")
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 13s\n", dir, "b.yaml")
+		cfg := &config{userCfg: filepath.Join(dir, "a.yaml")}
+
+		env := []string{envKeyUserConfig + "=" + filepath.Join(dir, "b.yaml")}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "11s", *have.timeout())
+	})
+
+	t.Run("environment replaces default path", func(t *testing.T) {
+		// --- Given ---
+		xdg := t.TempDir()
+		content := "version: 1\nsettings:\n  timeout: 17s\n"
+		oskit.Write(t, content, oskit.MkdirAll(t, xdg, binName), configFileName)
+
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  timeout: 13s\n", dir, "b.yaml")
+
+		cfg := &config{}
+		env := []string{
+			envKeyXDGConfigHome + "=" + xdg,
+			envKeyUserConfig + "=" + filepath.Join(dir, "b.yaml"),
+		}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "13s", *have.timeout())
+	})
+
+	t.Run("empty environment uses default path", func(t *testing.T) {
+		// --- Given ---
+		xdg := t.TempDir()
+		content := "version: 1\nsettings:\n  timeout: 17s\n"
+		oskit.Write(t, content, oskit.MkdirAll(t, xdg, binName), configFileName)
+
+		cfg := &config{}
+		env := []string{
+			envKeyXDGConfigHome + "=" + xdg,
+			envKeyUserConfig + "=",
+		}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, "17s", *have.timeout())
+	})
+
+	t.Run("empty file gives empty config", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "", dir, "empty.yaml")
+		pth := filepath.Join(dir, "empty.yaml")
+		cfg := &config{}
+
+		env := []string{envKeyUserConfig + "=" + pth}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, &fileConfig{}, have)
+	})
+
+	t.Run("no file at default path", func(t *testing.T) {
+		// --- Given ---
+		cfg := &config{}
+		env := []string{envKeyXDGConfigHome + "=" + t.TempDir()}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, &fileConfig{}, have)
+	})
+
+	t.Run("no default path", func(t *testing.T) {
+		// --- Given ---
+		cfg := &config{}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(nil)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, &fileConfig{}, have)
+	})
+
+	t.Run("error - relative option", func(t *testing.T) {
+		// --- Given ---
+		cfg := &config{userCfg: "rel.yaml"}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(nil)
+
+		// --- Then ---
+		assert.ErrorIs(t, parser.ErrAbsPath, err)
+		assert.ErrorEqual(t, "user config path must be absolute: rel.yaml", err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - relative environment", func(t *testing.T) {
+		// --- Given ---
+		cfg := &config{}
+		env := []string{envKeyUserConfig + "=rel.yaml"}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.ErrorIs(t, parser.ErrAbsPath, err)
+		assert.ErrorEqual(t, "user config path must be absolute: rel.yaml", err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - missing option file", func(t *testing.T) {
+		// --- Given ---
+		pth := filepath.Join(t.TempDir(), "nope.yaml")
+		cfg := &config{userCfg: pth}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(nil)
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgUserMissing, err)
+		assert.ErrorEqual(t, "user config file not found: "+pth, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - missing environment file", func(t *testing.T) {
+		// --- Given ---
+		cfg := &config{}
+		pth := filepath.Join(t.TempDir(), "nope.yaml")
+		env := []string{envKeyUserConfig + "=" + pth}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(env)
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgUserMissing, err)
+		assert.ErrorEqual(t, "user config file not found: "+pth, err)
+		assert.Nil(t, have)
+	})
+
+	t.Run("error - invalid content", func(t *testing.T) {
+		// --- Given ---
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nbogus: 1\n", dir, "a.yaml")
+		cfg := &config{userCfg: filepath.Join(dir, "a.yaml")}
+
+		// --- When ---
+		have, err := cfg.loadUserConfig(nil)
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgParse, err)
+		assert.Nil(t, have)
+	})
+}
+
 func Test_config_applyFileConfig(t *testing.T) {
 	t.Run("applies settings and the project target tree", func(t *testing.T) {
 		// --- Given ---
@@ -818,6 +1006,41 @@ func Test_config_applyFileConfig(t *testing.T) {
 		// --- Then ---
 		assert.NoError(t, err)
 		assert.Equal(t, 5*time.Second, cfg.timeout)
+	})
+
+	t.Run("environment user config under project settings", func(t *testing.T) {
+		// --- Given ---
+		xdg := t.TempDir()
+		content := "version: 1\nsettings:\n  timeout: 17s\n"
+		oskit.Write(t, content, oskit.MkdirAll(t, xdg, binName), configFileName)
+
+		usr := t.TempDir()
+		content = "version: 1\n" +
+			"settings:\n" +
+			"  timeout: 13s\n" +
+			"  tmp: /from/user\n"
+		oskit.Write(t, content, usr, "user.yaml")
+
+		dir := t.TempDir()
+		oskit.Write(t, "version: 1\nsettings:\n  tmp: /from/project\n",
+			dir, configFileName)
+		cfg := &config{
+			src: dir,
+			fs:  xflag.NewFlagSet("t", flag.ContinueOnError),
+		}
+
+		env := []string{
+			envKeyXDGConfigHome + "=" + xdg,
+			envKeyUserConfig + "=" + filepath.Join(usr, "user.yaml"),
+		}
+
+		// --- When ---
+		err := cfg.applyFileConfig(env)
+
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Equal(t, 13*time.Second, cfg.timeout)
+		assert.Equal(t, "/from/project", cfg.tmp)
 	})
 
 	t.Run("error - invalid settings timeout", func(t *testing.T) {
@@ -958,41 +1181,109 @@ func Test_invokedTarget(t *testing.T) {
 }
 
 func Test_runCheckConfig(t *testing.T) {
-	// --- Given ---
-	tst := ringtest.New(t)
-	absPath := modkit.Path("testdata/projects/config_target/project")
+	t.Run("reports project problems", func(t *testing.T) {
+		// --- Given ---
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
+		absPath := modkit.Path("testdata/projects/config_target/project")
 
-	prj := gmt.NewProject(t)
-	prj.GoModInit()
-	prj.MakefilesFrom(absPath)
-	prj.UseGomakeSrc(modkit.Root())
-	prj.GoModTidy()
-	prj.Close()
+		prj := gmt.NewProject(t)
+		prj.GoModInit()
+		prj.MakefilesFrom(absPath)
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
+		prj.Close()
 
-	yaml := "version: 1\n" +
-		"targets:\n" +
-		"  " + prjkit.GoModName + ":\n" +
-		"    show:\n" +
-		"      message: hi\n" +
-		"  bogus.com/x:\n" +
-		"    gone:\n" +
-		"      k: v\n"
-	oskit.Write(t, yaml, prj.Root(), configFileName)
+		yaml := "version: 1\n" +
+			"targets:\n" +
+			"  " + prjkit.GoModName + ":\n" +
+			"    show:\n" +
+			"      message: hi\n" +
+			"  bogus.com/x:\n" +
+			"    gone:\n" +
+			"      k: v\n"
+		oskit.Write(t, yaml, prj.Root(), configFileName)
 
-	rng := tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir())
-	cfg, err := newConfig("1.2.3", rng)
-	assert.NoError(t, err)
+		rng := tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir())
+		cfg, err := newConfig("1.2.3", rng)
+		assert.NoError(t, err)
 
-	targets := builtintest.NewTstProvider().Targets()
+		targets := builtintest.NewTstProvider().Targets()
 
-	// --- When ---
-	have, err := runCheckConfig(rng, cfg, targets)
+		// --- When ---
+		have, err := runCheckConfig(rng, cfg, targets)
 
-	// --- Then ---
-	assert.NoError(t, err)
-	assert.Contain(t, prjkit.GoModName+":", have)
-	assert.Contain(t, "show", have)
-	assert.Contain(t, "project import path has no target: bogus.com/x", have)
+		// --- Then ---
+		assert.NoError(t, err)
+		assert.Contain(t, prjkit.GoModName+":", have)
+		assert.Contain(t, "show", have)
+		want := "project import path has no target: bogus.com/x"
+		assert.Contain(t, want, have)
+	})
+
+	t.Run("reports problems of the environment user config",
+		func(t *testing.T) {
+			// --- Given ---
+			usr := t.TempDir()
+			yaml := "version: 1\nsettings:\n  tmp: rel/tmp\n"
+			oskit.Write(t, yaml, usr, "user.yaml")
+
+			env := append(
+				gmt.TestEnv(t),
+				envKeyUserConfig+"="+filepath.Join(usr, "user.yaml"),
+			)
+			tst := ringtest.New(t, ring.WithEnv(env))
+			absPath := modkit.Path("testdata/projects/config_target/project")
+
+			prj := gmt.NewProject(t)
+			prj.GoModInit()
+			prj.MakefilesFrom(absPath)
+			prj.UseGomakeSrc(modkit.Root())
+			prj.GoModTidy()
+			prj.Close()
+
+			rng := tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir())
+			cfg, err := newConfig("1.2.3", rng)
+			assert.NoError(t, err)
+
+			targets := builtintest.NewTstProvider().Targets()
+
+			// --- When ---
+			have, err := runCheckConfig(rng, cfg, targets)
+
+			// --- Then ---
+			assert.NoError(t, err)
+			want := "user settings.tmp is not an absolute path: rel/tmp"
+			assert.Contain(t, want, have)
+		},
+	)
+
+	t.Run("error - environment user config missing", func(t *testing.T) {
+		// --- Given ---
+		pth := filepath.Join(t.TempDir(), "nope.yaml")
+		tst := ringtest.New(t, ring.WithEnv(gmt.TestEnv(t)))
+		absPath := modkit.Path("testdata/projects/config_target/project")
+
+		prj := gmt.NewProject(t)
+		prj.GoModInit()
+		prj.MakefilesFrom(absPath)
+		prj.UseGomakeSrc(modkit.Root())
+		prj.GoModTidy()
+		prj.Close()
+
+		rng := tst.Ring("--src", prj.Root(), "--tmp", prj.TempDir())
+		cfg, err := newConfig("1.2.3", rng)
+		assert.NoError(t, err)
+		rng.EnvSet(envKeyUserConfig, pth)
+
+		targets := builtintest.NewTstProvider().Targets()
+
+		// --- When ---
+		have, err := runCheckConfig(rng, cfg, targets)
+
+		// --- Then ---
+		assert.ErrorIs(t, errCfgUserMissing, err)
+		assert.Empty(t, have)
+	})
 }
 
 func Test_checkConfigReport(t *testing.T) {

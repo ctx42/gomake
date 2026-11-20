@@ -12,6 +12,7 @@ options:
       --src             path where to look for targets
       --timeout         target execution timeout (default: 0)
       --tmp             absolute path temporary directory
+      --user-config     absolute path to user gomake.yaml (env GOMAKE_USER_CONFIG)
       --version         print version
       --wd              working directory for compiled makefile
 

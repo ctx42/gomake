@@ -27,10 +27,34 @@ configuration existed.
 | User    | `$XDG_CONFIG_HOME/gomake/gomake.yaml` |
 | Project | `<source-scan-dir>/gomake.yaml`       |
 
-When `XDG_CONFIG_HOME` is unset, the user-level path falls back to
-`$HOME/.config/gomake/gomake.yaml`. The source-scan directory is the directory
-GoMake searches for `makefile*.go` files — the current directory by default,
-or whatever `--src` selects.
+The source-scan directory is the directory GoMake searches for `makefile*.go`
+files — the current directory by default, or whatever `--src` selects.
+
+### User-level file
+
+GoMake picks the user-level file from the first of these that is set:
+
+1. the `--user-config <path>` option,
+2. the `GOMAKE_USER_CONFIG` environment variable,
+3. `$XDG_CONFIG_HOME/gomake/gomake.yaml`,
+4. `$HOME/.config/gomake/gomake.yaml`.
+
+An empty option or variable counts as not set. A path given with the option or
+the variable may have any file name, but it must be absolute and the file must
+exist; otherwise GoMake stops with an error. A missing file at one of the two
+default paths is not an error.
+
+The option and the variable replace only the user-level file. The project-level
+file still loads and still wins over the user-level file.
+
+To run without a user-level file, point GoMake at an empty file:
+
+```shell
+GOMAKE_USER_CONFIG=/dev/null gomake build
+```
+
+On Windows, create an empty file and use its absolute path. `gomake --version`
+reads no configuration file, so a wrong path does not affect it.
 
 ## Precedence
 

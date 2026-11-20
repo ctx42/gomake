@@ -997,14 +997,16 @@ Usage: gomake [flags] [target] [target-args...]
 | `--wd <dir>`           | Working directory for the compiled makefile binary (default: cwd)           |
 | `--bin <path>`         | Compile the makefile and write the binary to `<path>` instead of running it |
 | `--tmp <dir>`          | Override the temporary build directory                                      |
+| `--user-config <path>` | Absolute path to the user-level `gomake.yaml`                               |
 | `--timeout <duration>` | Target execution timeout (e.g. `30s`, `5m`). Default: no limit              |
 | `--complete`           | Install bash shell completion (exclusive with all other flags)              |
 
 ### Environment variables
 
-| Variable         | Description                                                          |
-|------------------|----------------------------------------------------------------------|
-| `GOMAKE_TMP_DIR` | Overrides the default temporary directory (`--tmp` takes precedence) |
+| Variable             | Description                                                                      |
+|----------------------|----------------------------------------------------------------------------------|
+| `GOMAKE_TMP_DIR`     | Overrides the default temporary directory (`--tmp` takes precedence)             |
+| `GOMAKE_USER_CONFIG` | Absolute path to the user-level `gomake.yaml` (`--user-config` takes precedence) |
 
 ### Examples
 
@@ -1058,6 +1060,24 @@ The intermediate build directory lives inside a temp directory. Defaults to
 export GOMAKE_TMP_DIR=/fast/nvme/tmp
 # or
 gomake --tmp /fast/nvme/tmp build
+```
+
+### User-level configuration file
+
+GoMake reads an optional `gomake.yaml` from the project directory and one
+from the user's config directory. It picks the user-level file from
+`--user-config`, then `GOMAKE_USER_CONFIG`, then
+`$XDG_CONFIG_HOME/gomake/gomake.yaml`, then
+`$HOME/.config/gomake/gomake.yaml`. A path given with the option or the
+variable must be absolute and the file must exist. The project-level file
+still loads and wins over the user-level file.
+
+```shell
+export GOMAKE_USER_CONFIG=/etc/ci/gomake.yaml
+# or
+gomake --user-config /etc/ci/gomake.yaml build
+# run without a user-level file
+GOMAKE_USER_CONFIG=/dev/null gomake build
 ```
 
 ### Compiling a standalone binary

@@ -75,6 +75,10 @@ var (
 	// errCfgVersionNew indicates a schema version newer than this binary
 	// supports.
 	errCfgVersionNew = errors.New("gomake.yaml: schema version not supported")
+
+	// errCfgUserMissing indicates that the user-level gomake.yaml named by the
+	// "--user-config" option or the envKeyUserConfig variable does not exist.
+	errCfgUserMissing = errors.New("user config file not found")
 )
 
 // fileSettings is the "settings" section of a gomake.yaml file. It configures
@@ -397,18 +401,43 @@ func (cfg *fileConfig) tmp() *string {
 	return cfg.Settings.Tmp
 }
 
+// loadUserConfig loads the user-level gomake.yaml. The file is taken from the
+// "--user-config" option, then from the envKeyUserConfig environment variable,
+// then from the default path returned by userConfigPath; an empty option or
+// variable counts as not set. A file named by the option or the variable must
+// be an absolute path to an existing file, while a missing file at the default
+// path yields an empty configuration.
+func (cfg *config) loadUserConfig(env []string) (*fileConfig, error) {
+	pth := cfg.userCfg
+	if pth == "" {
+		pth, _ = gomake.LookupEnv(env, envKeyUserConfig)
+	}
+	if pth == "" {
+		def, ok := userConfigPath(env)
+		if !ok {
+			return &fileConfig{}, nil
+		}
+		return loadConfigFile(def)
+	}
+
+	if !filepath.IsAbs(pth) {
+		return nil, fmt.Errorf("user config %w: %s", parser.ErrAbsPath, pth)
+	}
+	if _, err := os.Stat(pth); errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("%w: %s", errCfgUserMissing, pth)
+	}
+	return loadConfigFile(pth)
+}
+
 // applyFileConfig loads the user-level and project-level gomake.yaml files,
 // merges them, stores the per-target configuration on cfg, and applies the
 // settings section. The timeout and temporary directory are set only when a
 // higher-precedence source (a command-line option, or the environment for the
 // temporary directory) has not already provided a value.
 func (cfg *config) applyFileConfig(env []string) error {
-	user := &fileConfig{}
-	if pth, ok := userConfigPath(env); ok {
-		var err error
-		if user, err = loadConfigFile(pth); err != nil {
-			return err
-		}
+	user, err := cfg.loadUserConfig(env)
+	if err != nil {
+		return err
 	}
 
 	project, err := loadConfigFile(projectConfigPath(cfg.src))
@@ -521,11 +550,9 @@ func runCheckConfig(
 		return "", err
 	}
 
-	user := &fileConfig{}
-	if pth, ok := userConfigPath(rng.EnvAll()); ok {
-		if user, err = loadConfigFile(pth); err != nil {
-			return "", err
-		}
+	user, err := cfg.loadUserConfig(rng.EnvAll())
+	if err != nil {
+		return "", err
 	}
 	project, err := loadConfigFile(projectConfigPath(cfg.src))
 	if err != nil {
