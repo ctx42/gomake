@@ -34,6 +34,7 @@ func Test_TestEnv(t *testing.T) {
 	tspy.AssertExpectations() // Removes the XDG_CONFIG_HOME temp dir.
 	assert.Equal(t, goEnv(t, "GOCACHE"), env["GOCACHE"])
 	assert.Equal(t, goEnv(t, "GOENV"), env["GOENV"])
+	assert.Equal(t, "off", env["GOTELEMETRY"])
 
 	copied := []string{
 		"GOROOT",
@@ -52,7 +53,8 @@ func Test_TestEnv(t *testing.T) {
 		"TERM",
 		"SSH_AUTH_SOCK",
 	}
-	want := len(copied) + 3 // Plus GOCACHE, GOENV and XDG_CONFIG_HOME.
+	// Plus GOCACHE, GOENV, GOTELEMETRY and XDG_CONFIG_HOME.
+	want := len(copied) + 4
 	for _, key := range copied {
 		val, set := os.LookupEnv(key)
 		if !set {

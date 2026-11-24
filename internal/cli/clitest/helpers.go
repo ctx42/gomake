@@ -40,10 +40,13 @@ func TestEnv(t tester.T) []string {
 
 	// Point user config at an empty dir; HOME stays real for git, but a real
 	// $HOME/.config/gomake/gomake.yaml must not leak into config resolution.
+	// Telemetry is off: the go command writes it under XDG_CONFIG_HOME after
+	// it exits, which can make the temp dir cleanup fail.
 	env = append(
 		env,
 		"GOCACHE="+goEnv(t, "GOCACHE"),
 		"GOENV="+goEnv(t, "GOENV"),
+		"GOTELEMETRY=off",
 		"XDG_CONFIG_HOME="+t.TempDir(),
 	)
 
