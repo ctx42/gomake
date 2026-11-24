@@ -1,3 +1,12 @@
+## v0.32.0 (Tue, 24 Nov 2026 14:38:22 UTC)
+- docs(agents): document inlined runtime and test gotchas.
+- docs(agents): record lint config and pkg/gomake API policy.
+- refactor(cli): remove unused copied slice from prepare.
+- test: run gomake tests in a fixed environment.
+- feat(cli): add --user-config and GOMAKE_USER_CONFIG.
+- fix(cli): name the source file in settings errors.
+- chore(deps): update dependencies.
+
 ## v0.31.6 (Fri, 23 Oct 2026 20:08:23 UTC)
 - fix(cli): keep machine paths out of the --src and --wd help.
 
